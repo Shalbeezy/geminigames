@@ -1,0 +1,1094 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 select-none">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Muscle & Bone Creature Lab</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            overflow: hidden;
+        }
+        .font-mono-code {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(239, 68, 68, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(239, 68, 68, 0.8);
+        }
+        /* Canvas glowing effects */
+        .glow-red {
+            box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.4);
+        }
+        /* Active tool indicator */
+        .tool-btn.active {
+            background-color: #ef4444;
+            color: #ffffff;
+            border-color: #f87171;
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.5);
+        }
+    </style>
+</head>
+<body class="h-full w-full flex flex-col bg-slate-950 text-slate-100 overflow-hidden">
+
+    <!-- Top Navigation / Header Bar -->
+    <header class="h-14 bg-slate-900/90 border-b border-slate-800 px-4 flex items-center justify-between z-20 backdrop-blur-md shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-red-600 to-rose-400 flex items-center justify-center text-white shadow-lg shadow-red-900/40">
+                <i class="fas fa-dna text-lg animate-pulse"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-lg tracking-wide bg-gradient-to-r from-white via-slate-200 to-red-400 bg-clip-text text-transparent">CREATURE LAB</h1>
+                <p class="text-[10px] text-slate-400 -mt-1 font-mono-code">Verlet Physics & Muscle Oscillators</p>
+            </div>
+        </div>
+
+        <!-- Mode & Simulation Controls -->
+        <div class="flex items-center gap-2 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+            <button id="btnBuildMode" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-slate-800 text-white">
+                <i class="fas fa-hammer text-amber-400"></i> Editor
+            </button>
+            <button id="btnSimMode" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white">
+                <i class="fas fa-play text-emerald-400"></i> Simulate
+            </button>
+            <button id="btnEvolveMode" class="px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white">
+                <i class="fas fa-robot text-cyan-400"></i> AI Evolve
+            </button>
+        </div>
+
+        <!-- Action Controls -->
+        <div class="flex items-center gap-2">
+            <button id="btnResetSim" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5">
+                <i class="fas fa-undo"></i> Reset Position
+            </button>
+            <button id="btnClearCanvas" class="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900/80 text-rose-300 rounded-lg text-xs font-semibold border border-rose-800/50 transition flex items-center gap-1.5">
+                <i class="fas fa-trash-alt"></i> Clear
+            </button>
+            <!-- Presets Dropdown -->
+            <div class="relative">
+                <select id="presetSelect" class="bg-slate-800 border border-slate-700 text-xs font-semibold rounded-lg px-3 py-1.5 text-amber-300 focus:outline-none focus:border-amber-500 cursor-pointer">
+                    <option value="" disabled selected>-- Load Creature --</option>
+                    <option value="biped">Biped Runner</option>
+                    <option value="quadruped">Galloping Quadruped</option>
+                    <option value="inchworm">Inchworm Crawler</option>
+                    <option value="jumper">Frog Jumper</option>
+                    <option value="blob">Muscle Wheel</option>
+                </select>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <div class="flex-1 flex relative overflow-hidden">
+
+        <!-- Left Tools Palette (Editor Mode) -->
+        <div id="toolsSidebar" class="w-16 bg-slate-900/90 border-r border-slate-800 flex flex-col items-center py-4 gap-3 z-10 backdrop-blur-md shrink-0">
+            <button data-tool="select" class="tool-btn active w-10 h-10 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-xs transition" title="Select / Drag Joint (Shortcut: V)">
+                <i class="fas fa-mouse-pointer text-base"></i>
+            </button>
+            <button data-tool="joint" class="tool-btn w-10 h-10 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-xs text-slate-300 transition" title="Add Joint Mass (Shortcut: J)">
+                <i class="fas fa-circle text-base text-cyan-400"></i>
+            </button>
+            <button data-tool="bone" class="tool-btn w-10 h-10 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-xs text-slate-300 transition" title="Add Bone / Rigid Stick (Shortcut: B)">
+                <i class="fas fa-bone text-base text-slate-200"></i>
+            </button>
+            <button data-tool="muscle" class="tool-btn w-10 h-10 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-xs text-slate-300 transition" title="Add Red Muscle String (Shortcut: M)">
+                <i class="fas fa-heartbeat text-base text-red-500"></i>
+            </button>
+            <button data-tool="erase" class="tool-btn w-10 h-10 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-xs text-slate-300 transition" title="Delete Component (Shortcut: E)">
+                <i class="fas fa-eraser text-base text-rose-400"></i>
+            </button>
+
+            <div class="w-8 h-px bg-slate-800 my-1"></div>
+
+            <!-- Lock / Fix Joint Toggle -->
+            <button id="btnPinJoint" class="w-10 h-10 rounded-xl border border-slate-800 bg-slate-950 flex flex-col items-center justify-center text-slate-400 hover:text-amber-400 transition" title="Toggle Pin/Fix Joint Position">
+                <i class="fas fa-thumbtack text-base"></i>
+            </button>
+        </div>
+
+        <!-- Physics Canvas Workspace -->
+        <div class="flex-1 relative bg-slate-950 overflow-hidden">
+            <canvas id="simCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+            <!-- Overlay HUD Stats (Distance / Speed) -->
+            <div class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur-md border border-slate-800 rounded-2xl p-3 px-5 text-xs flex gap-6 z-10 pointer-events-none">
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-widest font-mono-code">Distance</div>
+                    <div class="text-xl font-mono-code font-bold text-emerald-400" id="hudDistance">0.00 m</div>
+                </div>
+                <div class="w-px h-8 bg-slate-800"></div>
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-widest font-mono-code">Top Speed</div>
+                    <div class="text-xl font-mono-code font-bold text-amber-400" id="hudSpeed">0.0 m/s</div>
+                </div>
+                <div class="w-px h-8 bg-slate-800"></div>
+                <div>
+                    <div class="text-[10px] text-slate-400 uppercase tracking-widest font-mono-code">Muscle Frequency</div>
+                    <div class="text-xl font-mono-code font-bold text-red-400" id="hudBrainTime">1.0 Hz</div>
+                </div>
+            </div>
+
+            <!-- AI Evolution Control Panel Overlay (Hidden by Default) -->
+            <div id="evolutionPanel" class="absolute top-4 right-4 w-72 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 z-10 hidden shadow-2xl">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="font-bold text-xs uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+                        <i class="fas fa-brain"></i> Genetic Auto-Trainer
+                    </span>
+                    <span class="text-[10px] font-mono-code bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-800" id="evoGenCount">Gen: 1</span>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <div class="flex justify-between text-slate-400 mb-1">
+                            <span>Best Fitness (Distance):</span>
+                            <span class="font-mono-code text-emerald-400 font-bold" id="evoBestDist">0.0 m</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div id="evoProgressBar" class="bg-gradient-to-r from-cyan-500 to-emerald-400 h-full w-0 transition-all duration-200"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-[11px]">
+                        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                            <div class="text-slate-500">Population</div>
+                            <div class="font-bold text-slate-200" id="evoPopSize">12 Organisms</div>
+                        </div>
+                        <div class="bg-slate-950 p-2 rounded-xl border border-slate-800">
+                            <div class="text-slate-500">Trial Secs</div>
+                            <div class="font-bold text-slate-200" id="evoTrialTime">6.0s</div>
+                        </div>
+                    </div>
+
+                    <button id="btnStartEvo" class="w-full py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="fas fa-dna"></i> Start Evolution
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bottom Floating Inspector Panel (When Selecting Muscle/Bone/Node) -->
+            <div id="inspectorPanel" class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-2xl p-4 z-10 w-[90%] max-w-xl shadow-2xl transition-all duration-300">
+                <div id="inspectorEmpty" class="text-center text-xs text-slate-500 py-1 font-mono-code">
+                    <i class="fas fa-hand-pointer mr-1"></i> Select a red muscle string to edit its Brain Oscillations (Frequency, Strength, Phase offset)
+                </div>
+
+                <div id="inspectorMuscle" class="hidden space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-heartbeat"></i> Muscle Brain Parameters
+                        </span>
+                        <span class="text-[10px] font-mono-code text-slate-400" id="muscleID">Muscle #1</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                        <!-- Amplitude Slider -->
+                        <div>
+                            <div class="flex justify-between text-slate-300 mb-1">
+                                <span>Contraction Force:</span>
+                                <span class="font-mono-code text-amber-400" id="valAmp">0.30</span>
+                            </div>
+                            <input type="range" id="sliderAmp" min="0" max="0.6" step="0.02" value="0.3" class="w-full accent-red-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+                        </div>
+
+                        <!-- Frequency Slider -->
+                        <div>
+                            <div class="flex justify-between text-slate-300 mb-1">
+                                <span>Speed (Freq):</span>
+                                <span class="font-mono-code text-cyan-400" id="valFreq">1.0x</span>
+                            </div>
+                            <input type="range" id="sliderFreq" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full accent-cyan-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+                        </div>
+
+                        <!-- Phase Offset Slider -->
+                        <div>
+                            <div class="flex justify-between text-slate-300 mb-1">
+                                <span>Phase Shift:</span>
+                                <span class="font-mono-code text-purple-400" id="valPhase">0.0π</span>
+                            </div>
+                            <input type="range" id="sliderPhase" min="0" max="6.28" step="0.1" value="0" class="w-full accent-purple-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar Settings & Environment -->
+        <div class="w-64 bg-slate-900/90 border-l border-slate-800 p-4 space-y-5 z-10 backdrop-blur-md overflow-y-auto shrink-0">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2 flex items-center gap-2">
+                <i class="fas fa-sliders-h text-red-500"></i> Physics Environment
+            </h2>
+
+            <!-- Gravity Slider -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-300">Gravity:</span>
+                    <span class="font-mono-code text-amber-400" id="valGravity">0.50</span>
+                </div>
+                <input type="range" id="sliderGravity" min="0" max="1.5" step="0.05" value="0.5" class="w-full accent-amber-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+            </div>
+
+            <!-- Ground Friction Slider -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-300">Ground Friction:</span>
+                    <span class="font-mono-code text-emerald-400" id="valFriction">0.85</span>
+                </div>
+                <input type="range" id="sliderFriction" min="0.1" max="0.99" step="0.02" value="0.85" class="w-full accent-emerald-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+            </div>
+
+            <!-- Muscle Stiffness -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-300">Muscle Stiffness:</span>
+                    <span class="font-mono-code text-red-400" id="valStiffness">0.50</span>
+                </div>
+                <input type="range" id="sliderStiffness" min="0.1" max="1.0" step="0.05" value="0.5" class="w-full accent-red-500 bg-slate-800 rounded-lg h-1.5 cursor-pointer">
+            </div>
+
+            <!-- Terrain Surface Settings -->
+            <div class="space-y-2 pt-2 border-t border-slate-800">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2">Terrain Type</span>
+                <select id="terrainSelect" class="w-full bg-slate-950 border border-slate-800 text-xs rounded-xl p-2.5 text-slate-200 focus:outline-none focus:border-red-500">
+                    <option value="flat">Flat Ground Testbed</option>
+                    <option value="hills">Rolling Hills</option>
+                    <option value="stairs">Obstacle Stairs</option>
+                </select>
+            </div>
+
+            <!-- Instructions Box -->
+            <div class="bg-slate-950/80 rounded-2xl p-3 border border-slate-800 text-[11px] text-slate-400 space-y-2 leading-relaxed">
+                <div class="font-bold text-slate-200 uppercase tracking-wider text-[10px] text-red-400 flex items-center gap-1">
+                    <i class="fas fa-lightbulb"></i> How to Build Life
+                </div>
+                <p>1. Add <b class="text-cyan-300">Joints</b> on the canvas.</p>
+                <p>2. Connect joints with rigid <b class="text-slate-200">Bones</b>.</p>
+                <p>3. Connect joints with red <b class="text-red-400">Muscles</b> across joints to actuate them.</p>
+                <p>4. Click <b class="text-emerald-400">Simulate</b> to watch your creature expand, contract & move!</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * VERLET PHYSICS ENGINE FOR BONES & MUSCLES
+         */
+        class Point {
+            constructor(x, y, pinned = false) {
+                this.x = x;
+                this.y = y;
+                this.oldx = x;
+                this.oldy = y;
+                this.pinned = pinned;
+                this.radius = 6;
+                this.mass = 1.0;
+            }
+
+            update(gravity, friction, dt) {
+                if (this.pinned) return;
+                const vx = (this.x - this.oldx) * friction;
+                const vy = (this.y - this.oldy) * friction;
+
+                this.oldx = this.x;
+                this.oldy = this.y;
+
+                this.x += vx;
+                this.y += vy + gravity;
+            }
+
+            constrainGround(groundHeightFn, friction) {
+                if (this.pinned) return;
+                const groundY = groundHeightFn(this.x);
+                if (this.y > groundY - this.radius) {
+                    this.y = groundY - this.radius;
+                    // Apply horizontal friction when sliding on ground
+                    const vx = (this.x - this.oldx) * friction;
+                    this.oldx = this.x - vx;
+                }
+            }
+        }
+
+        class Constraint {
+            constructor(p1, p2, isMuscle = false) {
+                this.p1 = p1;
+                this.p2 = p2;
+                this.isMuscle = isMuscle;
+                this.length = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                this.targetLength = this.length;
+                this.stiffness = isMuscle ? 0.5 : 1.0;
+
+                // Muscle Brain Oscillator parameters
+                this.amplitude = 0.3;  // Contraction percent (0.0 - 0.5)
+                this.frequency = 1.0;  // Speed multiplier
+                this.phase = 0.0;      // Offset phase in radians
+            }
+
+            updateMuscle(timeGlobal) {
+                if (!this.isMuscle) return;
+                // Oscillate muscle length with sine wave: restLength * (1 + amp * sin(freq * t + phase))
+                const contraction = Math.sin(timeGlobal * this.frequency * 3.0 + this.phase) * this.amplitude;
+                this.targetLength = this.length * (1 + contraction);
+            }
+
+            solve() {
+                const dx = this.p2.x - this.p1.x;
+                const dy = this.p2.y - this.p1.y;
+                const dist = Math.hypot(dx, dy) || 0.0001;
+                const delta = (dist - this.targetLength) / dist * 0.5 * this.stiffness;
+
+                if (!this.p1.pinned) {
+                    this.p1.x += dx * delta;
+                    this.p1.y += dy * delta;
+                }
+                if (!this.p2.pinned) {
+                    this.p2.x -= dx * delta;
+                    this.p2.y -= dy * delta;
+                }
+            }
+        }
+
+        class CreatureSystem {
+            constructor() {
+                this.points = [];
+                this.constraints = [];
+                this.startPosCopy = null;
+            }
+
+            clear() {
+                this.points = [];
+                this.constraints = [];
+            }
+
+            addPoint(x, y, pinned = false) {
+                const p = new Point(x, y, pinned);
+                this.points.push(p);
+                return p;
+            }
+
+            addConstraint(p1, p2, isMuscle = false) {
+                // Prevent duplicate constraints between same points
+                const exists = this.constraints.some(c => (c.p1 === p1 && c.p2 === p2) || (c.p1 === p2 && c.p2 === p1));
+                if (exists) return null;
+
+                const c = new Constraint(p1, p2, isMuscle);
+                this.constraints.push(c);
+                return c;
+            }
+
+            saveInitialState() {
+                this.startPosCopy = this.points.map(p => ({ x: p.x, y: p.y, pinned: p.pinned }));
+            }
+
+            restoreInitialState() {
+                if (!this.startPosCopy || this.startPosCopy.length !== this.points.length) return;
+                this.points.forEach((p, idx) => {
+                    const saved = this.startPosCopy[idx];
+                    p.x = saved.x;
+                    p.y = saved.y;
+                    p.oldx = saved.x;
+                    p.oldy = saved.y;
+                    p.pinned = saved.pinned;
+                });
+            }
+
+            getCenterOfMass() {
+                if (this.points.length === 0) return { x: 0, y: 0 };
+                let sumX = 0, sumY = 0;
+                this.points.forEach(p => { sumX += p.x; sumY += p.y; });
+                return { x: sumX / this.points.length, y: sumY / this.points.length };
+            }
+        }
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const creature = new CreatureSystem();
+
+        // Environment State
+        const env = {
+            gravity: 0.5,
+            friction: 0.85,
+            stiffness: 0.5,
+            terrain: 'flat', // flat, hills, stairs
+            mode: 'build',   // build, sim, evolve
+            tool: 'select',  // select, joint, bone, muscle, erase
+            selectedObj: null,
+            time: 0,
+            startCenterX: 0,
+            topDistance: 0,
+            topSpeed: 0
+        };
+
+        // Camera offset
+        let cameraX = 0;
+        let cameraY = 0;
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Ground Height Terrain Evaluator
+        function getGroundHeight(x) {
+            const baseY = canvas.height - 120;
+            if (env.terrain === 'hills') {
+                return baseY + Math.sin(x * 0.008) * 60 + Math.cos(x * 0.003) * 30;
+            } else if (env.terrain === 'stairs') {
+                const stepWidth = 150;
+                const stepHeight = 25;
+                const step = Math.floor(x / stepWidth);
+                return baseY - step * stepHeight;
+            }
+            return baseY;
+        }
+
+        function loadPreset(type) {
+            creature.clear();
+            const cx = canvas.width / 2;
+            const cy = canvas.height - 250;
+
+            if (type === 'biped') {
+                // Head / Torso
+                const head = creature.addPoint(cx, cy - 80);
+                const hip = creature.addPoint(cx, cy - 20);
+                creature.addConstraint(head, hip, false); // Bone spine
+
+                // Left Leg
+                const kneeL = creature.addPoint(cx - 20, cy + 30);
+                const footL = creature.addPoint(cx - 30, cy + 80);
+                creature.addConstraint(hip, kneeL, false);
+                creature.addConstraint(kneeL, footL, false);
+
+                // Right Leg
+                const kneeR = creature.addPoint(cx + 20, cy + 30);
+                const footR = creature.addPoint(cx + 30, cy + 80);
+                creature.addConstraint(hip, kneeR, false);
+                creature.addConstraint(kneeR, footR, false);
+
+                // Muscles driving legs
+                const m1 = creature.addConstraint(head, kneeL, true);
+                if (m1) { m1.phase = 0; m1.amplitude = 0.35; }
+                const m2 = creature.addConstraint(head, kneeR, true);
+                if (m2) { m2.phase = Math.PI; m2.amplitude = 0.35; }
+
+                const m3 = creature.addConstraint(hip, footL, true);
+                if (m3) { m3.phase = Math.PI * 0.5; m3.amplitude = 0.25; }
+                const m4 = creature.addConstraint(hip, footR, true);
+                if (m4) { m4.phase = Math.PI * 1.5; m4.amplitude = 0.25; }
+
+            } else if (type === 'quadruped') {
+                // Spine Body
+                const p1 = creature.addPoint(cx - 70, cy - 20);
+                const p2 = creature.addPoint(cx, cy - 30);
+                const p3 = creature.addPoint(cx + 70, cy - 20);
+                creature.addConstraint(p1, p2, false);
+                creature.addConstraint(p2, p3, false);
+
+                // Legs
+                const leg1 = creature.addPoint(cx - 80, cy + 50);
+                const leg2 = creature.addPoint(cx + 80, cy + 50);
+                creature.addConstraint(p1, leg1, false);
+                creature.addConstraint(p3, leg2, false);
+
+                // Muscle drives
+                const m1 = creature.addConstraint(p2, leg1, true);
+                if (m1) { m1.phase = 0; m1.amplitude = 0.4; }
+                const m2 = creature.addConstraint(p2, leg2, true);
+                if (m2) { m2.phase = Math.PI; m2.amplitude = 0.4; }
+                const m3 = creature.addConstraint(p1, p3, true);
+                if (m3) { m3.phase = Math.PI * 0.5; m3.amplitude = 0.2; }
+
+            } else if (type === 'inchworm') {
+                // Segmented Crawler
+                const n = 5;
+                const pts = [];
+                for (let i = 0; i < n; i++) {
+                    pts.push(creature.addPoint(cx - 100 + i * 50, cy + 40));
+                }
+                for (let i = 0; i < n - 1; i++) {
+                    creature.addConstraint(pts[i], pts[i+1], false);
+                }
+                // Arching Muscles
+                for (let i = 0; i < n - 2; i++) {
+                    const m = creature.addConstraint(pts[i], pts[i+2], true);
+                    if (m) {
+                        m.phase = i * 0.8;
+                        m.amplitude = 0.35;
+                    }
+                }
+            } else if (type === 'jumper') {
+                // Frog Jumper Body
+                const top = creature.addPoint(cx, cy - 60);
+                const leftL = creature.addPoint(cx - 50, cy + 40);
+                const rightL = creature.addPoint(cx + 50, cy + 40);
+                creature.addConstraint(top, leftL, false);
+                creature.addConstraint(top, rightL, false);
+
+                const m1 = creature.addConstraint(leftL, rightL, true);
+                if (m1) { m1.amplitude = 0.45; m1.frequency = 1.2; }
+            } else if (type === 'blob') {
+                // Pentagon Blob Wheel
+                const count = 6;
+                const rad = 60;
+                const ring = [];
+                const center = creature.addPoint(cx, cy);
+                for (let i = 0; i < count; i++) {
+                    const ang = (i / count) * Math.PI * 2;
+                    ring.push(creature.addPoint(cx + Math.cos(ang) * rad, cy + Math.sin(ang) * rad));
+                }
+                for (let i = 0; i < count; i++) {
+                    creature.addConstraint(ring[i], ring[(i + 1) % count], false);
+                    const m = creature.addConstraint(center, ring[i], true);
+                    if (m) {
+                        m.phase = i * (Math.PI * 2 / count);
+                        m.amplitude = 0.3;
+                    }
+                }
+            }
+
+            creature.saveInitialState();
+            env.topDistance = 0;
+            env.topSpeed = 0;
+            env.time = 0;
+            env.startCenterX = creature.getCenterOfMass().x;
+        }
+
+        let dragPoint = null;
+        let connectStartPoint = null;
+
+        function getMouseCanvasPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: e.clientX - rect.left + cameraX,
+                y: e.clientY - rect.top + cameraY
+            };
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            const mouse = getMouseCanvasPos(e);
+
+            // Find clicked point
+            const clickedPoint = creature.points.find(p => Math.hypot(p.x - mouse.x, p.y - mouse.y) < 16);
+
+            if (env.tool === 'select') {
+                if (clickedPoint) {
+                    dragPoint = clickedPoint;
+                    env.selectedObj = clickedPoint;
+                    updateInspector();
+                } else {
+                    // Check if muscle clicked
+                    const clickedMuscle = creature.constraints.find(c => {
+                        const dist = distToSegment(mouse, c.p1, c.p2);
+                        return dist < 10;
+                    });
+                    env.selectedObj = clickedMuscle || null;
+                    updateInspector();
+                }
+            } else if (env.tool === 'joint') {
+                const newPt = creature.addPoint(mouse.x, mouse.y);
+                creature.saveInitialState();
+            } else if (env.tool === 'bone' || env.tool === 'muscle') {
+                if (clickedPoint) {
+                    connectStartPoint = clickedPoint;
+                }
+            } else if (env.tool === 'erase') {
+                if (clickedPoint) {
+                    // Remove point & linked constraints
+                    creature.constraints = creature.constraints.filter(c => c.p1 !== clickedPoint && c.p2 !== clickedPoint);
+                    creature.points = creature.points.filter(p => p !== clickedPoint);
+                    creature.saveInitialState();
+                } else {
+                    // Remove constraint line
+                    const targetConstraint = creature.constraints.find(c => distToSegment(mouse, c.p1, c.p2) < 10);
+                    if (targetConstraint) {
+                        creature.constraints = creature.constraints.filter(c => c !== targetConstraint);
+                        creature.saveInitialState();
+                    }
+                }
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const mouse = getMouseCanvasPos(e);
+            if (dragPoint) {
+                dragPoint.x = mouse.x;
+                dragPoint.y = mouse.y;
+                dragPoint.oldx = mouse.x;
+                dragPoint.oldy = mouse.y;
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (connectStartPoint) {
+                const mouse = getMouseCanvasPos(e);
+                const endPoint = creature.points.find(p => p !== connectStartPoint && Math.hypot(p.x - mouse.x, p.y - mouse.y) < 20);
+                if (endPoint) {
+                    const isMuscle = (env.tool === 'muscle');
+                    creature.addConstraint(connectStartPoint, endPoint, isMuscle);
+                    creature.saveInitialState();
+                }
+            }
+            dragPoint = null;
+            connectStartPoint = null;
+        });
+
+        function distToSegment(p, v, w) {
+            const l2 = (w.x - v.x) ** 2 + (w.y - v.y) ** 2;
+            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+        }
+
+        function stepPhysics() {
+            if (env.mode === 'sim' || env.mode === 'evolve') {
+                env.time += 0.016;
+
+                // Update muscle Target Lengths
+                creature.constraints.forEach(c => {
+                    c.stiffness = env.stiffness;
+                    c.updateMuscle(env.time);
+                });
+
+                // Update point positions
+                creature.points.forEach(p => {
+                    p.update(env.gravity, env.friction, 0.016);
+                    p.constrainGround(getGroundHeight, env.friction);
+                });
+
+                // Satisfy distance constraints iteratively for stability
+                const subSteps = 10;
+                for (let i = 0; i < subSteps; i++) {
+                    creature.constraints.forEach(c => c.solve());
+                    creature.points.forEach(p => p.constrainGround(getGroundHeight, env.friction));
+                }
+
+                // Calculate distance & speed
+                const center = creature.getCenterOfMass();
+                const distMeters = Math.max(0, (center.x - env.startCenterX) / 50);
+                env.topDistance = Math.max(env.topDistance, distMeters);
+
+                document.getElementById('hudDistance').innerText = `${distMeters.toFixed(2)} m`;
+            }
+
+            // Smooth camera follow
+            const center = creature.getCenterOfMass();
+            if (creature.points.length > 0) {
+                cameraX += (center.x - canvas.width * 0.4 - cameraX) * 0.1;
+            } else {
+                cameraX *= 0.9;
+            }
+        }
+
+        function renderFrame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(-cameraX, -cameraY);
+
+            // 1. Draw Grid Lines
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.5)';
+            ctx.lineWidth = 1;
+            const gridStep = 50;
+            const startX = Math.floor(cameraX / gridStep) * gridStep;
+            const endX = startX + canvas.width + gridStep;
+            for (let x = startX; x < endX; x += gridStep) {
+                ctx.beginPath();
+                ctx.moveTo(x, cameraY);
+                ctx.lineTo(x, cameraY + canvas.height);
+                ctx.stroke();
+            }
+
+            // 2. Draw Ground Terrain
+            ctx.fillStyle = '#020617';
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(cameraX - 100, canvas.height + 500);
+
+            for (let x = cameraX - 100; x < cameraX + canvas.width + 100; x += 15) {
+                const y = getGroundHeight(x);
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(cameraX + canvas.width + 100, canvas.height + 500);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Distance Markers on Ground
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px JetBrains Mono';
+            for (let m = 0; m < 500; m += 5) {
+                const posX = env.startCenterX + m * 50;
+                if (posX > cameraX - 50 && posX < cameraX + canvas.width + 50) {
+                    const posY = getGroundHeight(posX);
+                    ctx.fillRect(posX, posY, 2, 8);
+                    ctx.fillText(`${m}m`, posX - 10, posY + 20);
+                }
+            }
+
+            // 3. Draw Preview Bone/Muscle placement line
+            if (connectStartPoint) {
+                const mouse = getMouseCanvasPos({ clientX: window.lastMouseX || 0, clientY: window.lastMouseY || 0 });
+                ctx.beginPath();
+                ctx.moveTo(connectStartPoint.x, connectStartPoint.y);
+                ctx.lineTo(mouse.x, mouse.y);
+                ctx.strokeStyle = (env.tool === 'muscle') ? '#ef4444' : '#94a3b8';
+                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 4. Draw Constraints (Bones & Red Muscle Strings)
+            creature.constraints.forEach(c => {
+                ctx.beginPath();
+                ctx.moveTo(c.p1.x, c.p1.y);
+                ctx.lineTo(c.p2.x, c.p2.y);
+
+                if (c.isMuscle) {
+                    // Dynamic Muscle styling based on contraction/expansion
+                    const currentLen = Math.hypot(c.p2.x - c.p1.x, c.p2.y - c.p1.y);
+                    const ratio = currentLen / c.length;
+
+                    // Glow effect for muscle
+                    ctx.shadowColor = 'rgba(239, 68, 68, 0.8)';
+                    ctx.shadowBlur = (env.selectedObj === c) ? 15 : 6;
+                    ctx.strokeStyle = (env.selectedObj === c) ? '#f87171' : `rgb(${Math.min(255, 200 + (1 - ratio) * 100)}, 40, 40)`;
+                    ctx.lineWidth = Math.max(2, 6 * (c.targetLength / c.length));
+                } else {
+                    // Sturdy Skeletal Bone styling
+                    ctx.shadowBlur = (env.selectedObj === c) ? 10 : 0;
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.strokeStyle = (env.selectedObj === c) ? '#38bdf8' : '#e2e8f0';
+                    ctx.lineWidth = 5;
+                }
+                ctx.stroke();
+                ctx.shadowBlur = 0; // reset glow
+            });
+
+            // 5. Draw Joint Points
+            creature.points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = p.pinned ? '#f59e0b' : (env.selectedObj === p ? '#38bdf8' : '#06b6d4');
+                ctx.shadowColor = '#06b6d4';
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            ctx.restore();
+        }
+
+        window.addEventListener('mousemove', (e) => {
+            window.lastMouseX = e.clientX;
+            window.lastMouseY = e.clientY;
+        });
+
+        function gameLoop() {
+            stepPhysics();
+            renderFrame();
+            requestAnimationFrame(gameLoop);
+        }
+
+        class GeneticTrainer {
+            constructor() {
+                this.popSize = 10;
+                this.generation = 1;
+                this.currentGenomeIdx = 0;
+                this.trialTime = 5.0; // seconds per test
+                this.timer = 0;
+                this.population = [];
+                this.bestFitness = 0;
+                this.active = false;
+            }
+
+            initPopulation() {
+                this.population = [];
+                for (let i = 0; i < this.popSize; i++) {
+                    // Random brain genome parameters for muscles
+                    const genome = creature.constraints.filter(c => c.isMuscle).map(() => ({
+                        amplitude: Math.random() * 0.4 + 0.1,
+                        frequency: Math.random() * 2.0 + 0.5,
+                        phase: Math.random() * Math.PI * 2
+                    }));
+                    this.population.push({ genome, fitness: 0 });
+                }
+            }
+
+            applyGenome(genome) {
+                const muscles = creature.constraints.filter(c => c.isMuscle);
+                muscles.forEach((m, idx) => {
+                    if (genome[idx]) {
+                        m.amplitude = genome[idx].amplitude;
+                        m.frequency = genome[idx].frequency;
+                        m.phase = genome[idx].phase;
+                    }
+                });
+            }
+
+            start() {
+                if (creature.constraints.filter(c => c.isMuscle).length === 0) {
+                    alert('Add red muscles to your creature before evolving a brain!');
+                    return;
+                }
+                this.active = true;
+                this.generation = 1;
+                this.bestFitness = 0;
+                this.currentGenomeIdx = 0;
+                this.initPopulation();
+                this.testNext();
+            }
+
+            testNext() {
+                if (this.currentGenomeIdx >= this.popSize) {
+                    this.evolveNextGen();
+                    return;
+                }
+                creature.restoreInitialState();
+                this.applyGenome(this.population[this.currentGenomeIdx].genome);
+                env.time = 0;
+                env.mode = 'evolve';
+                this.timer = 0;
+
+                document.getElementById('evoGenCount').innerText = `Gen: ${this.generation} (${this.currentGenomeIdx + 1}/${this.popSize})`;
+            }
+
+            step(dt) {
+                if (!this.active) return;
+                this.timer += dt;
+
+                const center = creature.getCenterOfMass();
+                const dist = Math.max(0, (center.x - env.startCenterX) / 50);
+                this.population[this.currentGenomeIdx].fitness = dist;
+
+                if (dist > this.bestFitness) {
+                    this.bestFitness = dist;
+                    document.getElementById('evoBestDist').innerText = `${this.bestFitness.toFixed(2)} m`;
+                }
+
+                if (this.timer >= this.trialTime) {
+                    this.currentGenomeIdx++;
+                    this.testNext();
+                }
+            }
+
+            evolveNextGen() {
+                // Sort population by fitness
+                this.population.sort((a, b) => b.fitness - a.fitness);
+
+                const newPop = [];
+                // Elitism: Keep top 2 genomes
+                newPop.push(JSON.parse(JSON.stringify(this.population[0])));
+                newPop.push(JSON.parse(JSON.stringify(this.population[1])));
+
+                // Fill rest via crossover and mutation
+                while (newPop.length < this.popSize) {
+                    const parent = this.population[Math.floor(Math.random() * 3)]; // Select top performers
+                    const childGenome = parent.genome.map(g => ({
+                        amplitude: Math.min(0.5, Math.max(0.05, g.amplitude + (Math.random() - 0.5) * 0.1)),
+                        frequency: Math.min(3.0, Math.max(0.2, g.frequency + (Math.random() - 0.5) * 0.3)),
+                        phase: (g.phase + (Math.random() - 0.5) * 0.5) % (Math.PI * 2)
+                    }));
+                    newPop.push({ genome: childGenome, fitness: 0 });
+                }
+
+                this.population = newPop;
+                this.generation++;
+                this.currentGenomeIdx = 0;
+                this.testNext();
+            }
+        }
+
+        const evo = new GeneticTrainer();
+
+        function updateInspector() {
+            const emptyPanel = document.getElementById('inspectorEmpty');
+            const musclePanel = document.getElementById('inspectorMuscle');
+
+            if (env.selectedObj && env.selectedObj.isMuscle) {
+                emptyPanel.classList.add('hidden');
+                musclePanel.classList.remove('hidden');
+
+                const m = env.selectedObj;
+                document.getElementById('sliderAmp').value = m.amplitude;
+                document.getElementById('valAmp').innerText = m.amplitude.toFixed(2);
+
+                document.getElementById('sliderFreq').value = m.frequency;
+                document.getElementById('valFreq').innerText = `${m.frequency.toFixed(1)}x`;
+
+                document.getElementById('sliderPhase').value = m.phase;
+                document.getElementById('valPhase').innerText = `${(m.phase / Math.PI).toFixed(1)}π`;
+            } else {
+                emptyPanel.classList.remove('hidden');
+                musclePanel.classList.add('hidden');
+            }
+        }
+
+        // Mode Switching
+        document.getElementById('btnBuildMode').onclick = () => {
+            env.mode = 'build';
+            evo.active = false;
+            creature.restoreInitialState();
+            document.getElementById('btnBuildMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-slate-800 text-white';
+            document.getElementById('btnSimMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('btnEvolveMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('evolutionPanel').classList.add('hidden');
+        };
+
+        document.getElementById('btnSimMode').onclick = () => {
+            env.mode = 'sim';
+            evo.active = false;
+            creature.saveInitialState();
+            env.time = 0;
+            env.startCenterX = creature.getCenterOfMass().x;
+            document.getElementById('btnSimMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white';
+            document.getElementById('btnBuildMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('btnEvolveMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('evolutionPanel').classList.add('hidden');
+        };
+
+        document.getElementById('btnEvolveMode').onclick = () => {
+            env.mode = 'evolve';
+            creature.saveInitialState();
+            document.getElementById('btnEvolveMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 bg-cyan-600 text-white';
+            document.getElementById('btnBuildMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('btnSimMode').className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white';
+            document.getElementById('evolutionPanel').classList.remove('hidden');
+        };
+
+        // Tool Selection Palette
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.onclick = () => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                env.tool = btn.dataset.tool;
+            };
+        });
+
+        // Toggle Pin Joint
+        document.getElementById('btnPinJoint').onclick = () => {
+            if (env.selectedObj && env.selectedObj instanceof Point) {
+                env.selectedObj.pinned = !env.selectedObj.pinned;
+                creature.saveInitialState();
+            }
+        };
+
+        // Reset & Clear
+        document.getElementById('btnResetSim').onclick = () => {
+            creature.restoreInitialState();
+            env.time = 0;
+            env.topDistance = 0;
+            document.getElementById('hudDistance').innerText = '0.00 m';
+        };
+
+        document.getElementById('btnClearCanvas').onclick = () => {
+            creature.clear();
+            env.selectedObj = null;
+            updateInspector();
+        };
+
+        // Preset Loader
+        document.getElementById('presetSelect').onchange = (e) => {
+            loadPreset(e.target.value);
+            e.target.value = '';
+        };
+
+        // Muscle Inspector Sliders
+        document.getElementById('sliderAmp').oninput = (e) => {
+            if (env.selectedObj && env.selectedObj.isMuscle) {
+                env.selectedObj.amplitude = parseFloat(e.target.value);
+                document.getElementById('valAmp').innerText = env.selectedObj.amplitude.toFixed(2);
+            }
+        };
+
+        document.getElementById('sliderFreq').oninput = (e) => {
+            if (env.selectedObj && env.selectedObj.isMuscle) {
+                env.selectedObj.frequency = parseFloat(e.target.value);
+                document.getElementById('valFreq').innerText = `${env.selectedObj.frequency.toFixed(1)}x`;
+            }
+        };
+
+        document.getElementById('sliderPhase').oninput = (e) => {
+            if (env.selectedObj && env.selectedObj.isMuscle) {
+                env.selectedObj.phase = parseFloat(e.target.value);
+                document.getElementById('valPhase').innerText = `${(env.selectedObj.phase / Math.PI).toFixed(1)}π`;
+            }
+        };
+
+        // Environment Sliders
+        document.getElementById('sliderGravity').oninput = (e) => {
+            env.gravity = parseFloat(e.target.value);
+            document.getElementById('valGravity').innerText = env.gravity.toFixed(2);
+        };
+        document.getElementById('sliderFriction').oninput = (e) => {
+            env.friction = parseFloat(e.target.value);
+            document.getElementById('valFriction').innerText = env.friction.toFixed(2);
+        };
+        document.getElementById('sliderStiffness').oninput = (e) => {
+            env.stiffness = parseFloat(e.target.value);
+            document.getElementById('valStiffness').innerText = env.stiffness.toFixed(2);
+        };
+        document.getElementById('terrainSelect').onchange = (e) => {
+            env.terrain = e.target.value;
+        };
+
+        // Start AI Evolution
+        document.getElementById('btnStartEvo').onclick = () => {
+            evo.start();
+        };
+
+        // Keyboard Shortcuts
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'v' || e.key === 'V') document.querySelector('[data-tool="select"]').click();
+            if (e.key === 'j' || e.key === 'J') document.querySelector('[data-tool="joint"]').click();
+            if (e.key === 'b' || e.key === 'B') document.querySelector('[data-tool="bone"]').click();
+            if (e.key === 'm' || e.key === 'M') document.querySelector('[data-tool="muscle"]').click();
+            if (e.key === 'e' || e.key === 'E') document.querySelector('[data-tool="erase"]').click();
+            if (e.key === ' ') {
+                if (env.mode === 'build') document.getElementById('btnSimMode').click();
+                else document.getElementById('btnBuildMode').click();
+            }
+        });
+
+        // Initialize with default Biped creature
+        window.onload = () => {
+            loadPreset('biped');
+            gameLoop();
+
+            // Run evolution ticker in step loop
+            setInterval(() => {
+                if (env.mode === 'evolve') {
+                    evo.step(0.05);
+                }
+            }, 50);
+        };
+    </script>
+</body>
+</html>

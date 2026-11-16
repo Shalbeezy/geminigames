@@ -1,0 +1,1418 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Merge 25 - Suika Physics Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cosmic: {
+                            900: '#090d16',
+                            800: '#111827',
+                            700: '#1f293d',
+                            accent: '#6366f1',
+                            pink: '#ec4899',
+                            gold: '#fbbf24'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at 50% 20%, #1e1b4b 0%, #090d16 80%);
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .glass-button {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.15s ease-in-out;
+        }
+        .glass-button:hover:not(:disabled) {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+        .glass-button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+        .glow-box {
+            box-shadow: 0 0 25px rgba(99, 102, 241, 0.25);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.2); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.4); }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-between overflow-x-hidden min-h-screen">
+
+    <!-- TOP HEADER / NAV BAR -->
+    <header class="w-full max-w-6xl mx-auto px-4 py-3 flex items-center justify-between z-10">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-atom text-white text-xl animate-spin-slow"></i>
+            </div>
+            <div>
+                <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-white via-indigo-200 to-pink-400 bg-clip-text text-transparent">
+                    COSMIC MERGE 25
+                </h1>
+                <p class="text-[10px] text-indigo-300 font-medium tracking-wider uppercase">Suika Physics Evolution</p>
+            </div>
+        </div>
+
+        <!-- System Controls -->
+        <div class="flex items-center space-x-2">
+            <button id="toggleFaceBtn" onclick="toggleFaces()" title="Toggle Cute Faces" class="glass-button p-2.5 rounded-xl text-slate-300 hover:text-white flex items-center space-x-1.5 text-xs font-semibold">
+                <i id="faceIcon" class="fa-solid fa-face-smile text-amber-400"></i>
+                <span class="hidden sm:inline">Faces</span>
+            </button>
+
+            <button id="toggleAudioBtn" onclick="toggleAudio()" title="Toggle Audio" class="glass-button p-2.5 rounded-xl text-slate-300 hover:text-white flex items-center space-x-1.5 text-xs font-semibold">
+                <i id="audioIcon" class="fa-solid fa-volume-high text-indigo-400"></i>
+                <span class="hidden sm:inline">Sound</span>
+            </button>
+
+            <button onclick="openDexModal()" title="Evolution Collection Dex" class="glass-button px-3 py-2 rounded-xl text-xs font-bold text-pink-300 border-pink-500/30 hover:border-pink-400 flex items-center space-x-1.5">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Dex <span id="dexUnlockedCount" class="text-white bg-pink-500/30 px-1.5 py-0.5 rounded-md text-[10px]">1/25</span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME LAYOUT CONTAINER -->
+    <main class="flex-1 w-full max-w-6xl mx-auto px-2 sm:px-4 py-2 flex flex-col lg:flex-row items-center justify-center gap-4 lg:gap-6">
+        
+        <!-- SIDEBAR LEFT / TOP HUD (HOLD & PREVIEW & STATS) -->
+        <aside class="w-full lg:w-64 flex flex-row lg:flex-col justify-between lg:justify-start gap-3 shrink-0">
+            
+            <!-- SCORES CARD -->
+            <div class="glass-panel p-3.5 rounded-2xl flex-1 lg:flex-none flex flex-col justify-between">
+                <div class="flex items-center justify-between border-b border-slate-700/60 pb-2 mb-2">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Score</span>
+                    <span id="currentScore" class="font-extrabold text-2xl text-white">0</span>
+                </div>
+                <div class="flex items-center justify-between text-xs">
+                    <span class="text-slate-400 font-semibold">Best Record</span>
+                    <span id="bestScore" class="font-bold text-amber-400 text-sm">0</span>
+                </div>
+            </div>
+
+            <!-- HOLD & NEXT BALL SLOTS -->
+            <div class="glass-panel p-3 rounded-2xl flex items-center justify-around lg:justify-between gap-2 flex-1 lg:flex-none">
+                <!-- HOLD SLOT -->
+                <div onclick="triggerHoldSwap()" class="flex flex-col items-center cursor-pointer group">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center">
+                        Hold <span class="text-[9px] text-indigo-400 ml-1 font-mono">(C/Shift)</span>
+                    </span>
+                    <div id="holdContainer" class="w-16 h-16 rounded-xl bg-slate-900/80 border border-slate-700/80 group-hover:border-indigo-500/50 flex items-center justify-center relative overflow-hidden transition">
+                        <canvas id="holdCanvas" width="60" height="60" class="pointer-events-none"></canvas>
+                        <span id="holdEmptyText" class="text-[10px] text-slate-600 font-bold uppercase">Empty</span>
+                    </div>
+                </div>
+
+                <div class="h-10 w-[1px] bg-slate-700/50 lg:hidden"></div>
+
+                <!-- NEXT SLOT -->
+                <div class="flex flex-col items-center">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Next Ball</span>
+                    <div class="w-16 h-16 rounded-xl bg-slate-900/80 border border-slate-700/80 flex items-center justify-center relative overflow-hidden">
+                        <canvas id="nextCanvas" width="60" height="60" class="pointer-events-none"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POWER-UPS PANEL -->
+            <div class="glass-panel p-3 rounded-2xl hidden lg:flex flex-col space-y-2">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
+                    Tactical Power-Ups
+                    <i class="fa-solid fa-bolt text-amber-400 text-xs"></i>
+                </span>
+                
+                <!-- Power-up 1: Shake Jar -->
+                <button id="pwrShakeBtn" onclick="usePowerup('shake')" class="glass-button p-2.5 rounded-xl flex items-center justify-between text-left group">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center group-hover:scale-105 transition">
+                            <i class="fa-solid fa-vial-virus text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Jar Shake</div>
+                            <div class="text-[9px] text-slate-400">Jostle stuck balls</div>
+                        </div>
+                    </div>
+                    <span id="pwrShakeCount" class="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold text-xs">1</span>
+                </button>
+
+                <!-- Power-up 2: Pop Smallest -->
+                <button id="pwrPopBtn" onclick="usePowerup('pop')" class="glass-button p-2.5 rounded-xl flex items-center justify-between text-left group">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center group-hover:scale-105 transition">
+                            <i class="fa-solid fa-burst text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Pop Smallest</div>
+                            <div class="text-[9px] text-slate-400">Clear Tier 1-2</div>
+                        </div>
+                    </div>
+                    <span id="pwrPopCount" class="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold text-xs">1</span>
+                </button>
+
+                <!-- Power-up 3: Upgrade Drop -->
+                <button id="pwrUpgradeBtn" onclick="usePowerup('upgrade')" class="glass-button p-2.5 rounded-xl flex items-center justify-between text-left group">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center group-hover:scale-105 transition">
+                            <i class="fa-solid fa-arrow-up-right-dots text-sm"></i>
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-white">Upgrade Drop</div>
+                            <div class="text-[9px] text-slate-400">Drop tier +1</div>
+                        </div>
+                    </div>
+                    <span id="pwrUpgradeCount" class="px-2 py-0.5 rounded-md bg-indigo-600 text-white font-extrabold text-xs">1</span>
+                </button>
+
+                <p class="text-[9px] text-slate-500 text-center pt-1">+1 Charge per 5,000 points!</p>
+            </div>
+        </aside>
+
+        <!-- CENTER CANVAS CONTAINER -->
+        <div class="relative flex-1 flex flex-col items-center justify-center w-full max-w-[540px]">
+            <div id="canvasWrapper" class="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-700/60 glow-box bg-slate-900/90">
+                <canvas id="gameCanvas" width="520" height="740" class="block cursor-crosshair touch-none"></canvas>
+                
+                <!-- Combo Overlay Banner -->
+                <div id="comboBanner" class="absolute top-24 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transform scale-50 transition-all duration-300 flex flex-col items-center">
+                    <span id="comboMultiplierText" class="text-3xl font-black italic bg-gradient-to-r from-amber-300 via-pink-400 to-purple-400 bg-clip-text text-transparent drop-shadow-md">
+                        2x COMBO!
+                    </span>
+                </div>
+            </div>
+
+            <!-- MOBILE POWER-UPS BAR -->
+            <div class="flex lg:hidden items-center justify-center gap-2 w-full mt-2">
+                <button onclick="usePowerup('shake')" class="glass-button flex-1 py-2 px-2 rounded-xl flex items-center justify-center space-x-1 text-xs">
+                    <i class="fa-solid fa-vial-virus text-indigo-400"></i>
+                    <span class="font-bold">Shake</span>
+                    <span id="pwrShakeCountMobile" class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-md font-bold">1</span>
+                </button>
+                <button onclick="usePowerup('pop')" class="glass-button flex-1 py-2 px-2 rounded-xl flex items-center justify-center space-x-1 text-xs">
+                    <i class="fa-solid fa-burst text-red-400"></i>
+                    <span class="font-bold">Pop 1-2</span>
+                    <span id="pwrPopCountMobile" class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-md font-bold">1</span>
+                </button>
+                <button onclick="usePowerup('upgrade')" class="glass-button flex-1 py-2 px-2 rounded-xl flex items-center justify-center space-x-1 text-xs">
+                    <i class="fa-solid fa-arrow-up-right-dots text-amber-400"></i>
+                    <span class="font-bold">+1 Drop</span>
+                    <span id="pwrUpgradeCountMobile" class="bg-indigo-600 text-white text-[10px] px-1.5 py-0.2 rounded-md font-bold">1</span>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER / INSTRUCTIONS -->
+    <footer class="w-full max-w-6xl mx-auto px-4 py-2 text-center text-[11px] text-slate-500 font-medium z-10">
+        Controls: Move mouse/touch to aim. Click/Tap/Space to drop ball. Press 'C' or 'Shift' to Hold/Swap.
+    </footer>
+
+    <!-- MODAL 1: EVOLUTION COLLECTION DEX -->
+    <div id="dexModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
+        <div class="glass-panel w-full max-w-2xl rounded-3xl border border-slate-700/80 p-5 sm:p-6 flex flex-col max-h-[90vh] shadow-2xl">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-700/80">
+                <div>
+                    <h2 class="text-xl font-black text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-book-open text-pink-400"></i>
+                        <span>25-Ball Evolution Dex</span>
+                    </h2>
+                    <p class="text-xs text-slate-400">Merge matching balls to discover higher tiers!</p>
+                </div>
+                <button onclick="closeDexModal()" class="glass-button p-2 rounded-xl text-slate-400 hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Dex Grid Container -->
+            <div id="dexGrid" class="flex-1 overflow-y-auto py-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pr-1">
+                <!-- Dynamic cards injected via JS -->
+            </div>
+
+            <div class="pt-3 border-t border-slate-700/80 flex items-center justify-between text-xs">
+                <button onclick="confirmResetCollection()" class="text-red-400 hover:text-red-300 font-semibold transition">
+                    <i class="fa-solid fa-trash-can mr-1"></i>Reset Collection
+                </button>
+                <button onclick="closeDexModal()" class="glass-button px-4 py-2 rounded-xl font-bold text-white">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: NEW TIER DISCOVERED CELEBRATION BANNER -->
+    <div id="discoveryModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-sm rounded-3xl border border-amber-500/40 p-6 text-center shadow-2xl animate-bounce-short">
+            <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-400 to-pink-500 mx-auto flex items-center justify-center text-white text-2xl shadow-lg shadow-amber-500/30 mb-3">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <span class="text-xs font-bold text-amber-400 uppercase tracking-widest">New Discovery!</span>
+            <h3 id="discoveryTierName" class="text-2xl font-black text-white mt-1">OMEGA CORE</h3>
+            <p id="discoveryRarity" class="text-xs font-semibold text-pink-400 mt-0.5">Transcendent Tier 25</p>
+            
+            <div class="w-32 h-32 mx-auto my-4 flex items-center justify-center relative">
+                <canvas id="discoveryCanvas" width="120" height="120"></canvas>
+            </div>
+
+            <button onclick="closeDiscoveryModal()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-pink-500 to-indigo-600 text-white font-extrabold text-sm shadow-lg shadow-pink-500/20 hover:brightness-110 transition">
+                Awesome!
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL 3: GAME OVER & VICTORY -->
+    <div id="gameOverModal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel w-full max-w-md rounded-3xl border border-red-500/30 p-6 text-center shadow-2xl">
+            <div id="gameOverIcon" class="w-16 h-16 rounded-full bg-red-500/20 text-red-400 mx-auto flex items-center justify-center text-3xl mb-3 border border-red-500/40">
+                <i class="fa-solid fa-skull"></i>
+            </div>
+            <h3 id="gameOverTitle" class="text-2xl font-black text-white">JAR OVERFLOW!</h3>
+            <p id="gameOverSub" class="text-xs text-slate-400 mt-1">The jar overflowed with cosmic energy.</p>
+
+            <div class="my-5 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Final Score</span>
+                    <span id="goFinalScore" class="font-extrabold text-lg text-white">0</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Highest Tier Merged</span>
+                    <span id="goHighestTier" class="font-bold text-amber-400">Tier 1</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-slate-400">Total Unlocked</span>
+                    <span id="goUnlockedCount" class="font-bold text-pink-400">1 / 25</span>
+                </div>
+            </div>
+
+            <button onclick="restartGame()" class="w-full py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-sm shadow-lg shadow-indigo-600/30 transition">
+                <i class="fa-solid fa-rotate-right mr-2"></i>Play Again
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME ENGINE CODE -->
+    <script>
+        // ==========================================
+        // 1. TIER DEFINITIONS & RADIUS SCALING ENGINE
+        // ==========================================
+        const TOTAL_TIERS = 25;
+        const MIN_RADIUS = 14;
+        const MAX_RADIUS = 132;
+
+        // Exponential radius curve: r = 14 * (132 / 14) ^ ((t-1)/24)
+        function getTierRadius(tier) {
+            return MIN_RADIUS * Math.pow(MAX_RADIUS / MIN_RADIUS, (tier - 1) / (TOTAL_TIERS - 1));
+        }
+
+        const RARITIES = {
+            COMMON: { name: 'Common', color: '#94a3b8' },
+            UNCOMMON: { name: 'Uncommon', color: '#34d399' },
+            RARE: { name: 'Rare', color: '#60a5fa' },
+            EPIC: { name: 'Epic', color: '#c084fc' },
+            LEGENDARY: { name: 'Legendary', color: '#fbbf24' },
+            MYTHIC: { name: 'Mythic', color: '#f43f5e' },
+            CELESTIAL: { name: 'Celestial', color: '#38bdf8' },
+            TRANSCENDENT: { name: 'Transcendent', color: '#f472b6' }
+        };
+
+        const BALL_DEFS = [
+            { tier: 1, name: 'Pebble', rarity: RARITIES.COMMON, baseColor: '#64748b', accentColor: '#94a3b8', points: 10 },
+            { tier: 2, name: 'Sky Marble', rarity: RARITIES.COMMON, baseColor: '#0284c7', accentColor: '#38bdf8', points: 25 },
+            { tier: 3, name: 'Sea Pearl', rarity: RARITIES.COMMON, baseColor: '#cbd5e1', accentColor: '#ffffff', points: 45 },
+            { tier: 4, name: 'Golden Amber', rarity: RARITIES.COMMON, baseColor: '#d97706', accentColor: '#fbbf24', points: 70 },
+
+            { tier: 5, name: 'Forest Jade', rarity: RARITIES.UNCOMMON, baseColor: '#059669', accentColor: '#34d399', points: 100 },
+            { tier: 6, name: 'Rose Coral', rarity: RARITIES.UNCOMMON, baseColor: '#e11d48', accentColor: '#fb7185', points: 140 },
+            { tier: 7, name: 'Sun Topaz', rarity: RARITIES.UNCOMMON, baseColor: '#ca8a04', accentColor: '#fde047', points: 190 },
+            { tier: 8, name: 'Royal Amethyst', rarity: RARITIES.UNCOMMON, baseColor: '#7e22ce', accentColor: '#c084fc', points: 250 },
+
+            { tier: 9, name: 'Deep Sapphire', rarity: RARITIES.RARE, baseColor: '#1d4ed8', accentColor: '#60a5fa', points: 320 },
+            { tier: 10, name: 'Crimson Ruby', rarity: RARITIES.RARE, baseColor: '#b91c1c', accentColor: '#f87171', points: 400 },
+            { tier: 11, name: 'Mystic Emerald', rarity: RARITIES.RARE, baseColor: '#0f766e', accentColor: '#2dd4bf', points: 500 },
+            { tier: 12, name: 'Prism Opal', rarity: RARITIES.RARE, baseColor: '#db2777', accentColor: '#f472b6', points: 620 },
+
+            { tier: 13, name: 'Void Obsidian', rarity: RARITIES.EPIC, baseColor: '#111827', accentColor: '#818cf8', points: 760 },
+            { tier: 14, name: 'Magma Core', rarity: RARITIES.EPIC, baseColor: '#c2410c', accentColor: '#fb923c', points: 920 },
+            { tier: 15, name: 'Plasma Orb', rarity: RARITIES.EPIC, baseColor: '#0891b2', accentColor: '#22d3ee', points: 1100 },
+            { tier: 16, name: 'Aether Sphere', rarity: RARITIES.EPIC, baseColor: '#0d9488', accentColor: '#5eead4', points: 1320 },
+
+            { tier: 17, name: 'Solar Flare', rarity: RARITIES.LEGENDARY, baseColor: '#eab308', accentColor: '#fef08a', points: 1600 },
+            { tier: 18, name: 'Lunar Eclipse', rarity: RARITIES.LEGENDARY, baseColor: '#4338ca', accentColor: '#a5b4fc', points: 1950 },
+            { tier: 19, name: 'Cosmic Nebula', rarity: RARITIES.LEGENDARY, baseColor: '#c026d3', accentColor: '#f5d0fe', points: 2400 },
+
+            { tier: 20, name: 'Supernova', rarity: RARITIES.MYTHIC, baseColor: '#f59e0b', accentColor: '#ffffff', points: 3000 },
+            { tier: 21, name: 'Singularity', rarity: RARITIES.MYTHIC, baseColor: '#0f172a', accentColor: '#a855f7', points: 3800 },
+            { tier: 22, name: 'Quasar', rarity: RARITIES.MYTHIC, baseColor: '#0284c7', accentColor: '#e0f2fe', points: 4800 },
+
+            { tier: 23, name: 'Chrono Sphere', rarity: RARITIES.CELESTIAL, baseColor: '#d97706', accentColor: '#fef08a', points: 6000 },
+            { tier: 24, name: 'Infinity Prism', rarity: RARITIES.CELESTIAL, baseColor: '#7c3aed', accentColor: '#f472b6', points: 8000 },
+            { tier: 25, name: 'OMEGA CORE', rarity: RARITIES.TRANSCENDENT, baseColor: '#ec4899', accentColor: '#ffffff', points: 15000 }
+        ];
+
+        // Attach computed radius to definitions
+        BALL_DEFS.forEach(def => {
+            def.radius = getTierRadius(def.tier);
+        });
+
+        // ==========================================
+        // 2. AUDIO SYNTHESIZER (WEB AUDIO API)
+        // ==========================================
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type, param = 1) {
+            if (isMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'drop') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.exponentialRampToValueAtTime(140, now + 0.12);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } else if (type === 'merge') {
+                const tier = Math.min(25, Math.max(1, param));
+                const freq = 220 * Math.pow(1.06, tier);
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.2);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'discovery') {
+                const notes = [330, 440, 554, 659, 880];
+                notes.forEach((f, i) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, now + i * 0.08);
+                    gain.gain.setValueAtTime(0.2, now + i * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.08 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + i * 0.08);
+                    osc.stop(now + i * 0.08 + 0.3);
+                });
+            } else if (type === 'supernova') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.6);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.8);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.8);
+            } else if (type === 'powerup') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            document.getElementById('audioIcon').className = isMuted 
+                ? 'fa-solid fa-volume-xmark text-slate-500' 
+                : 'fa-solid fa-volume-high text-indigo-400';
+        }
+
+        let showCuteFaces = true;
+        function toggleFaces() {
+            showCuteFaces = !showCuteFaces;
+            document.getElementById('faceIcon').className = showCuteFaces 
+                ? 'fa-solid fa-face-smile text-amber-400' 
+                : 'fa-solid fa-face-meh text-slate-500';
+        }
+
+        // ==========================================
+        // 3. GAME STATE & GLOBALS
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const JAR = {
+            left: 30,
+            right: 490,
+            width: 460,
+            top: 110,
+            bottom: 710,
+            height: 600,
+            dangerY: 180
+        };
+
+        let currentScore = 0;
+        let bestScore = 0;
+        let unlockedTiers = new Set([1]); // Persisted in localStorage
+
+        let balls = []; // Active physics bodies
+        let particles = [];
+        let floatTexts = [];
+        let confetti = [];
+
+        let currentDropTier = 1;
+        let nextDropTier = 1;
+        let holdTier = null;
+        let canHoldSwap = true;
+
+        let aimX = 260; // Initial x
+        let dropCooldown = 0; // Timer
+        const COOLDOWN_TIME = 0.45; // Seconds
+
+        let comboCount = 0;
+        let lastMergeTime = 0;
+
+        let dangerTimer = 0; // Overflow danger timer
+        let isGameOver = false;
+
+        // Power-ups charges
+        let powerups = {
+            shake: 1,
+            pop: 1,
+            upgrade: 1
+        };
+        let lastEarnedPowerupScore = 0;
+
+        let screenShakeTime = 0;
+        let screenShakeMag = 0;
+
+        // ==========================================
+        // 4. STORAGE & SAVING
+        // ==========================================
+        function loadStorage() {
+            try {
+                const savedBest = localStorage.getItem('cm25_best');
+                if (savedBest) bestScore = parseInt(savedBest) || 0;
+                document.getElementById('bestScore').textContent = bestScore;
+
+                const savedUnlocked = localStorage.getItem('cm25_unlocked');
+                if (savedUnlocked) {
+                    const arr = JSON.parse(savedUnlocked);
+                    if (Array.isArray(arr)) unlockedTiers = new Set(arr);
+                }
+            } catch (e) {
+                console.error("Storage error", e);
+            }
+            updateDexUnlockedBadge();
+        }
+
+        function saveStorage() {
+            try {
+                localStorage.setItem('cm25_best', bestScore.toString());
+                localStorage.setItem('cm25_unlocked', JSON.stringify(Array.from(unlockedTiers)));
+            } catch (e) {}
+        }
+
+        function updateDexUnlockedBadge() {
+            document.getElementById('dexUnlockedCount').textContent = `${unlockedTiers.size}/${TOTAL_TIERS}`;
+        }
+
+        // ==========================================
+        // 5. BALL PHYSICS CLASS
+        // ==========================================
+        class Ball {
+            constructor(x, y, tier) {
+                this.id = Math.random().toString(36).substring(2, 9);
+                this.x = x;
+                this.y = y;
+                this.vx = 0;
+                this.vy = 0;
+                this.tier = tier;
+                this.radius = BALL_DEFS[tier - 1].radius;
+                this.mass = this.radius * this.radius;
+                this.angle = Math.random() * Math.PI * 2;
+                this.angularVelocity = 0;
+                this.isSettled = false;
+                this.toRemove = false;
+            }
+
+            update(dt) {
+                // Apply Gravity
+                this.vy += 1150 * dt;
+
+                // Air Damping
+                this.vx *= 0.998;
+                this.vy *= 0.998;
+                this.angularVelocity *= 0.98;
+
+                // Move
+                this.x += this.vx * dt;
+                this.y += this.vy * dt;
+                this.angle += this.angularVelocity * dt;
+
+                // Wall Collisions
+                const minX = JAR.left + this.radius;
+                const maxX = JAR.right - this.radius;
+                const maxY = JAR.bottom - this.radius;
+
+                if (this.x < minX) {
+                    this.x = minX;
+                    this.vx = -this.vx * 0.3;
+                    this.angularVelocity += this.vy * 0.02;
+                } else if (this.x > maxX) {
+                    this.x = maxX;
+                    this.vx = -this.vx * 0.3;
+                    this.angularVelocity -= this.vy * 0.02;
+                }
+
+                if (this.y > maxY) {
+                    this.y = maxY;
+                    this.vy = -this.vy * 0.25;
+                    this.vx *= 0.92;
+                    this.angularVelocity = -this.vx * 0.05;
+                }
+            }
+        }
+
+        // ==========================================
+        // 6. PHYSICS SUB-STEPPING ENGINE
+        // ==========================================
+        function updatePhysics(dt) {
+            const SUB_STEPS = 10;
+            const subDt = dt / SUB_STEPS;
+
+            for (let step = 0; step < SUB_STEPS; step++) {
+                // Update position & wall collisions
+                for (let i = 0; i < balls.length; i++) {
+                    if (!balls[i].toRemove) balls[i].update(subDt);
+                }
+
+                // Circle to Circle collisions & merging
+                for (let i = 0; i < balls.length; i++) {
+                    const b1 = balls[i];
+                    if (b1.toRemove) continue;
+
+                    for (let j = i + 1; j < balls.length; j++) {
+                        const b2 = balls[j];
+                        if (b2.toRemove) continue;
+
+                        const dx = b2.x - b1.x;
+                        const dy = b2.y - b1.y;
+                        const distSq = dx * dx + dy * dy;
+                        const minDist = b1.radius + b2.radius;
+
+                        if (distSq < minDist * minDist) {
+                            const dist = Math.sqrt(distSq) || 0.0001;
+
+                            // CHECK MERGE CONDITION
+                            if (b1.tier === b2.tier && b1.tier < TOTAL_TIERS) {
+                                triggerMerge(b1, b2);
+                                break;
+                            } else if (b1.tier === TOTAL_TIERS && b2.tier === TOTAL_TIERS) {
+                                triggerSupernova(b1, b2);
+                                break;
+                            }
+
+                            // NORMAL COLLISION RESOLUTION
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+
+                            // Overlap separation proportional to inverse mass
+                            const overlap = minDist - dist;
+                            const mSum = b1.mass + b2.mass;
+                            b1.x -= nx * overlap * (b2.mass / mSum);
+                            b1.y -= ny * overlap * (b2.mass / mSum);
+                            b2.x += nx * overlap * (b1.mass / mSum);
+                            b2.y += ny * overlap * (b1.mass / mSum);
+
+                            // Relative velocity along normal
+                            const rvx = b2.vx - b1.vx;
+                            const rvy = b2.vy - b1.vy;
+                            const velAlongNormal = rvx * nx + rvy * ny;
+
+                            if (velAlongNormal < 0) {
+                                const restitution = 0.2;
+                                const impulse = -(1 + restitution) * velAlongNormal / (1 / b1.mass + 1 / b2.mass);
+
+                                b1.vx -= (impulse / b1.mass) * nx;
+                                b1.vy -= (impulse / b1.mass) * ny;
+                                b2.vx += (impulse / b2.mass) * nx;
+                                b2.vy += (impulse / b2.mass) * ny;
+
+                                // Tangential surface friction & angular roll
+                                const tx = -ny;
+                                const ty = nx;
+                                const rvt = rvx * tx + rvy * ty;
+                                const frictionImpulse = -rvt * 0.1 / (1 / b1.mass + 1 / b2.mass);
+
+                                b1.vx -= (frictionImpulse / b1.mass) * tx;
+                                b1.vy -= (frictionImpulse / b1.mass) * ty;
+                                b2.vx += (frictionImpulse / b2.mass) * tx;
+                                b2.vy += (frictionImpulse / b2.mass) * ty;
+
+                                b1.angularVelocity -= frictionImpulse * 0.01;
+                                b2.angularVelocity += frictionImpulse * 0.01;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Remove marked balls
+            balls = balls.filter(b => !b.toRemove);
+        }
+
+        // ==========================================
+        // 7. MERGING & COMBO ENGINE
+        // ==========================================
+        function triggerMerge(b1, b2) {
+            b1.toRemove = true;
+            b2.toRemove = true;
+
+            const nextTier = b1.tier + 1;
+            const midX = (b1.x + b2.x) / 2;
+            const midY = (b1.y + b2.y) / 2;
+
+            // Create merged ball
+            const newBall = new Ball(midX, midY, nextTier);
+            // Conservation of momentum
+            newBall.vx = (b1.vx * b1.mass + b2.vx * b2.mass) / (b1.mass + b2.mass);
+            newBall.vy = (b1.vy * b1.mass + b2.vy * b2.mass) / (b1.mass + b2.mass) - 40; // subtle upward pop
+            balls.push(newBall);
+
+            // Combo multiplier check (within 1.2s)
+            const now = performance.now();
+            if (now - lastMergeTime < 1200) {
+                comboCount++;
+            } else {
+                comboCount = 1;
+            }
+            lastMergeTime = now;
+
+            if (comboCount > 1) {
+                showComboText(comboCount);
+            }
+
+            // Points calculation
+            const def = BALL_DEFS[nextTier - 1];
+            const earnedPoints = def.points * comboCount;
+            addScore(earnedPoints);
+
+            // Audio & Visual Effects
+            playSound('merge', nextTier);
+            spawnParticleBurst(midX, midY, def.baseColor, def.accentColor, 15 + nextTier);
+            spawnFloatingText(`+${earnedPoints}`, midX, midY - 10, def.accentColor);
+
+            if (nextTier >= 12) {
+                triggerScreenShake(nextTier * 0.8, 0.25);
+            }
+
+            // Check discovery
+            if (!unlockedTiers.has(nextTier)) {
+                unlockedTiers.add(nextTier);
+                saveStorage();
+                updateDexUnlockedBadge();
+                showDiscoveryModal(nextTier);
+            }
+        }
+
+        function triggerSupernova(b1, b2) {
+            b1.toRemove = true;
+            b2.toRemove = true;
+
+            const midX = (b1.x + b2.x) / 2;
+            const midY = (b1.y + b2.y) / 2;
+
+            addScore(50000);
+            playSound('supernova');
+            spawnParticleBurst(midX, midY, '#ec4899', '#fde047', 80);
+            spawnFloatingText('+50,000 SUPERNOVA!', midX, midY - 30, '#fde047');
+            triggerScreenShake(20, 0.6);
+
+            // Clear small nearby balls (Tiers 1-5)
+            balls.forEach(b => {
+                if (b.tier <= 5) {
+                    const dist = Math.hypot(b.x - midX, b.y - midY);
+                    if (dist < 300) {
+                        b.toRemove = true;
+                        spawnParticleBurst(b.x, b.y, '#38bdf8', '#ffffff', 10);
+                    }
+                }
+            });
+        }
+
+        function addScore(pts) {
+            currentScore += pts;
+            document.getElementById('currentScore').textContent = currentScore.toLocaleString();
+
+            if (currentScore > bestScore) {
+                bestScore = currentScore;
+                document.getElementById('bestScore').textContent = bestScore.toLocaleString();
+                saveStorage();
+            }
+
+            // Power-up reward per 5,000 points
+            if (currentScore - lastEarnedPowerupScore >= 5000) {
+                lastEarnedPowerupScore = currentScore - (currentScore % 5000);
+                powerups.shake = Math.min(3, powerups.shake + 1);
+                powerups.pop = Math.min(3, powerups.pop + 1);
+                powerups.upgrade = Math.min(3, powerups.upgrade + 1);
+                updatePowerupUI();
+                spawnFloatingText('POWER-UP RECHARGED!', 260, 250, '#fbbf24');
+                playSound('powerup');
+            }
+        }
+
+        // ==========================================
+        // 8. POWER-UPS & HOLD MECHANIC
+        // ==========================================
+        function getRandomDropTier() {
+            // Spawn Tiers 1-5 with weighted probabilities
+            const weights = [45, 30, 15, 7, 3];
+            const rand = Math.random() * 100;
+            let sum = 0;
+            for (let i = 0; i < weights.length; i++) {
+                sum += weights[i];
+                if (rand <= sum) return i + 1;
+            }
+            return 1;
+        }
+
+        function triggerHoldSwap() {
+            if (!canHoldSwap || isGameOver) return;
+            initAudio();
+
+            if (holdTier === null) {
+                holdTier = currentDropTier;
+                currentDropTier = nextDropTier;
+                nextDropTier = getRandomDropTier();
+            } else {
+                const temp = currentDropTier;
+                currentDropTier = holdTier;
+                holdTier = temp;
+            }
+
+            canHoldSwap = false;
+            document.getElementById('holdEmptyText').style.display = 'none';
+            renderPreviewCanvases();
+            playSound('powerup');
+        }
+
+        function usePowerup(type) {
+            if (isGameOver || powerups[type] <= 0) return;
+            initAudio();
+
+            if (type === 'shake') {
+                powerups.shake--;
+                balls.forEach(b => {
+                    b.vx += (Math.random() - 0.5) * 350;
+                    b.vy -= Math.random() * 300 + 100;
+                });
+                triggerScreenShake(12, 0.35);
+                playSound('powerup');
+            } else if (type === 'pop') {
+                let popped = 0;
+                balls.forEach(b => {
+                    if (b.tier <= 2) {
+                        b.toRemove = true;
+                        popped++;
+                        spawnParticleBurst(b.x, b.y, BALL_DEFS[b.tier - 1].baseColor, '#ffffff', 10);
+                    }
+                });
+                if (popped > 0) {
+                    powerups.pop--;
+                    playSound('supernova');
+                    spawnFloatingText(`POPPED ${popped} SMALL BALLS!`, 260, 300, '#ef4444');
+                }
+            } else if (type === 'upgrade') {
+                if (currentDropTier < 8) {
+                    powerups.upgrade--;
+                    currentDropTier++;
+                    renderPreviewCanvases();
+                    playSound('powerup');
+                    spawnFloatingText('DROP UPGRADED!', 260, 200, '#facc15');
+                }
+            }
+
+            updatePowerupUI();
+        }
+
+        function updatePowerupUI() {
+            document.getElementById('pwrShakeCount').textContent = powerups.shake;
+            document.getElementById('pwrPopCount').textContent = powerups.pop;
+            document.getElementById('pwrUpgradeCount').textContent = powerups.upgrade;
+
+            document.getElementById('pwrShakeCountMobile').textContent = powerups.shake;
+            document.getElementById('pwrPopCountMobile').textContent = powerups.pop;
+            document.getElementById('pwrUpgradeCountMobile').textContent = powerups.upgrade;
+        }
+
+        // ==========================================
+        // 9. DRAWING & VISUAL RENDERING
+        // ==========================================
+        function drawJar() {
+            // Jar Glowing Glass Outline
+            ctx.save();
+            ctx.lineWidth = 6;
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+            ctx.shadowColor = '#6366f1';
+            ctx.shadowBlur = 15;
+
+            ctx.beginPath();
+            ctx.moveTo(JAR.left, JAR.top);
+            ctx.lineTo(JAR.left, JAR.bottom - 20);
+            ctx.quadraticCurveTo(JAR.left, JAR.bottom, JAR.left + 20, JAR.bottom);
+            ctx.lineTo(JAR.right - 20, JAR.bottom);
+            ctx.quadraticCurveTo(JAR.right, JAR.bottom, JAR.right, JAR.bottom - 20);
+            ctx.lineTo(JAR.right, JAR.top);
+            ctx.stroke();
+            ctx.restore();
+
+            // Overflow Danger Line
+            ctx.save();
+            ctx.setLineDash([8, 6]);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = dangerTimer > 0 ? '#ef4444' : 'rgba(239, 68, 68, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(JAR.left, JAR.dangerY);
+            ctx.lineTo(JAR.right, JAR.dangerY);
+            ctx.stroke();
+
+            // Danger warning label
+            ctx.fillStyle = dangerTimer > 0 ? '#ef4444' : 'rgba(239, 68, 68, 0.5)';
+            ctx.font = 'bold 10px Outfit';
+            ctx.fillText('DANGER OVERFLOW LINE', JAR.left + 10, JAR.dangerY - 6);
+            ctx.restore();
+        }
+
+        function drawBall(targetCtx, x, y, tier, angle = 0, scale = 1) {
+            const def = BALL_DEFS[tier - 1];
+            const r = def.radius * scale;
+
+            targetCtx.save();
+            targetCtx.translate(x, y);
+            targetCtx.rotate(angle);
+
+            // Outer Aura for High Tiers
+            if (tier >= 17) {
+                targetCtx.save();
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 1.25, 0, Math.PI * 2);
+                const auraGradient = targetCtx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * 1.25);
+                auraGradient.addColorStop(0, def.accentColor + '88');
+                auraGradient.addColorStop(1, 'transparent');
+                targetCtx.fillStyle = auraGradient;
+                targetCtx.fill();
+                targetCtx.restore();
+            }
+
+            // Ball Base Sphere 3D Gradient
+            targetCtx.beginPath();
+            targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+            const grad = targetCtx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+            grad.addColorStop(0, def.accentColor);
+            grad.addColorStop(0.7, def.baseColor);
+            grad.addColorStop(1, '#000000');
+            targetCtx.fillStyle = grad;
+            targetCtx.fill();
+
+            // Specular Highlight Rim
+            targetCtx.beginPath();
+            targetCtx.arc(-r * 0.25, -r * 0.25, r * 0.4, 0, Math.PI * 2);
+            targetCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+            targetCtx.fill();
+
+            // Custom Procedural Ring / Pattern for specific tiers
+            if (tier === 23) {
+                // Chrono Celestial Ring
+                targetCtx.strokeStyle = 'rgba(254, 240, 138, 0.8)';
+                targetCtx.lineWidth = Math.max(2, r * 0.08);
+                targetCtx.beginPath();
+                targetCtx.ellipse(0, 0, r * 1.3, r * 0.4, Math.PI / 4, 0, Math.PI * 2);
+                targetCtx.stroke();
+            } else if (tier === 25) {
+                // OMEGA Crown / Halo
+                targetCtx.strokeStyle = '#ffffff';
+                targetCtx.lineWidth = Math.max(3, r * 0.08);
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
+                targetCtx.stroke();
+            }
+
+            // Optional Cute Expressions
+            if (showCuteFaces && r >= 10) {
+                targetCtx.fillStyle = '#ffffff';
+                targetCtx.shadowColor = '#000000';
+                targetCtx.shadowBlur = 4;
+
+                const eyeOffset = r * 0.28;
+                const eyeR = Math.max(1.8, r * 0.09);
+
+                // Eyes
+                targetCtx.beginPath();
+                targetCtx.arc(-eyeOffset, -r * 0.1, eyeR, 0, Math.PI * 2);
+                targetCtx.arc(eyeOffset, -r * 0.1, eyeR, 0, Math.PI * 2);
+                targetCtx.fill();
+
+                // Smile
+                targetCtx.beginPath();
+                targetCtx.arc(0, 0, r * 0.25, 0.15 * Math.PI, 0.85 * Math.PI);
+                targetCtx.lineWidth = Math.max(1.5, r * 0.06);
+                targetCtx.strokeStyle = '#ffffff';
+                targetCtx.stroke();
+            }
+
+            targetCtx.restore();
+        }
+
+        function drawDropperGuide() {
+            if (dropCooldown > 0 || isGameOver) return;
+
+            const r = BALL_DEFS[currentDropTier - 1].radius;
+            const dropY = JAR.top - 40;
+
+            // Dotted vertical line
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+            ctx.beginPath();
+            ctx.moveTo(aimX, dropY + r);
+            ctx.lineTo(aimX, JAR.bottom);
+            ctx.stroke();
+            ctx.restore();
+
+            // Preview current ball at dropper top
+            drawBall(ctx, aimX, dropY, currentDropTier);
+        }
+
+        function renderPreviewCanvases() {
+            // Next Canvas
+            const nextC = document.getElementById('nextCanvas');
+            const nCtx = nextC.getContext('2d');
+            nCtx.clearRect(0, 0, 60, 60);
+            const nScale = Math.min(1, 24 / BALL_DEFS[nextDropTier - 1].radius);
+            drawBall(nCtx, 30, 30, nextDropTier, 0, nScale);
+
+            // Hold Canvas
+            const holdC = document.getElementById('holdCanvas');
+            const hCtx = holdC.getContext('2d');
+            hCtx.clearRect(0, 0, 60, 60);
+            if (holdTier !== null) {
+                const hScale = Math.min(1, 24 / BALL_DEFS[holdTier - 1].radius);
+                drawBall(hCtx, 30, 30, holdTier, 0, hScale);
+            }
+        }
+
+        // ==========================================
+        // 10. PARTICLE & FLOATING TEXT ENGINE
+        // ==========================================
+        function spawnParticleBurst(x, y, color1, color2, count = 20) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 220 + 40;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: Math.random() * 4 + 2,
+                    color: Math.random() > 0.5 ? color1 : color2,
+                    life: 1.0,
+                    decay: Math.random() * 1.5 + 1.0
+                });
+            }
+        }
+
+        function updateAndDrawParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= p.decay * dt;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function spawnFloatingText(text, x, y, color) {
+            floatTexts.push({
+                text, x, y, color,
+                life: 1.0
+            });
+        }
+
+        function updateAndDrawFloatingText(dt) {
+            for (let i = floatTexts.length - 1; i >= 0; i--) {
+                const ft = floatTexts[i];
+                ft.y -= 35 * dt;
+                ft.life -= 1.2 * dt;
+
+                if (ft.life <= 0) {
+                    floatTexts.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = ft.life;
+                ctx.font = 'black 14px Outfit';
+                ctx.fillStyle = ft.color;
+                ctx.textAlign = 'center';
+                ctx.shadowColor = '#000000';
+                ctx.shadowBlur = 6;
+                ctx.fillText(ft.text, ft.x, ft.y);
+                ctx.restore();
+            }
+        }
+
+        function showComboText(combo) {
+            const banner = document.getElementById('comboBanner');
+            const textEl = document.getElementById('comboMultiplierText');
+            textEl.textContent = `${combo}x MULTI-MERGE!`;
+            banner.classList.remove('opacity-0', 'scale-50');
+            banner.classList.add('opacity-100', 'scale-110');
+
+            setTimeout(() => {
+                banner.classList.remove('opacity-100', 'scale-110');
+                banner.classList.add('opacity-0', 'scale-50');
+            }, 900);
+        }
+
+        function triggerScreenShake(magnitude, duration) {
+            screenShakeMag = magnitude;
+            screenShakeTime = duration;
+        }
+
+        // ==========================================
+        // 11. GAME OVER & OVERFLOW DETECTION
+        // ==========================================
+        function checkOverflowDanger(dt) {
+            let isAnyBallInDanger = false;
+
+            balls.forEach(b => {
+                // If ball center is above danger line and ball is nearly stationary
+                if (b.y - b.radius < JAR.dangerY && Math.hypot(b.vx, b.vy) < 25) {
+                    isAnyBallInDanger = true;
+                }
+            });
+
+            if (isAnyBallInDanger) {
+                dangerTimer += dt;
+                if (dangerTimer >= 2.5 && !isGameOver) {
+                    triggerGameOver();
+                }
+            } else {
+                dangerTimer = Math.max(0, dangerTimer - dt * 2);
+            }
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            playSound('supernova');
+
+            let maxTierReached = 1;
+            balls.forEach(b => {
+                if (b.tier > maxTierReached) maxTierReached = b.tier;
+            });
+
+            document.getElementById('goFinalScore').textContent = currentScore.toLocaleString();
+            document.getElementById('goHighestTier').textContent = `Tier ${maxTierReached} (${BALL_DEFS[maxTierReached - 1].name})`;
+            document.getElementById('goUnlockedCount').textContent = `${unlockedTiers.size} / ${TOTAL_TIERS}`;
+
+            document.getElementById('gameOverModal').classList.remove('hidden');
+        }
+
+        function restartGame() {
+            balls = [];
+            particles = [];
+            floatTexts = [];
+            currentScore = 0;
+            dangerTimer = 0;
+            isGameOver = false;
+            currentDropTier = 1;
+            nextDropTier = getRandomDropTier();
+            holdTier = null;
+            canHoldSwap = true;
+
+            document.getElementById('currentScore').textContent = '0';
+            document.getElementById('holdEmptyText').style.display = 'block';
+            document.getElementById('gameOverModal').classList.add('hidden');
+
+            renderPreviewCanvases();
+        }
+
+        // ==========================================
+        // 12. CONTROLS & INPUT HANDLERS
+        // ==========================================
+        function setAimPosition(clientX) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const canvasX = (clientX - rect.left) * scaleX;
+
+            const r = BALL_DEFS[currentDropTier - 1].radius;
+            aimX = Math.max(JAR.left + r, Math.min(JAR.right - r, canvasX));
+        }
+
+        function executeDrop() {
+            if (dropCooldown > 0 || isGameOver) return;
+            initAudio();
+
+            const r = BALL_DEFS[currentDropTier - 1].radius;
+            const dropY = JAR.top - 40;
+
+            const droppedBall = new Ball(aimX, dropY, currentDropTier);
+            droppedBall.vy = 100; // Drop velocity
+            balls.push(droppedBall);
+
+            playSound('drop');
+
+            // Reset drop state
+            currentDropTier = nextDropTier;
+            nextDropTier = getRandomDropTier();
+            canHoldSwap = true;
+            dropCooldown = COOLDOWN_TIME;
+
+            renderPreviewCanvases();
+        }
+
+        canvas.addEventListener('mousemove', (e) => setAimPosition(e.clientX));
+        canvas.addEventListener('touchmove', (e) => {
+            if (e.touches.length > 0) {
+                setAimPosition(e.touches[0].clientX);
+            }
+        });
+
+        canvas.addEventListener('click', () => executeDrop());
+        canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            executeDrop();
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') {
+                const r = BALL_DEFS[currentDropTier - 1].radius;
+                aimX = Math.max(JAR.left + r, aimX - 20);
+            } else if (e.key === 'ArrowRight' || e.key === 'd') {
+                const r = BALL_DEFS[currentDropTier - 1].radius;
+                aimX = Math.min(JAR.right - r, aimX + 20);
+            } else if (e.key === ' ' || e.key === 'ArrowDown' || e.key === 's') {
+                executeDrop();
+            } else if (e.key === 'c' || e.key === 'C' || e.key === 'Shift') {
+                triggerHoldSwap();
+            }
+        });
+
+        // ==========================================
+        // 13. EVOLUTION DEX MODAL LOGIC
+        // ==========================================
+        function openDexModal() {
+            const dexGrid = document.getElementById('dexGrid');
+            dexGrid.innerHTML = '';
+
+            BALL_DEFS.forEach(def => {
+                const isUnlocked = unlockedTiers.has(def.tier);
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl border flex flex-col items-center justify-between text-center transition ${
+                    isUnlocked 
+                    ? 'bg-slate-900/90 border-slate-700/80 shadow-lg' 
+                    : 'bg-slate-950/40 border-slate-800/40 opacity-50'
+                }`;
+
+                const miniCanvasId = `dexCanvas_${def.tier}`;
+
+                card.innerHTML = `
+                    <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full" style="color: ${def.rarity.color}; background: ${def.rarity.color}22">
+                        ${def.rarity.name}
+                    </span>
+                    <div class="w-16 h-16 my-2 flex items-center justify-center">
+                        <canvas id="${miniCanvasId}" width="60" height="60"></canvas>
+                    </div>
+                    <div>
+                        <div class="text-xs font-bold ${isUnlocked ? 'text-white' : 'text-slate-500'}">
+                            ${isUnlocked ? def.name : '??? Locked'}
+                        </div>
+                        <div class="text-[10px] text-slate-400 font-semibold">Tier ${def.tier} • ${def.points} pts</div>
+                    </div>
+                `;
+
+                dexGrid.appendChild(card);
+
+                // Render Icon
+                setTimeout(() => {
+                    const c = document.getElementById(miniCanvasId);
+                    if (c) {
+                        const cCtx = c.getContext('2d');
+                        if (isUnlocked) {
+                            const scale = Math.min(1, 24 / def.radius);
+                            drawBall(cCtx, 30, 30, def.tier, 0, scale);
+                        } else {
+                            cCtx.fillStyle = '#334155';
+                            cCtx.beginPath();
+                            cCtx.arc(30, 30, 18, 0, Math.PI * 2);
+                            cCtx.fill();
+                            cCtx.fillStyle = '#64748b';
+                            cCtx.font = 'bold 16px Outfit';
+                            cCtx.textAlign = 'center';
+                            cCtx.fillText('?', 30, 35);
+                        }
+                    }
+                }, 10);
+            });
+
+            document.getElementById('dexModal').classList.remove('hidden');
+        }
+
+        function closeDexModal() {
+            document.getElementById('dexModal').classList.add('hidden');
+        }
+
+        function confirmResetCollection() {
+            if (confirm("Reset all discovered ball tiers in your Dex?")) {
+                unlockedTiers = new Set([1]);
+                saveStorage();
+                updateDexUnlockedBadge();
+                openDexModal();
+            }
+        }
+
+        function showDiscoveryModal(tier) {
+            const def = BALL_DEFS[tier - 1];
+            document.getElementById('discoveryTierName').textContent = def.name;
+            document.getElementById('discoveryRarity').textContent = `${def.rarity.name} • Tier ${def.tier}`;
+
+            const discCanvas = document.getElementById('discoveryCanvas');
+            const dCtx = discCanvas.getContext('2d');
+            dCtx.clearRect(0, 0, 120, 120);
+            const scale = Math.min(1, 50 / def.radius);
+            drawBall(dCtx, 60, 60, tier, 0, scale);
+
+            document.getElementById('discoveryModal').classList.remove('hidden');
+            playSound('discovery');
+        }
+
+        function closeDiscoveryModal() {
+            document.getElementById('discoveryModal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 14. MAIN GAME LOOP
+        // ==========================================
+        let lastFrameTime = performance.now();
+
+        function gameLoop(now) {
+            const dt = Math.min(0.033, (now - lastFrameTime) / 1000);
+            lastFrameTime = now;
+
+            if (dropCooldown > 0) {
+                dropCooldown -= dt;
+            }
+
+            // Update Physics
+            if (!isGameOver) {
+                updatePhysics(dt);
+                checkOverflowDanger(dt);
+            }
+
+            // Screen Shake calculation
+            ctx.save();
+            if (screenShakeTime > 0) {
+                screenShakeTime -= dt;
+                const rx = (Math.random() - 0.5) * screenShakeMag;
+                const ry = (Math.random() - 0.5) * screenShakeMag;
+                ctx.translate(rx, ry);
+            }
+
+            // Clear Frame
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Background Glass Jar
+            drawJar();
+
+            // Draw Active Balls
+            balls.forEach(b => {
+                drawBall(ctx, b.x, b.y, b.tier, b.angle);
+            });
+
+            // Draw Dropper & Guide Line
+            drawDropperGuide();
+
+            // Draw Particles & Floating Text
+            updateAndDrawParticles(dt);
+            updateAndDrawFloatingText(dt);
+
+            ctx.restore();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // ==========================================
+        // 15. INITIALIZATION ON LOAD
+        // ==========================================
+        window.addEventListener('load', () => {
+            loadStorage();
+            nextDropTier = getRandomDropTier();
+            renderPreviewCanvases();
+            updatePowerupUI();
+            requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>

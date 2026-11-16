@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PONG SUPREME: Multiverse Edition</title>
+    <!-- Tailwind CSS for modern responsive UI styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Rajdhani:wght@500;700&display=swap');
+
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #030712;
+            color: #f0f4f8;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        .font-orbitron {
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        /* Custom glowing scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #090d16;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #00f0ff;
+            border-radius: 3px;
+        }
+
+        /* Glassmorphism panel styling */
+        .glass-panel {
+            background: rgba(10, 15, 30, 0.88);
+            backdrop-filter: blur(14px);
+            border: 1px solid rgba(0, 240, 255, 0.25);
+            box-shadow: 0 10px 35px 0 rgba(0, 0, 0, 0.75);
+        }
+
+        /* Neon text & border glows */
+        .glow-cyan {
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.8), 0 0 20px rgba(0, 240, 255, 0.4);
+        }
+        .glow-magenta {
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.8), 0 0 20px rgba(255, 0, 127, 0.4);
+        }
+        .glow-gold {
+            text-shadow: 0 0 10px rgba(245, 158, 11, 0.8), 0 0 20px rgba(245, 158, 11, 0.4);
+        }
+
+        canvas {
+            display: block;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 text-white select-none">
+
+    <!-- TOP HUD OVERLAY -->
+    <header class="absolute top-0 left-0 w-full z-10 px-6 py-3 flex justify-between items-center bg-gradient-to-b from-slate-950/90 via-slate-950/50 to-transparent pointer-events-none">
+        <!-- Player 1 Status -->
+        <div class="flex items-center space-x-4 pointer-events-auto">
+            <div class="flex flex-col">
+                <span class="text-xs uppercase tracking-widest text-cyan-400 font-bold">Player 1 (P1)</span>
+                <span id="score-p1" class="text-4xl font-black font-orbitron text-cyan-400 glow-cyan">0</span>
+                <!-- Laser Mode Health Bar P1 -->
+                <div id="hp-container-p1" class="hidden w-32 h-3 bg-slate-800 rounded-full overflow-hidden border border-cyan-500/50 mt-1">
+                    <div id="hp-bar-p1" class="h-full bg-gradient-to-r from-cyan-500 to-blue-400 w-full transition-all duration-150"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Title & Dynamic Gauge HUD -->
+        <div class="flex flex-col items-center justify-center text-center">
+            <h1 id="mode-title-display" class="text-lg md:text-2xl font-black font-orbitron tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 uppercase glow-cyan">
+                CLASSIC PONG
+            </h1>
+            <span id="mode-subtitle-display" class="text-xs text-slate-400 font-mono tracking-wide">
+                1P VS AI (MEDIUM)
+            </span>
+            <!-- Wind Gauge HUD for Gust Mode -->
+            <div id="wind-hud" class="hidden items-center space-x-2 mt-1 px-3 py-1 bg-slate-900/90 rounded-full border border-teal-500/40 text-xs font-mono text-teal-300">
+                <span>WIND GAUGE:</span>
+                <span id="wind-speed-text" class="font-bold">0 MPH</span>
+                <svg id="wind-arrow-icon" class="w-4 h-4 transform transition-transform duration-200 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+            </div>
+        </div>
+
+        <!-- Player 2 / AI Status -->
+        <div class="flex items-center space-x-4 pointer-events-auto">
+            <div class="flex flex-col items-end">
+                <span id="p2-label" class="text-xs uppercase tracking-widest text-pink-400 font-bold">Player 2 (AI)</span>
+                <span id="score-p2" class="text-4xl font-black font-orbitron text-pink-500 glow-magenta">0</span>
+                <!-- Laser Mode Health Bar P2 -->
+                <div id="hp-container-p2" class="hidden w-32 h-3 bg-slate-800 rounded-full overflow-hidden border border-pink-500/50 mt-1">
+                    <div id="hp-bar-p2" class="h-full bg-gradient-to-r from-pink-500 to-rose-400 w-full transition-all duration-150"></div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- FLOATING ACTION BUTTONS (TOP RIGHT CORNER) -->
+    <div class="absolute top-4 right-4 z-20 flex space-x-2">
+        <button id="btn-sound" class="p-2.5 rounded-xl glass-panel hover:bg-cyan-500/20 text-cyan-400 transition border border-cyan-500/30" title="Toggle Sound">
+            <svg id="icon-sound-on" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            <svg id="icon-sound-off" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/></svg>
+        </button>
+        <button id="btn-theme" class="p-2.5 rounded-xl glass-panel hover:bg-purple-500/20 text-purple-400 transition border border-purple-500/30" title="Change Visual Theme">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+        </button>
+        <button id="btn-achievements" class="p-2.5 rounded-xl glass-panel hover:bg-amber-500/20 text-amber-400 transition border border-amber-500/30" title="Achievements">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+        </button>
+        <button id="btn-pause" class="p-2.5 rounded-xl glass-panel hover:bg-cyan-500/20 text-cyan-400 transition border border-cyan-500/30" title="Pause Game">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </button>
+        <button id="btn-modes" class="px-4 py-2 rounded-xl glass-panel hover:bg-cyan-500/20 text-cyan-300 font-bold text-sm transition border border-cyan-500/40 flex items-center space-x-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <span>MODES</span>
+        </button>
+    </div>
+
+    <!-- MAIN GAME CANVAS -->
+    <main class="relative flex-grow w-full h-full">
+        <canvas id="gameCanvas" class="w-full h-full bg-slate-950"></canvas>
+    </main>
+
+    <!-- ON-SCREEN MOBILE / TOUCH FLIPPER BUTTONS (Pinball Mode Only) -->
+    <div id="flipper-controls" class="hidden absolute bottom-6 left-0 right-0 z-20 justify-between px-8 pointer-events-none">
+        <button id="btn-flip-left" class="pointer-events-auto px-8 py-4 bg-cyan-600/80 active:bg-cyan-400 text-white font-orbitron font-bold rounded-2xl border-2 border-cyan-300 shadow-lg shadow-cyan-500/40 touch-none">FLIP LEFT (A / W / SPACE)</button>
+        <button id="btn-flip-right" class="pointer-events-auto px-8 py-4 bg-pink-600/80 active:bg-pink-400 text-white font-orbitron font-bold rounded-2xl border-2 border-pink-300 shadow-lg shadow-pink-500/40 touch-none">FLIP RIGHT (LEFT ARROW / UP / D)</button>
+    </div>
+
+    <!-- MODE SELECTION MODAL / DASHBOARD -->
+    <div id="modal-modes" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-5xl max-h-[92vh] rounded-3xl p-6 md:p-8 flex flex-col overflow-hidden border border-cyan-500/40">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-2xl md:text-3xl font-black font-orbitron text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 glow-cyan">
+                        MULTIVERSE EDITION: MODE SELECT
+                    </h2>
+                    <p class="text-xs md:text-sm text-slate-400">Select one of 21 hyper-customized game modes</p>
+                </div>
+                <button id="btn-close-modes" class="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Match Settings Bar (1P/2P, AI Difficulty) -->
+            <div class="flex flex-wrap items-center justify-between gap-4 p-4 mb-6 bg-slate-900/90 rounded-2xl border border-slate-800">
+                <div class="flex items-center space-x-3">
+                    <span class="text-xs uppercase font-bold text-slate-400">Match Type:</span>
+                    <button id="btn-toggle-pvp" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-cyan-500 text-slate-950 border border-cyan-400">1P VS AI</button>
+                </div>
+                <div id="ai-diff-container" class="flex flex-wrap items-center gap-2">
+                    <span class="text-xs uppercase font-bold text-slate-400">AI Difficulty:</span>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300" data-diff="easy">EASY</button>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 font-bold" data-diff="medium">MEDIUM</button>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300" data-diff="hard">HARD</button>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 text-pink-400 border border-pink-500/40" data-diff="impossible">PREDICTIVE</button>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 text-amber-400 border border-amber-500/40" data-diff="adaptive">ADAPTIVE</button>
+                    <button class="ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 text-purple-400 border border-purple-500/40" data-diff="ultracurve">ULTRA CURVE</button>
+                </div>
+            </div>
+
+            <!-- Modes Grid -->
+            <div id="modes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto pr-2 pb-4">
+                <!-- Dynamically Populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- PAUSE MODAL -->
+    <div id="modal-pause" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-6 text-center space-y-6 border border-cyan-500/40">
+            <h2 class="text-3xl font-black font-orbitron text-cyan-400 glow-cyan">GAME PAUSED</h2>
+            
+            <div class="space-y-3">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Switch Mode Mid-Match:</label>
+                <select id="pause-mode-select" class="w-full py-2.5 px-4 rounded-xl bg-slate-900 border border-cyan-500/40 text-cyan-300 font-bold text-sm focus:outline-none">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+
+            <div class="flex flex-col space-y-3 pt-2">
+                <button id="btn-resume" class="w-full py-3 rounded-xl bg-cyan-500 text-slate-950 font-bold font-orbitron hover:bg-cyan-400 transition shadow-lg shadow-cyan-500/30">
+                    RESUME MATCH
+                </button>
+                <button id="btn-restart" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold font-orbitron transition border border-slate-700">
+                    RESET SCORES & BALL
+                </button>
+                <button id="btn-pause-modes" class="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-purple-300 font-bold font-orbitron transition border border-purple-500/40">
+                    FULL MODE MENU
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACHIEVEMENTS MODAL -->
+    <div id="modal-achievements" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-6 border border-amber-500/40">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold font-orbitron text-amber-400 glow-gold">ACHIEVEMENTS</h2>
+                <button id="btn-close-achievements" class="text-slate-400 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div id="achievements-list" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Dynamically populated -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ACHIEVEMENT NOTIFICATION TOAST -->
+    <div id="achievement-toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none glass-panel p-4 rounded-2xl border border-amber-500/50 flex items-center space-x-3 shadow-lg shadow-amber-500/20">
+        <div class="text-3xl">🏆</div>
+        <div>
+            <div class="text-[10px] uppercase font-bold text-amber-400 tracking-wider font-orbitron">Achievement Unlocked!</div>
+            <div id="toast-title" class="font-bold text-sm text-white font-orbitron">Title</div>
+            <div id="toast-desc" class="text-xs text-slate-300">Description</div>
+        </div>
+    </div>
+
+    <!-- SOUND SYNTHESIS & GAME ENGINE SCRIPT -->
+    <script>
+        // --- WEB AUDIO API SYNTHESIZER ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type, duration, vol = 0.1) {
+                if (this.muted || !this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            wall() { this.playTone(220, 'sine', 0.08, 0.08); }
+            hit() { this.playTone(440, 'triangle', 0.1, 0.12); }
+            score() {
+                if (this.muted || !this.ctx) return;
+                this.playTone(523.25, 'square', 0.12, 0.15);
+                setTimeout(() => this.playTone(659.25, 'square', 0.12, 0.15), 100);
+                setTimeout(() => this.playTone(783.99, 'square', 0.25, 0.15), 200);
+            }
+            laser() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(880, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+            flipper() { this.playTone(330, 'sine', 0.06, 0.1); }
+            bumper() { this.playTone(600, 'sine', 0.12, 0.15); }
+            boom() {
+                if (this.muted || !this.ctx) return;
+                this.playTone(90, 'sawtooth', 0.3, 0.25);
+            }
+            achievement() {
+                if (this.muted || !this.ctx) return;
+                this.playTone(523.25, 'triangle', 0.1, 0.15);
+                setTimeout(() => this.playTone(659.25, 'triangle', 0.1, 0.15), 80);
+                setTimeout(() => this.playTone(783.99, 'triangle', 0.1, 0.15), 160);
+                setTimeout(() => this.playTone(1046.50, 'square', 0.25, 0.2), 240);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // --- GAME MODES DEFINITIONS (21 Google Snake Style Modes) ---
+        const GAME_MODES = [
+            { id: 'classic', name: 'Classic Pong', icon: '🏓', desc: 'Standard retro Pong physics with precision spin curve physics.' },
+            { id: 'multiball', name: 'Multiball Chaos', icon: '🔮', desc: 'Multiple hyper-fast balls bouncing continuously around the court. All balls respawn!' },
+            { id: 'portals', name: 'Warp Portals', icon: '🌀', desc: 'Teleportation portals redirect ball trajectories unexpectedly.' },
+            { id: 'bumpers', name: 'Bumper Grid', icon: '🟧', desc: 'Spinning orange square pinball bumpers propel balls with bonus momentum.' },
+            { id: 'powerups', name: 'Power-Up Mayhem', icon: '⭐', desc: 'Collect floating icons for Paddle Grow, Shrink, Shields, and Freeze Beams.' },
+            { id: 'speedball', name: 'Speedball Hyper', icon: '⚡', desc: 'Ball speed accelerates by 1.1x on every hit with hot ember spark FX.' },
+            { id: 'darkmode', name: 'Flashlight Dark', icon: '🔦', desc: 'Pitch-black court illuminated by paddle searchlights with 10% ball visibility.' },
+            { id: 'blackhole', name: 'Black Hole', icon: '🕳️', desc: 'Center gravitational singularity launching balls super fast on center contact.' },
+            { id: 'twindefense', name: 'Twin Defense', icon: '🛡️', desc: 'Dual mirrored paddles defend each player zone simultaneously.' },
+            { id: 'boss', name: 'Boss Raid', icon: '👾', desc: 'A giant spinning central boss entity that both players can hit to score bonus points.' },
+            { id: 'lasers', name: 'Laser Cannons', icon: '🔫', desc: 'Press SPACE to shoot laser bolts! 100 HP health bars with 3s respawns.' },
+            { id: 'quantum', name: 'Quantum Ghost', icon: '👻', desc: 'Ball spawns ghost decoys in superposition to confuse opponents.' },
+            { id: 'shrinking', name: 'Shrinking Arena', icon: '📐', desc: 'Physical upper and lower borders steadily narrow down the playing field.' },
+            { id: 'gust', name: 'Gust Wind', icon: '💨', desc: 'Dynamic swirling wind physics vector indicated in real-time on top HUD.' },
+            { id: 'pinball', name: 'Pinball Flipper', icon: '🎯', desc: 'Interactive pinball flippers propels the ball across the board.' },
+            { id: 'volleyball', name: 'Volleyball Net', icon: '🏐', desc: 'A central physical net blocks low returns, requiring high arcing lob shots.' },
+            { id: 'drones', name: 'Hazard Drones', icon: '🛸', desc: 'Hostile moving defense drones shoot lasers and bounce balls in midfield.' },
+            { id: 'ice', name: 'Ice Friction', icon: '🧊', desc: 'Zero-friction slippery ice paddle movement with maximum spin curve physics!' },
+            { id: 'bricks', name: 'Brick Defense', icon: '🧱', desc: 'Breakout brick wall barriers protecting player goal lines.' },
+            { id: 'timewarp', name: 'Time Warp', icon: '⏳', desc: 'Bouncing speed dilation zone dynamically applies slow-mo or hyper-warp effects.' },
+            { id: 'sandbox', name: 'Custom Sandbox', icon: '🛠️', desc: 'Fully customizable arena parameters.' }
+        ];
+
+        // --- ACHIEVEMENTS DATA ---
+        const ACHIEVEMENTS = [
+            { id: 'first_win', title: 'First Blood', desc: 'Score your first point in any mode.', unlocked: false },
+            { id: 'curve_master', title: 'Spin Wizard', desc: 'Impart a massive curve spin on the ball.', unlocked: false },
+            { id: 'boss_slayer', title: 'Raid Leader', desc: 'Defeat the central spinning boss in Boss Raid mode.', unlocked: false },
+            { id: 'laser_king', title: 'Sniper', desc: 'Land a laser shot on your opponent.', unlocked: false }
+        ];
+
+        // --- ACHIEVEMENTS SYSTEM LOGIC ---
+        function loadAchievements() {
+            try {
+                const saved = localStorage.getItem('pong_supreme_achievements');
+                if (saved) {
+                    const unlockedIds = JSON.parse(saved);
+                    ACHIEVEMENTS.forEach(a => {
+                        if (unlockedIds.includes(a.id)) a.unlocked = true;
+                    });
+                }
+            } catch(e) {}
+        }
+
+        function saveAchievements() {
+            try {
+                const unlockedIds = ACHIEVEMENTS.filter(a => a.unlocked).map(a => a.id);
+                localStorage.setItem('pong_supreme_achievements', JSON.stringify(unlockedIds));
+            } catch(e) {}
+        }
+
+        function unlockAchievement(id) {
+            const ach = ACHIEVEMENTS.find(a => a.id === id);
+            if (!ach || ach.unlocked) return;
+
+            ach.unlocked = true;
+            saveAchievements();
+            audio.achievement();
+
+            const toast = document.getElementById('achievement-toast');
+            const toastTitle = document.getElementById('toast-title');
+            const toastDesc = document.getElementById('toast-desc');
+
+            if (toast && toastTitle && toastDesc) {
+                toastTitle.innerText = ach.title;
+                toastDesc.innerText = ach.desc;
+                toast.classList.remove('translate-y-20', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-0', 'opacity-100');
+                    toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3500);
+            }
+        }
+
+        // --- STATE VARIABLES ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentMode = 'classic';
+        let currentTheme = 'cyberpunk';
+        let isPvP = false;
+        let aiDifficulty = 'medium';
+        let isPaused = false;
+
+        let p1InputMode = 'mouse'; // 'mouse' or 'keys'
+        let lastMousePos = { x: 0, y: 0 };
+
+        // Player Scores
+        let scoreP1 = 0;
+        let scoreP2 = 0;
+
+        // Player Paddles
+        const p1 = { x: 30, y: 0, w: 14, h: 100, vy: 0, vyVel: 0, lastY: 0, hp: 100, respawnTimer: 0, freezeTimer: 0, powerTimer: 0 };
+        const p2 = { x: 0, y: 0, w: 14, h: 100, vy: 0, vyVel: 0, lastY: 0, hp: 100, respawnTimer: 0, freezeTimer: 0, powerTimer: 0 };
+
+        // Main Ball
+        const ball = { x: 0, y: 0, radius: 8, vx: 6, vy: 3, spin: 0, lastHitBy: 1, trail: [] };
+        let extraBalls = [];
+
+        // Dynamic Mode Entities
+        let portals = [];
+        let bumpers = [];
+        let powerups = [];
+        let lasers = [];
+        let bricks = [];
+        let drones = [];
+        let flippers = [];
+        let decoyBalls = [];
+        let boss = null;
+        let net = null;
+        let timeZone = null;
+        let windParticles = [];
+        let particles = [];
+
+        let arenaShrink = { top: 0, bottom: 0, left: 0, right: 0 };
+        let windAngle = 0;
+        let windForce = 0;
+        let p1Shield = false;
+        let p2Shield = false;
+
+        let p1LaserCooldown = 0;
+        let p2LaserCooldown = 0;
+        let powerupSpawnTimer = 0;
+        let p2LastKnownBallY = null;
+
+        // Key states
+        const keys = { w: false, s: false, Up: false, Down: false, Left: false, Space: false, a: false, d: false };
+
+        // --- RESIZE & CANVAS SETUP ---
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+
+            p1.y = canvas.height / 2 - p1.h / 2;
+            p2.x = canvas.width - 44;
+            p2.y = canvas.height / 2 - p2.h / 2;
+
+            if (net) {
+                net.x = canvas.width / 2 - 4;
+                net.y = canvas.height * 0.35;
+                net.w = 8;
+                net.h = canvas.height * 0.65;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- CLEAR OBJECTS FOR MODE SWITCHING ---
+        function clearModeObjects() {
+            extraBalls = [];
+            portals = [];
+            bumpers = [];
+            powerups = [];
+            lasers = [];
+            bricks = [];
+            drones = [];
+            flippers = [];
+            decoyBalls = [];
+            boss = null;
+            net = null;
+            timeZone = null;
+            windParticles = [];
+            particles = [];
+            arenaShrink = { top: 0, bottom: 0, left: 0, right: 0 };
+            p1Shield = false;
+            p2Shield = false;
+            p1.hp = 100; p1.respawnTimer = 0; p1.freezeTimer = 0; p1.h = 100; p1.vyVel = 0;
+            p2.hp = 100; p2.respawnTimer = 0; p2.freezeTimer = 0; p2.h = 100; p2.vyVel = 0;
+
+            document.getElementById('hp-container-p1').classList.add('hidden');
+            document.getElementById('hp-container-p2').classList.add('hidden');
+            document.getElementById('wind-hud').classList.add('hidden');
+            document.getElementById('wind-hud').classList.remove('flex');
+            document.getElementById('flipper-controls').classList.add('hidden');
+            document.getElementById('flipper-controls').classList.remove('flex');
+        }
+
+        // --- MODE INITIALIZER ---
+        function initMode(modeId) {
+            currentMode = modeId;
+            clearModeObjects();
+            resizeCanvas();
+            resetBall();
+
+            const modeObj = GAME_MODES.find(m => m.id === modeId) || GAME_MODES[0];
+            document.getElementById('mode-title-display').innerText = modeObj.name;
+
+            if (modeId === 'multiball') {
+                for (let i = 0; i < 3; i++) {
+                    extraBalls.push({
+                        x: canvas.width / 2,
+                        y: canvas.height / 2,
+                        radius: 8,
+                        vx: (Math.random() > 0.5 ? 1 : -1) * (5 + Math.random() * 3),
+                        vy: (Math.random() - 0.5) * 6,
+                        spin: 0,
+                        lastHitBy: 1,
+                        trail: []
+                    });
+                }
+            } else if (modeId === 'portals') {
+                portals = [
+                    { x: canvas.width * 0.3, y: canvas.height * 0.3, r: 24, pair: 1, color: '#00f0ff' },
+                    { x: canvas.width * 0.7, y: canvas.height * 0.7, r: 24, pair: 0, color: '#ff007f' },
+                    { x: canvas.width * 0.3, y: canvas.height * 0.7, r: 24, pair: 3, color: '#f59e0b' },
+                    { x: canvas.width * 0.7, y: canvas.height * 0.3, r: 24, pair: 2, color: '#10b981' }
+                ];
+            } else if (modeId === 'bumpers') {
+                bumpers = [
+                    { x: canvas.width * 0.4, y: canvas.height * 0.3, size: 50, val: 100, rotSpeed: 1.5, angle: 0, flash: 0 },
+                    { x: canvas.width * 0.6, y: canvas.height * 0.3, size: 50, val: 100, rotSpeed: -1.5, angle: 0, flash: 0 },
+                    { x: canvas.width * 0.4, y: canvas.height * 0.7, size: 50, val: 100, rotSpeed: -1.5, angle: 0, flash: 0 },
+                    { x: canvas.width * 0.6, y: canvas.height * 0.7, size: 50, val: 100, rotSpeed: 1.5, angle: 0, flash: 0 },
+                    { x: canvas.width * 0.5, y: canvas.height * 0.5, size: 60, val: 250, rotSpeed: 2.0, angle: 0, flash: 0 }
+                ];
+            } else if (modeId === 'boss') {
+                boss = {
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    size: 90,
+                    hp: 500,
+                    maxHp: 500,
+                    angle: 0,
+                    rotSpeed: 1.2
+                };
+            } else if (modeId === 'lasers') {
+                document.getElementById('hp-container-p1').classList.remove('hidden');
+                document.getElementById('hp-container-p2').classList.remove('hidden');
+            } else if (modeId === 'gust') {
+                document.getElementById('wind-hud').classList.remove('hidden');
+                document.getElementById('wind-hud').classList.add('flex');
+                for (let i = 0; i < 40; i++) {
+                    windParticles.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        len: 15 + Math.random() * 20,
+                        speed: 2 + Math.random() * 3
+                    });
+                }
+            } else if (modeId === 'pinball') {
+                document.getElementById('flipper-controls').classList.remove('hidden');
+                document.getElementById('flipper-controls').classList.add('flex');
+                
+                flippers = [
+                    { x: canvas.width * 0.32, y: canvas.height * 0.35, length: 110, angle: Math.PI / 4, restAngle: Math.PI / 4, activeAngle: -Math.PI / 6, side: 'left' },
+                    { x: canvas.width * 0.32, y: canvas.height * 0.65, length: 110, angle: -Math.PI / 4, restAngle: -Math.PI / 4, activeAngle: Math.PI / 6, side: 'left' },
+                    { x: canvas.width * 0.68, y: canvas.height * 0.35, length: 110, angle: (3 * Math.PI) / 4, restAngle: (3 * Math.PI) / 4, activeAngle: (7 * Math.PI) / 6, side: 'right' },
+                    { x: canvas.width * 0.68, y: canvas.height * 0.65, length: 110, angle: -(3 * Math.PI) / 4, restAngle: -(3 * Math.PI) / 4, activeAngle: -(7 * Math.PI) / 6, side: 'right' }
+                ];
+            } else if (modeId === 'volleyball') {
+                net = {
+                    x: canvas.width / 2 - 4,
+                    y: canvas.height * 0.35,
+                    w: 8,
+                    h: canvas.height * 0.65
+                };
+            } else if (modeId === 'drones') {
+                drones = [
+                    { x: canvas.width * 0.4, y: canvas.height * 0.25, size: 36, vy: 3, shootTimer: 0 },
+                    { x: canvas.width * 0.6, y: canvas.height * 0.75, size: 36, vy: -3, shootTimer: 1.2 }
+                ];
+            } else if (modeId === 'bricks') {
+                const brickCols = 2;
+                const brickRows = 6;
+                const bWidth = 16;
+                const bHeight = canvas.height / (brickRows + 2);
+
+                for (let r = 0; r < brickRows; r++) {
+                    bricks.push({ x: canvas.width * 0.22, y: (r + 1) * bHeight, w: bWidth, h: bHeight - 6, hp: 2 });
+                    bricks.push({ x: canvas.width * 0.78 - bWidth, y: (r + 1) * bHeight, w: bWidth, h: bHeight - 6, hp: 2 });
+                }
+            } else if (modeId === 'timewarp') {
+                timeZone = {
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    r: 95,
+                    vx: 2.5,
+                    vy: 1.8
+                };
+            }
+        }
+
+        // --- RESET BALL POSITION ---
+        function resetBall(direction = 0) {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.spin = 0;
+            ball.trail = [];
+            ball.blackHoleCooling = true; // Prevent center slingshot on spawn
+
+            let dirX = direction === 0 ? (Math.random() > 0.5 ? 1 : -1) : (direction === 1 ? -1 : 1);
+            let initialSpeed = currentMode === 'speedball' ? 9.5 : 7.0;
+
+            ball.vx = dirX * initialSpeed;
+            ball.vy = (Math.random() - 0.5) * 6;
+
+            // Safe boss spawn override
+            if (currentMode === 'boss') {
+                ball.x = canvas.width * 0.25;
+            }
+        }
+
+        // --- AI LOGIC FOR P2 ---
+        function updateAI() {
+            if (isPvP) {
+                if (keys.Up && p2.freezeTimer <= 0) {
+                    if (currentMode === 'ice') p2.vyVel = Math.max(p2.vyVel - 2.5, -18);
+                    else p2.y -= 14.0;
+                }
+                if (keys.Down && p2.freezeTimer <= 0) {
+                    if (currentMode === 'ice') p2.vyVel = Math.min(p2.vyVel + 2.5, 18);
+                    else p2.y += 14.0;
+                }
+                return;
+            }
+
+            if (p2.freezeTimer > 0) return;
+
+            let speed = 5.2;
+            let errorMargin = 10;
+
+            if (aiDifficulty === 'easy') { speed = 3.2; errorMargin = 30; }
+            else if (aiDifficulty === 'medium') { speed = 5.2; errorMargin = 15; }
+            else if (aiDifficulty === 'hard') { speed = 7.2; errorMargin = 5; }
+            else if (aiDifficulty === 'impossible') { speed = 10.5; errorMargin = 0; }
+            else if (aiDifficulty === 'ultracurve') { speed = 13.0; errorMargin = 2; }
+            else if (aiDifficulty === 'adaptive') {
+                speed = 5.0 + (scoreP1 - scoreP2) * 0.8;
+                speed = Math.max(3, Math.min(11, speed));
+            }
+
+            let targetY = ball.y - p2.h / 2;
+
+            // Ultra Curve AI logic: Snaps movement up & down right at impact to maximize spin
+            if (aiDifficulty === 'ultracurve' && ball.vx > 0 && Math.abs(ball.x - p2.x) < 250) {
+                const curvePhase = Math.sin(performance.now() * 0.035);
+                targetY = ball.y - (curvePhase > 0 ? 10 : p2.h - 10);
+            }
+
+            // Flashlight Dark Mode AI Vision Limit
+            if (currentMode === 'darkmode') {
+                const distToAI = Math.hypot(ball.x - (p2.x + p2.w / 2), ball.y - (p2.y + p2.h / 2));
+                if (distToAI <= 210) {
+                    p2LastKnownBallY = ball.y;
+                } else if (p2LastKnownBallY) {
+                    targetY = p2LastKnownBallY - p2.h / 2;
+                } else {
+                    targetY = canvas.height / 2 - p2.h / 2;
+                }
+            }
+
+            if ((aiDifficulty === 'impossible' || aiDifficulty === 'hard') && ball.vx > 0 && currentMode !== 'darkmode') {
+                let timeToReach = (p2.x - ball.x) / ball.vx;
+                let predictedY = ball.y + ball.vy * timeToReach;
+                while (predictedY < 0 || predictedY > canvas.height) {
+                    if (predictedY < 0) predictedY = -predictedY;
+                    if (predictedY > canvas.height) predictedY = 2 * canvas.height - predictedY;
+                }
+                targetY = predictedY - p2.h / 2;
+            }
+
+            const centerY = p2.y + p2.h / 2;
+            if (Math.abs(centerY - (targetY + p2.h / 2)) > errorMargin) {
+                if (currentMode === 'ice') {
+                    p2.vyVel += (centerY < targetY + p2.h / 2 ? 1.8 : -1.8);
+                    p2.vyVel = Math.max(-18, Math.min(18, p2.vyVel));
+                } else {
+                    if (centerY < targetY + p2.h / 2) p2.y += speed;
+                    else p2.y -= speed;
+                }
+            }
+        }
+
+        // --- INPUT CONTROL HANDLING ---
+        window.addEventListener('keydown', (e) => {
+            if (['w', 's', 'W', 'S'].includes(e.key)) {
+                p1InputMode = 'keys';
+            }
+
+            if (e.key === 'w' || e.key === 'W') keys.w = true;
+            if (e.key === 's' || e.key === 'S') keys.s = true;
+            if (e.key === 'ArrowUp') keys.Up = true;
+            if (e.key === 'ArrowDown') keys.Down = true;
+            if (e.key === 'ArrowLeft') keys.Left = true;
+            if (e.key === ' ' || e.key === 'Spacebar') keys.Space = true;
+            if (e.key === 'a' || e.key === 'A') keys.a = true;
+            if (e.key === 'd' || e.key === 'D') keys.d = true;
+
+            if (e.key === 'Escape') togglePause();
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'w' || e.key === 'W') keys.w = false;
+            if (e.key === 's' || e.key === 'S') keys.s = false;
+            if (e.key === 'ArrowUp') keys.Up = false;
+            if (e.key === 'ArrowDown') keys.Down = false;
+            if (e.key === 'ArrowLeft') keys.Left = false;
+            if (e.key === ' ' || e.key === 'Spacebar') keys.Space = false;
+            if (e.key === 'a' || e.key === 'A') keys.a = false;
+            if (e.key === 'd' || e.key === 'D') keys.d = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            const distMoved = Math.hypot(e.clientX - lastMousePos.x, e.clientY - lastMousePos.y);
+            lastMousePos = { x: e.clientX, y: e.clientY };
+
+            if (distMoved > 3) {
+                p1InputMode = 'mouse';
+            }
+
+            if (p1InputMode === 'mouse') {
+                const rect = canvas.getBoundingClientRect();
+                p1.y = e.clientY - rect.top - p1.h / 2;
+            }
+        });
+
+        // Mobile Touch
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            p1InputMode = 'mouse';
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            p1.y = touch.clientY - rect.top - p1.h / 2;
+        }, { passive: false });
+
+        // Flipper Touch Listeners
+        const btnFlipL = document.getElementById('btn-flip-left');
+        const btnFlipR = document.getElementById('btn-flip-right');
+        btnFlipL.addEventListener('touchstart', (e) => { e.preventDefault(); keys.a = true; keys.w = true; });
+        btnFlipL.addEventListener('touchend', (e) => { e.preventDefault(); keys.a = false; keys.w = false; });
+        btnFlipR.addEventListener('touchstart', (e) => { e.preventDefault(); keys.Left = true; keys.Up = true; });
+        btnFlipR.addEventListener('touchend', (e) => { e.preventDefault(); keys.Left = false; keys.Up = false; });
+
+        // --- SPARK PARTICLES CREATION ---
+        function spawnSparks(x, y, color, spinMag = 0) {
+            const isHighSpin = spinMag > 0.4;
+            const sparkCount = isHighSpin ? Math.min(50, 14 + Math.floor(spinMag * 11)) : 12;
+            const sparkColors = isHighSpin 
+                ? ['#ffffff', '#ffe600', '#ff5500', '#ff0033', '#ff007f'] 
+                : [color, '#ffffff'];
+
+            for (let i = 0; i < sparkCount; i++) {
+                const speed = isHighSpin ? (4 + Math.random() * (9 + spinMag * 3)) : (2 + Math.random() * 6);
+                const angle = Math.random() * Math.PI * 2;
+                particles.push({
+                    x: x, y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: sparkColors[Math.floor(Math.random() * sparkColors.length)],
+                    alpha: 1.0,
+                    size: isHighSpin ? (2 + Math.random() * 3) : (1.5 + Math.random() * 2),
+                    decay: 1.6 + Math.random() * 1.4,
+                    isSpark: isHighSpin
+                });
+            }
+        }
+
+        function distToSegment(p, v, w) {
+            const l2 = (w.x - v.x)**2 + (w.y - v.y)**2;
+            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+        }
+
+        // --- MAIN GAME UPDATE LOOP ---
+        function update(dt) {
+            if (isPaused) return;
+
+            audio.init();
+
+            // P1 Keyboard movement (Faster speed: 14.0)
+            if (p1InputMode === 'keys' && p1.freezeTimer <= 0) {
+                if (currentMode === 'ice') {
+                    if (keys.w) p1.vyVel = Math.max(p1.vyVel - 2.5, -18);
+                    if (keys.s) p1.vyVel = Math.min(p1.vyVel + 2.5, 18);
+                } else {
+                    if (keys.w) p1.y -= 14.0;
+                    if (keys.s) p1.y += 14.0;
+                }
+            }
+
+            // Ice Friction Mode Paddle Momentum & Slide
+            if (currentMode === 'ice') {
+                p1.y += p1.vyVel;
+                p2.y += p2.vyVel;
+                p1.vyVel *= 0.95;
+                p2.vyVel *= 0.95;
+            }
+
+            updateAI();
+
+            // Laser Mode Shooting Control
+            if (p1LaserCooldown > 0) p1LaserCooldown -= dt;
+            if (p2LaserCooldown > 0) p2LaserCooldown -= dt;
+
+            if (currentMode === 'lasers') {
+                if (keys.Space && p1LaserCooldown <= 0 && p1.respawnTimer <= 0) {
+                    lasers.push({ x: p1.x + p1.w + 10, y: p1.y + p1.h / 2, vx: 14, color: '#00f0ff', owner: 1 });
+                    p1LaserCooldown = 0.35;
+                    audio.laser();
+                }
+
+                // AI / P2 Laser Firing Logic
+                if (!isPvP && p2LaserCooldown <= 0 && p2.respawnTimer <= 0) {
+                    if (Math.abs((p2.y + p2.h / 2) - (p1.y + p1.h / 2)) < 150 && Math.random() < 0.08) {
+                        lasers.push({ x: p2.x - 10, y: p2.y + p2.h / 2, vx: -14, color: '#ff007f', owner: 2 });
+                        p2LaserCooldown = 0.5;
+                        audio.laser();
+                    }
+                }
+            }
+
+            // Power-ups Mechanics & Active Timers
+            if (p1.powerTimer > 0) { p1.powerTimer -= dt; if (p1.powerTimer <= 0) p1.h = 100; }
+            if (p2.powerTimer > 0) { p2.powerTimer -= dt; if (p2.powerTimer <= 0) p2.h = 100; }
+            if (p1.freezeTimer > 0) p1.freezeTimer -= dt;
+            if (p2.freezeTimer > 0) p2.freezeTimer -= dt;
+
+            if (currentMode === 'powerups') {
+                powerupSpawnTimer += dt;
+                if (powerupSpawnTimer >= 5.0 && powerups.length < 3) {
+                    powerupSpawnTimer = 0;
+                    const types = [
+                        { type: 'grow', icon: '⬆️', color: '#22c55e' },
+                        { type: 'shrink', icon: '⬇️', color: '#ef4444' },
+                        { type: 'freeze', icon: '❄️', color: '#38bdf8' },
+                        { type: 'shield', icon: '🛡️', color: '#f59e0b' },
+                        { type: 'speed', icon: '⚡', color: '#eab308' }
+                    ];
+                    const selected = types[Math.floor(Math.random() * types.length)];
+                    powerups.push({
+                        x: canvas.width * (0.3 + Math.random() * 0.4),
+                        y: canvas.height * (0.2 + Math.random() * 0.6),
+                        r: 18,
+                        ...selected
+                    });
+                }
+            }
+
+            // Time Warp Zone Update
+            if (timeZone) {
+                timeZone.x += timeZone.vx;
+                timeZone.y += timeZone.vy;
+                if (timeZone.x - timeZone.r <= 50 || timeZone.x + timeZone.r >= canvas.width - 50) timeZone.vx = -timeZone.vx;
+                if (timeZone.y - timeZone.r <= 20 || timeZone.y + timeZone.r >= canvas.height - 20) timeZone.vy = -timeZone.vy;
+            }
+
+            // SHRINKING ARENA BOUNDS
+            let topBound = 0;
+            let bottomBound = canvas.height;
+
+            if (currentMode === 'shrinking') {
+                arenaShrink.top = Math.min(canvas.height * 0.28, arenaShrink.top + dt * 9);
+                arenaShrink.bottom = Math.min(canvas.height * 0.28, arenaShrink.bottom + dt * 9);
+                topBound = arenaShrink.top;
+                bottomBound = canvas.height - arenaShrink.bottom;
+            }
+
+            // Clamp Paddles
+            p1.y = Math.max(topBound, Math.min(bottomBound - p1.h, p1.y));
+            p2.y = Math.max(topBound, Math.min(bottomBound - p2.h, p2.y));
+
+            // Track Paddle Velocity for Spin/Curve
+            p1.vy = p1.y - p1.lastY;
+            p1.lastY = p1.y;
+            p2.vy = p2.y - p2.lastY;
+            p2.lastY = p2.y;
+
+            // Respawn Timers for Laser Mode
+            if (p1.respawnTimer > 0) {
+                p1.respawnTimer -= dt;
+                if (p1.respawnTimer <= 0) { p1.hp = 100; p1.respawnTimer = 0; }
+            }
+            if (p2.respawnTimer > 0) {
+                p2.respawnTimer -= dt;
+                if (p2.respawnTimer <= 0) { p2.hp = 100; p2.respawnTimer = 0; }
+            }
+
+            // Flippers Update
+            flippers.forEach(f => {
+                let active = false;
+                if (f.side === 'left') {
+                    if (keys.a || keys.w || keys.Space) active = true;
+                } else if (f.side === 'right') {
+                    if (isPvP) {
+                        if (keys.Left || keys.Up || keys.d) active = true;
+                    } else {
+                        // AI flipper control: automatically flip when ball approaches
+                        const allBalls = [ball, ...extraBalls];
+                        for (let b of allBalls) {
+                            const distToFlipper = Math.hypot(b.x - f.x, b.y - f.y);
+                            if (distToFlipper < 135 && b.x > canvas.width * 0.45) {
+                                active = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                f.isActive = active;
+                const targetAngle = active ? f.activeAngle : f.restAngle;
+                f.angle += (targetAngle - f.angle) * 0.35;
+            });
+
+            // Drones Update
+            if (currentMode === 'drones') {
+                drones.forEach(d => {
+                    d.y += d.vy;
+                    if (d.y - d.size/2 <= topBound || d.y + d.size/2 >= bottomBound) {
+                        d.vy = -d.vy;
+                    }
+                    d.shootTimer += dt;
+                    if (d.shootTimer >= 2.5) {
+                        d.shootTimer = 0;
+                        const dir = Math.random() > 0.5 ? 1 : -1;
+                        lasers.push({ x: d.x, y: d.y, vx: dir * 7, color: '#ef4444' });
+                    }
+                });
+            }
+
+            // Boss Rotation Update
+            if (boss) {
+                boss.angle += dt * boss.rotSpeed;
+                boss.y = canvas.height / 2 + Math.sin(performance.now() * 0.002) * 30;
+            }
+
+            // Bumpers Rotation Update
+            bumpers.forEach(bump => {
+                bump.angle += dt * bump.rotSpeed;
+            });
+
+            // Lasers Update
+            for (let i = lasers.length - 1; i >= 0; i--) {
+                const l = lasers[i];
+                l.x += l.vx;
+
+                if (l.vx < 0 && p1.respawnTimer <= 0 && l.x <= p1.x + p1.w && l.x >= p1.x && l.y >= p1.y && l.y <= p1.y + p1.h) {
+                    p1.hp -= 25;
+                    spawnSparks(l.x, l.y, '#00f0ff', 0.5);
+                    audio.boom();
+                    lasers.splice(i, 1);
+                    if (p1.hp <= 0) p1.respawnTimer = 3.0;
+                    continue;
+                }
+                if (l.vx > 0 && p2.respawnTimer <= 0 && l.x >= p2.x && l.x <= p2.x + p2.w && l.y >= p2.y && l.y <= p2.y + p2.h) {
+                    p2.hp -= 25;
+                    spawnSparks(l.x, l.y, '#ff007f', 0.5);
+                    audio.boom();
+                    if (l.owner === 1) unlockAchievement('laser_king');
+                    lasers.splice(i, 1);
+                    if (p2.hp <= 0) p2.respawnTimer = 3.0;
+                    continue;
+                }
+
+                if (l.x < 0 || l.x > canvas.width) {
+                    lasers.splice(i, 1);
+                }
+            }
+
+            // Quantum Decoys Update
+            if (currentMode === 'quantum') {
+                if (Math.random() < 0.03 && decoyBalls.length < 5) {
+                    decoyBalls.push({
+                        x: ball.x + (Math.random() - 0.5) * 40,
+                        y: ball.y + (Math.random() - 0.5) * 40,
+                        vx: ball.vx + (Math.random() - 0.5) * 2,
+                        vy: ball.vy + (Math.random() - 0.5) * 2,
+                        alpha: 0.8
+                    });
+                }
+                for (let i = decoyBalls.length - 1; i >= 0; i--) {
+                    const db = decoyBalls[i];
+                    db.x += db.vx;
+                    db.y += db.vy;
+                    db.alpha -= dt * 0.4;
+                    if (db.alpha <= 0 || db.x < 0 || db.x > canvas.width) {
+                        decoyBalls.splice(i, 1);
+                    }
+                }
+            }
+
+            // Update All Active Balls
+            const allActiveBalls = [ball, ...extraBalls];
+            allActiveBalls.forEach((b) => {
+                if (b.scored) return;
+
+                // Ball spin physics & decay (Harder curve in Ice Friction mode)
+                const spinCurveForce = currentMode === 'ice' ? 0.08 : 0.04;
+                b.vy += (b.spin || 0) * spinCurveForce;
+                b.spin = (b.spin || 0) * 0.982;
+
+                if (!b.trail) b.trail = [];
+                b.trail.unshift({ x: b.x, y: b.y });
+                if (b.trail.length > 12) b.trail.pop();
+
+                // Fixed Time Warp Speed Zone Physics
+                if (timeZone) {
+                    const distToTZ = Math.hypot(b.x - timeZone.x, b.y - timeZone.y);
+                    if (distToTZ < timeZone.r && !b.inTimeZone) {
+                        b.inTimeZone = true;
+                        const isHyper = Math.random() < 0.35;
+                        b.timeWarpFactor = isHyper ? 1.85 : 0.45;
+                        b.vx *= b.timeWarpFactor;
+                        b.vy *= b.timeWarpFactor;
+                        audio.flipper();
+                        spawnSparks(b.x, b.y, isHyper ? '#f59e0b' : '#3b82f6', 1.0);
+                    } else if (distToTZ >= timeZone.r && b.inTimeZone) {
+                        if (b.timeWarpFactor) {
+                            b.vx /= b.timeWarpFactor;
+                            b.vy /= b.timeWarpFactor;
+                        }
+                        b.inTimeZone = false;
+                        b.timeWarpFactor = 1.0;
+                    }
+                }
+
+                // Powerups Collision
+                for (let pi = powerups.length - 1; pi >= 0; pi--) {
+                    const pow = powerups[pi];
+                    if (Math.hypot(b.x - pow.x, b.y - pow.y) < pow.r + b.radius) {
+                        const beneficiary = b.lastHitBy || (b.vx > 0 ? 1 : 2);
+                        const opponent = beneficiary === 1 ? 2 : 1;
+                        const benObj = beneficiary === 1 ? p1 : p2;
+                        const oppObj = opponent === 1 ? p1 : p2;
+
+                        if (pow.type === 'grow') {
+                            benObj.h = 160;
+                            benObj.powerTimer = 7.0;
+                        } else if (pow.type === 'shrink') {
+                            oppObj.h = 55;
+                            oppObj.powerTimer = 7.0;
+                        } else if (pow.type === 'freeze') {
+                            oppObj.freezeTimer = 2.2;
+                        } else if (pow.type === 'shield') {
+                            if (beneficiary === 1) p1Shield = true;
+                            else p2Shield = true;
+                        } else if (pow.type === 'speed') {
+                            b.vx *= 1.4;
+                            b.vy *= 1.4;
+                        }
+
+                        audio.bumper();
+                        spawnSparks(pow.x, pow.y, pow.color, 1.0);
+                        powerups.splice(pi, 1);
+                    }
+                }
+
+                // Gust Wind Mode
+                if (currentMode === 'gust') {
+                    windAngle += dt * 0.15;
+                    windForce = 0.5 + Math.sin(windAngle * 2) * 0.35;
+                    const wx = Math.cos(windAngle) * windForce;
+                    const wy = Math.sin(windAngle) * windForce;
+                    b.vx += wx * 0.09;
+                    b.vy += wy * 0.09;
+
+                    const speedElem = document.getElementById('wind-speed-text');
+                    const arrowElem = document.getElementById('wind-arrow-icon');
+                    if (speedElem) speedElem.innerText = `${Math.round(windForce * 60)} MPH`;
+                    if (arrowElem) arrowElem.style.transform = `rotate(${windAngle * (180/Math.PI) + 90}deg)`;
+                }
+
+                // Black Hole Gravity & Center High-Speed Slingshot Launch
+                if (currentMode === 'blackhole') {
+                    const bhx = canvas.width / 2;
+                    const bhy = canvas.height / 2;
+                    const dx = bhx - b.x;
+                    const dy = bhy - b.y;
+                    const distSq = Math.max(dx * dx + dy * dy, 900);
+                    const dist = Math.sqrt(distSq);
+                    const G = 380;
+                    const force = G / distSq;
+                    b.vx += (dx / dist) * force;
+                    b.vy += (dy / dist) * force;
+
+                    // Super Fast Slingshot Launch when hitting center
+                    if (dist < 28 && !b.blackHoleCooling) {
+                        b.blackHoleCooling = true;
+                        const launchAngle = Math.atan2(b.vy, b.vx) + (Math.random() - 0.5) * 0.4;
+                        const launchSpeed = 19.0; // Humanly reactable high speed
+                        b.vx = Math.cos(launchAngle) * launchSpeed;
+                        b.vy = Math.sin(launchAngle) * launchSpeed;
+                        audio.boom();
+                        spawnSparks(bhx, bhy, '#a855f7', 1.5);
+                    } else if (dist > 95) {
+                        b.blackHoleCooling = false;
+                    }
+                }
+
+                // Move Ball
+                b.x += b.vx;
+                b.y += b.vy;
+
+                // Wall Bounces
+                if (b.y - b.radius <= topBound) {
+                    b.y = topBound + b.radius;
+                    b.vy = -b.vy;
+                    audio.wall();
+                } else if (b.y + b.radius >= bottomBound) {
+                    b.y = bottomBound - b.radius;
+                    b.vy = -b.vy;
+                    audio.wall();
+                }
+
+                // Goal Shields Collision
+                if (p1Shield && b.x - b.radius <= 14) {
+                    b.vx = Math.abs(b.vx);
+                    p1Shield = false;
+                    audio.bumper();
+                    spawnSparks(b.x, b.y, '#38bdf8', 1.0);
+                }
+                if (p2Shield && b.x + b.radius >= canvas.width - 14) {
+                    b.vx = -Math.abs(b.vx);
+                    p2Shield = false;
+                    audio.bumper();
+                    spawnSparks(b.x, b.y, '#38bdf8', 1.0);
+                }
+
+                // Portals Collision
+                portals.forEach(p => {
+                    const dist = Math.hypot(b.x - p.x, b.y - p.y);
+                    if (dist < p.r + b.radius && !b.portalCooldown) {
+                        const other = portals[p.pair];
+                        b.x = other.x + Math.sign(b.vx) * (other.r + 10);
+                        b.y = other.y;
+                        b.portalCooldown = true;
+                        setTimeout(() => { b.portalCooldown = false; }, 300);
+                        audio.flipper();
+                    }
+                });
+
+                // Bumpers Collision (Spinning Orange Squares)
+                bumpers.forEach(bmp => {
+                    const dist = Math.hypot(b.x - bmp.x, b.y - bmp.y);
+                    if (dist < (bmp.size / 2) + b.radius) {
+                        const angle = Math.atan2(b.y - bmp.y, b.x - bmp.x);
+                        const currentSpeed = Math.hypot(b.vx, b.vy);
+                        const newSpeed = Math.max(currentSpeed * 1.1, 8);
+                        b.vx = Math.cos(angle) * newSpeed;
+                        b.vy = Math.sin(angle) * newSpeed;
+                        bmp.flash = 10;
+                        audio.bumper();
+                        spawnSparks(bmp.x, bmp.y, '#f97316', 0.8);
+                    }
+                    if (bmp.flash > 0) bmp.flash--;
+                });
+
+                // Volleyball Net Collision
+                if (net) {
+                    if (b.x + b.radius >= net.x && b.x - b.radius <= net.x + net.w && b.y + b.radius >= net.y) {
+                        b.vx = -b.vx;
+                        if (b.x < net.x) b.x = net.x - b.radius;
+                        else b.x = net.x + net.w + b.radius;
+                        audio.wall();
+                    }
+                }
+
+                // Bricks Collision
+                for (let i = bricks.length - 1; i >= 0; i--) {
+                    const br = bricks[i];
+                    if (b.x + b.radius >= br.x && b.x - b.radius <= br.x + br.w && b.y + b.radius >= br.y && b.y - b.radius <= br.y + br.h) {
+                        b.vx = -b.vx;
+                        br.hp--;
+                        audio.hit();
+                        spawnSparks(b.x, b.y, '#38bdf8', 0.5);
+                        if (br.hp <= 0) bricks.splice(i, 1);
+                        break;
+                    }
+                }
+
+                // Hazard Drones Collision
+                drones.forEach(d => {
+                    if (b.x + b.radius >= d.x - d.size/2 && b.x - b.radius <= d.x + d.size/2 &&
+                        b.y + b.radius >= d.y - d.size/2 && b.y - b.radius <= d.y + d.size/2) {
+                        b.vx = -b.vx;
+                        b.vy = -b.vy;
+                        audio.hit();
+                        spawnSparks(b.x, b.y, '#ef4444', 0.8);
+                    }
+                });
+
+                // Centered Boss Collision (Damageable by Both Sides)
+                if (boss) {
+                    const half = boss.size / 2;
+                    if (b.x + b.radius >= boss.x - half && b.x - b.radius <= boss.x + half &&
+                        b.y + b.radius >= boss.y - half && b.y - b.radius <= boss.y + half) {
+                        
+                        b.vx = -b.vx;
+                        boss.hp -= 20;
+                        audio.hit();
+                        spawnSparks(b.x, b.y, '#a855f7', 1.0);
+
+                        const scorer = b.lastHitBy || (b.vx < 0 ? 2 : 1);
+
+                        if (boss.hp <= 0) {
+                            boss.hp = boss.maxHp;
+                            audio.score();
+                            if (scorer === 1) {
+                                scoreP1 += 5;
+                                document.getElementById('score-p1').innerText = scoreP1;
+                                unlockAchievement('boss_slayer');
+                            } else {
+                                scoreP2 += 5;
+                                document.getElementById('score-p2').innerText = scoreP2;
+                            }
+                        }
+                    }
+                }
+
+                // Flippers Collision
+                flippers.forEach(f => {
+                    const tipX = f.x + Math.cos(f.angle) * f.length;
+                    const tipY = f.y + Math.sin(f.angle) * f.length;
+                    const dist = distToSegment({ x: b.x, y: b.y }, { x: f.x, y: f.y }, { x: tipX, y: tipY });
+                    if (dist < b.radius + 10) {
+                        const active = f.isActive;
+                        const boost = active ? 16 : 10;
+                        const angleNormal = f.angle + (f.side === 'left' ? -Math.PI / 2 : Math.PI / 2);
+                        
+                        b.vx = Math.cos(angleNormal) * boost;
+                        b.vy = Math.sin(angleNormal) * boost;
+                        b.x += b.vx * 0.5;
+                        b.y += b.vy * 0.5;
+
+                        audio.flipper();
+                        spawnSparks(b.x, b.y, '#f59e0b', 1.0);
+                    }
+                });
+
+                // Twin Defense Paddles Definition
+                const p1Paddles = [{ x: p1.x, y: p1.y, w: p1.w, h: p1.h }];
+                const p2Paddles = [{ x: p2.x, y: p2.y, w: p2.w, h: p2.h }];
+
+                if (currentMode === 'twindefense') {
+                    p1Paddles.push({ x: canvas.width * 0.28, y: p1.y, w: p1.w, h: p1.h });
+                    p2Paddles.push({ x: canvas.width * 0.72 - p2.w, y: p2.y, w: p2.w, h: p2.h });
+                }
+
+                // P1 Paddle Collision
+                if (p1.respawnTimer <= 0) {
+                    p1Paddles.forEach(pad => {
+                        if (b.vx < 0 && b.x - b.radius <= pad.x + pad.w && b.x + b.radius >= pad.x && b.y >= pad.y && b.y <= pad.y + pad.h) {
+                            b.x = pad.x + pad.w + b.radius;
+                            b.vx = -b.vx * 1.04;
+                            const hitOffset = (b.y - (pad.y + pad.h / 2)) / (pad.h / 2);
+                            b.vy = hitOffset * 7;
+                            b.lastHitBy = 1;
+                            
+                            // Ice Friction mode amplified spin curve
+                            const spinMult = currentMode === 'ice' ? 3.5 : 1.0;
+                            b.spin = ((b.spin || 0) + p1.vy * 0.45 + hitOffset * 2.5) * spinMult;
+                            const spinMag = Math.abs(b.spin);
+                            if (spinMag > 1.8) unlockAchievement('curve_master');
+
+                            if (currentMode === 'speedball') {
+                                b.vx *= 1.1;
+                                b.vy *= 1.1;
+                            }
+
+                            audio.hit();
+                            spawnSparks(b.x, b.y, '#00f0ff', spinMag);
+                        }
+                    });
+                }
+
+                // P2 Paddle Collision
+                if (p2.respawnTimer <= 0) {
+                    p2Paddles.forEach(pad => {
+                        if (b.vx > 0 && b.x + b.radius >= pad.x && b.x - b.radius <= pad.x + pad.w && b.y >= pad.y && b.y <= pad.y + pad.h) {
+                            b.x = pad.x - b.radius;
+                            b.vx = -b.vx * 1.04;
+                            const hitOffset = (b.y - (pad.y + pad.h / 2)) / (pad.h / 2);
+                            b.vy = hitOffset * 7;
+                            b.lastHitBy = 2;
+
+                            // Ice Friction mode amplified spin curve
+                            const spinMult = currentMode === 'ice' ? 3.5 : 1.0;
+                            b.spin = ((b.spin || 0) + p2.vy * 0.45 + hitOffset * 2.5) * spinMult;
+                            const spinMag = Math.abs(b.spin);
+
+                            if (currentMode === 'speedball') {
+                                b.vx *= 1.1;
+                                b.vy *= 1.1;
+                            }
+
+                            audio.hit();
+                            spawnSparks(b.x, b.y, '#ff007f', spinMag);
+                        }
+                    });
+                }
+
+                // Goal Scoring Checks
+                if (b.x < 0) {
+                    scoreP2++;
+                    document.getElementById('score-p2').innerText = scoreP2;
+                    audio.score();
+
+                    if (currentMode === 'multiball') {
+                        // All balls respawn in Multiball mode
+                        b.x = canvas.width / 2;
+                        b.y = canvas.height / 2;
+                        b.vx = (5 + Math.random() * 3);
+                        b.vy = (Math.random() - 0.5) * 6;
+                        b.spin = 0;
+                    } else {
+                        b.scored = true;
+                        if (b === ball) resetBall(2);
+                    }
+                } else if (b.x > canvas.width) {
+                    scoreP1++;
+                    document.getElementById('score-p1').innerText = scoreP1;
+                    audio.score();
+                    unlockAchievement('first_win');
+
+                    if (currentMode === 'multiball') {
+                        // All balls respawn in Multiball mode
+                        b.x = canvas.width / 2;
+                        b.y = canvas.height / 2;
+                        b.vx = -(5 + Math.random() * 3);
+                        b.vy = (Math.random() - 0.5) * 6;
+                        b.spin = 0;
+                    } else {
+                        b.scored = true;
+                        if (b === ball) resetBall(1);
+                    }
+                }
+            });
+
+            // Clean Scored Extra Balls (Non-multiball modes)
+            if (currentMode !== 'multiball') {
+                extraBalls = extraBalls.filter(eb => !eb.scored);
+            }
+            if (ball.scored) ball.scored = false;
+
+            if (currentMode === 'lasers') {
+                document.getElementById('hp-bar-p1').style.width = `${Math.max(0, p1.hp)}%`;
+                document.getElementById('hp-bar-p2').style.width = `${Math.max(0, p2.hp)}%`;
+            }
+
+            // Update Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.isSpark) {
+                    p.vy += 0.14;
+                    p.vx *= 0.96;
+                }
+                p.alpha -= dt * (p.decay || 2.2);
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // --- CANVAS RENDERING SYSTEM ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let primaryGlow = '#00f0ff';
+            let secondaryGlow = '#ff007f';
+            if (currentTheme === 'synthwave') { primaryGlow = '#f59e0b'; secondaryGlow = '#d946ef'; }
+            else if (currentTheme === 'crt') { primaryGlow = '#22c55e'; secondaryGlow = '#16a34a'; }
+
+            // Grid Lines
+            ctx.strokeStyle = 'rgba(0, 240, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Time Warp Zone Visual
+            if (timeZone) {
+                ctx.save();
+                ctx.translate(timeZone.x, timeZone.y);
+                const tzGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, timeZone.r);
+                tzGrad.addColorStop(0, 'rgba(59, 130, 246, 0.35)');
+                tzGrad.addColorStop(0.7, 'rgba(168, 85, 247, 0.2)');
+                tzGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                ctx.fillStyle = tzGrad;
+                ctx.beginPath(); ctx.arc(0, 0, timeZone.r, 0, Math.PI * 2); ctx.fill();
+
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([8, 8]);
+                ctx.shadowColor = '#3b82f6';
+                ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.arc(0, 0, timeZone.r, 0, Math.PI * 2); ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
+
+            // Powerups Visual
+            powerups.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 14;
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+                ctx.font = '15px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(p.icon, 0, 1);
+                ctx.restore();
+            });
+
+            // Goal Shields
+            if (p1Shield) {
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 6;
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(12, canvas.height); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+            if (p2Shield) {
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 6;
+                ctx.shadowColor = '#38bdf8';
+                ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.moveTo(canvas.width - 12, 0); ctx.lineTo(canvas.width - 12, canvas.height); ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Shrinking Arena Borders
+            if (currentMode === 'shrinking') {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 15;
+                ctx.strokeRect(
+                    arenaShrink.left,
+                    arenaShrink.top,
+                    canvas.width - arenaShrink.left - arenaShrink.right,
+                    canvas.height - arenaShrink.top - arenaShrink.bottom
+                );
+                ctx.shadowBlur = 0;
+            }
+
+            // Net Line
+            if (currentMode !== 'volleyball') {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, 0);
+                ctx.lineTo(canvas.width / 2, canvas.height);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Black Hole Visual
+            if (currentMode === 'blackhole') {
+                const cx = canvas.width / 2;
+                const cy = canvas.height / 2;
+                const grad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 70);
+                grad.addColorStop(0, '#000000');
+                grad.addColorStop(0.5, '#7e22ce');
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.beginPath(); ctx.arc(cx, cy, 70, 0, Math.PI * 2); ctx.fill();
+
+                ctx.strokeStyle = '#a855f7';
+                ctx.lineWidth = 2;
+                ctx.beginPath(); ctx.arc(cx, cy, 28, 0, Math.PI * 2); ctx.stroke();
+            }
+
+            // Bumpers Visual (Spinning Orange Squares)
+            bumpers.forEach(bump => {
+                ctx.save();
+                ctx.translate(bump.x, bump.y);
+                ctx.rotate(bump.angle || 0);
+
+                ctx.shadowColor = bump.flash > 0 ? '#ffffff' : '#f97316';
+                ctx.shadowBlur = bump.flash > 0 ? 25 : 15;
+                ctx.fillStyle = bump.flash > 0 ? '#ffffff' : '#090d16';
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 4;
+
+                const sz = bump.size || 52;
+                ctx.fillRect(-sz/2, -sz/2, sz, sz);
+                ctx.strokeRect(-sz/2, -sz/2, sz, sz);
+
+                ctx.rotate(-bump.angle || 0);
+                ctx.fillStyle = '#f97316';
+                ctx.font = 'bold 12px Orbitron';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(bump.val, 0, 0);
+
+                ctx.restore();
+                ctx.shadowBlur = 0;
+            });
+
+            // Volleyball Net Visual
+            if (net) {
+                ctx.fillStyle = 'rgba(245, 158, 11, 0.35)';
+                ctx.strokeStyle = '#f59e0b';
+                ctx.lineWidth = 3;
+                ctx.fillRect(net.x, net.y, net.w, net.h);
+                ctx.strokeRect(net.x, net.y, net.w, net.h);
+            }
+
+            // Bricks Visual
+            bricks.forEach(br => {
+                ctx.fillStyle = br.hp === 2 ? '#0284c7' : '#38bdf8';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2;
+                ctx.fillRect(br.x, br.y, br.w, br.h);
+                ctx.strokeRect(br.x, br.y, br.w, br.h);
+            });
+
+            // Hazard Drones Visual
+            drones.forEach(d => {
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 12;
+                ctx.fillRect(d.x - d.size/2, d.y - d.size/2, d.size, d.size);
+                ctx.strokeRect(d.x - d.size/2, d.y - d.size/2, d.size, d.size);
+
+                ctx.fillStyle = '#ef4444';
+                ctx.beginPath(); ctx.arc(d.x, d.y, 5, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+
+            // Flippers Visual
+            flippers.forEach(f => {
+                const tipX = f.x + Math.cos(f.angle) * f.length;
+                const tipY = f.y + Math.sin(f.angle) * f.length;
+                ctx.strokeStyle = f.side === 'left' ? primaryGlow : secondaryGlow;
+                ctx.lineWidth = 10;
+                ctx.lineCap = 'round';
+                ctx.shadowColor = ctx.strokeStyle;
+                ctx.shadowBlur = 12;
+                ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(tipX, tipY); ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            // Boss Visual (Spinning Centered Entity)
+            if (boss) {
+                ctx.save();
+                ctx.translate(boss.x, boss.y);
+                ctx.rotate(boss.angle || 0);
+
+                ctx.fillStyle = '#2e1065';
+                ctx.strokeStyle = '#a855f7';
+                ctx.lineWidth = 4;
+                ctx.shadowColor = '#a855f7';
+                ctx.shadowBlur = 20;
+
+                const half = boss.size / 2;
+                ctx.fillRect(-half, -half, boss.size, boss.size);
+                ctx.strokeRect(-half, -half, boss.size, boss.size);
+
+                ctx.rotate(-boss.angle || 0);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(-half, -half - 15, boss.size * (boss.hp / boss.maxHp), 6);
+
+                ctx.restore();
+                ctx.shadowBlur = 0;
+            }
+
+            // Portals Visual
+            portals.forEach(p => {
+                ctx.strokeStyle = p.color;
+                ctx.lineWidth = 4;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 15;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.stroke();
+                ctx.shadowBlur = 0;
+            });
+
+            // Flashlight Dark Mode Spotlight
+            if (currentMode === 'darkmode') {
+                ctx.save();
+                ctx.fillStyle = 'rgba(2, 4, 10, 0.98)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.globalCompositeOperation = 'destination-out';
+
+                const lightSources = [
+                    { x: p1.x + p1.w / 2, y: p1.y + p1.h / 2, radius: 180 },
+                    { x: p2.x + p2.w / 2, y: p2.y + p2.h / 2, radius: 180 }
+                ];
+
+                lightSources.forEach(src => {
+                    const grad = ctx.createRadialGradient(src.x, src.y, 10, src.x, src.y, src.radius);
+                    grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+                    grad.addColorStop(0.6, 'rgba(0, 0, 0, 0.7)');
+                    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(src.x, src.y, src.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                ctx.restore();
+            }
+
+            // Draw Paddles
+            const p1Paddles = [{ x: p1.x, y: p1.y }];
+            if (currentMode === 'twindefense') p1Paddles.push({ x: canvas.width * 0.28, y: p1.y });
+
+            p1Paddles.forEach(pad => {
+                ctx.save();
+                if (p1.respawnTimer > 0) ctx.globalAlpha = 0.3;
+                if (p1.freezeTimer > 0) ctx.fillStyle = '#38bdf8';
+                else ctx.fillStyle = primaryGlow;
+                ctx.shadowColor = primaryGlow;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(pad.x, pad.y, p1.w, p1.h);
+                ctx.restore();
+            });
+
+            const p2Paddles = [{ x: p2.x, y: p2.y }];
+            if (currentMode === 'twindefense') p2Paddles.push({ x: canvas.width * 0.72 - p2.w, y: p2.y });
+
+            p2Paddles.forEach(pad => {
+                ctx.save();
+                if (p2.respawnTimer > 0) ctx.globalAlpha = 0.3;
+                if (p2.freezeTimer > 0) ctx.fillStyle = '#38bdf8';
+                else ctx.fillStyle = secondaryGlow;
+                ctx.shadowColor = secondaryGlow;
+                ctx.shadowBlur = 15;
+                ctx.fillRect(pad.x, pad.y, p2.w, p2.h);
+                ctx.restore();
+            });
+
+            // Quantum Decoys
+            decoyBalls.forEach(db => {
+                ctx.save();
+                ctx.globalAlpha = db.alpha;
+                ctx.fillStyle = '#a855f7';
+                ctx.beginPath(); ctx.arc(db.x, db.y, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.restore();
+            });
+
+            // Balls & Motion Trails with Spin Hot-Red Glow Effect
+            const allBalls = [ball, ...extraBalls];
+            allBalls.forEach(b => {
+                const spinMag = Math.abs(b.spin || 0);
+                const hasSpin = spinMag > 0.4;
+                const ballColor = hasSpin ? '#ff0033' : (b.color || primaryGlow);
+                const ballGlow = hasSpin ? '#ff0055' : (b.color || primaryGlow);
+
+                // Flashlight Mode Opacity Clamped to 10%
+                const modeAlpha = currentMode === 'darkmode' ? 0.10 : 1.0;
+
+                for (let i = 0; i < (b.trail ? b.trail.length : 0); i++) {
+                    const pt = b.trail[i];
+                    const alpha = (1 - i / b.trail.length) * 0.5 * modeAlpha;
+                    ctx.fillStyle = ballColor;
+                    ctx.globalAlpha = alpha;
+                    ctx.beginPath();
+                    ctx.arc(pt.x, pt.y, b.radius * (1 - i / (b.trail.length * 1.5)), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = modeAlpha;
+
+                ctx.fillStyle = ballColor;
+                ctx.shadowColor = ballGlow;
+                ctx.shadowBlur = hasSpin ? Math.min(38, 16 + spinMag * 6) : 15;
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2); ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.globalAlpha = 1.0;
+            });
+
+            // Lasers Visual
+            lasers.forEach(l => {
+                ctx.fillStyle = l.color;
+                ctx.shadowColor = l.color;
+                ctx.shadowBlur = 10;
+                ctx.fillRect(l.x - 10, l.y - 3, 20, 6);
+                ctx.shadowBlur = 0;
+            });
+
+            // Gust Breeze Particles
+            if (currentMode === 'gust') {
+                ctx.strokeStyle = 'rgba(45, 212, 191, 0.25)';
+                ctx.lineWidth = 1.5;
+                windParticles.forEach(wp => {
+                    wp.x += Math.cos(windAngle) * wp.speed;
+                    wp.y += Math.sin(windAngle) * wp.speed;
+                    if (wp.x < 0) wp.x = canvas.width;
+                    if (wp.x > canvas.width) wp.x = 0;
+                    if (wp.y < 0) wp.y = canvas.height;
+                    if (wp.y > canvas.height) wp.y = 0;
+
+                    ctx.beginPath();
+                    ctx.moveTo(wp.x, wp.y);
+                    ctx.lineTo(wp.x + Math.cos(windAngle) * wp.len, wp.y + Math.sin(windAngle) * wp.len);
+                    ctx.stroke();
+                });
+            }
+
+            // Spark Particles
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                const pSize = p.size || 3;
+                ctx.fillRect(p.x, p.y, pSize, pSize);
+                ctx.restore();
+            });
+        }
+
+        // --- MAIN LOOP RUNNER ---
+        let lastTime = performance.now();
+        function gameLoop(now) {
+            const dt = Math.min((now - lastTime) / 1000, 0.1);
+            lastTime = now;
+
+            update(dt);
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- UI & MODAL INTERACTION LOGIC ---
+        function togglePause() {
+            isPaused = !isPaused;
+            const pauseModal = document.getElementById('modal-pause');
+            if (isPaused) {
+                populatePauseModeSelect();
+                pauseModal.classList.remove('hidden');
+            } else {
+                pauseModal.classList.add('hidden');
+            }
+        }
+
+        function populatePauseModeSelect() {
+            const select = document.getElementById('pause-mode-select');
+            select.innerHTML = '';
+            GAME_MODES.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.id;
+                opt.innerText = `${m.icon} ${m.name}`;
+                if (m.id === currentMode) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        document.getElementById('pause-mode-select').addEventListener('change', (e) => {
+            initMode(e.target.value);
+        });
+
+        function populateModeGrid() {
+            const grid = document.getElementById('modes-grid');
+            grid.innerHTML = '';
+            GAME_MODES.forEach(m => {
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-2xl glass-panel border transition cursor-pointer flex flex-col justify-between hover:scale-[1.02] ${currentMode === m.id ? 'border-cyan-400 bg-cyan-950/30' : 'border-slate-800 hover:border-cyan-500/50'}`;
+                card.innerHTML = `
+                    <div>
+                        <div class="flex items-center space-x-3 mb-2">
+                            <span class="text-2xl">${m.icon}</span>
+                            <h3 class="font-bold font-orbitron text-cyan-300 text-sm">${m.name}</h3>
+                        </div>
+                        <p class="text-xs text-slate-400 leading-relaxed">${m.desc}</p>
+                    </div>
+                    <button class="mt-4 w-full py-2 rounded-xl text-xs font-bold font-orbitron uppercase tracking-wider ${currentMode === m.id ? 'bg-cyan-500 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-300'} transition">
+                        ${currentMode === m.id ? 'ACTIVE MODE' : 'SELECT MODE'}
+                    </button>
+                `;
+                card.addEventListener('click', () => {
+                    initMode(m.id);
+                    document.getElementById('modal-modes').classList.add('hidden');
+                    populateModeGrid();
+                });
+                grid.appendChild(card);
+            });
+        }
+
+        // UI Event Listeners
+        document.getElementById('btn-modes').addEventListener('click', () => {
+            populateModeGrid();
+            document.getElementById('modal-modes').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-modes').addEventListener('click', () => {
+            document.getElementById('modal-modes').classList.add('hidden');
+        });
+        document.getElementById('btn-pause').addEventListener('click', togglePause);
+        document.getElementById('btn-resume').addEventListener('click', togglePause);
+        document.getElementById('btn-pause-modes').addEventListener('click', () => {
+            togglePause();
+            populateModeGrid();
+            document.getElementById('modal-modes').classList.remove('hidden');
+        });
+        document.getElementById('btn-restart').addEventListener('click', () => {
+            scoreP1 = 0; scoreP2 = 0;
+            document.getElementById('score-p1').innerText = '0';
+            document.getElementById('score-p2').innerText = '0';
+            initMode(currentMode);
+            togglePause();
+        });
+
+        // PvP / AI Mode Toggle
+        const btnPvp = document.getElementById('btn-toggle-pvp');
+        btnPvp.addEventListener('click', () => {
+            isPvP = !isPvP;
+            btnPvp.innerText = isPvP ? '2P LOCAL MATCH' : '1P VS AI';
+            btnPvp.className = `px-4 py-2 rounded-xl text-xs font-bold transition ${isPvP ? 'bg-pink-500 text-white border border-pink-400' : 'bg-cyan-500 text-slate-950 border border-cyan-400'}`;
+            document.getElementById('p2-label').innerText = isPvP ? 'Player 2 (P2)' : 'Player 2 (AI)';
+            document.getElementById('ai-diff-container').style.display = isPvP ? 'none' : 'flex';
+            document.getElementById('mode-subtitle-display').innerText = isPvP ? '2 PLAYER LOCAL' : `1P VS AI (${aiDifficulty.toUpperCase()})`;
+        });
+
+        // AI Difficulty Selection
+        document.querySelectorAll('.ai-diff-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.ai-diff-btn').forEach(b => {
+                    b.className = 'ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300';
+                });
+                aiDifficulty = e.target.dataset.diff;
+                e.target.className = 'ai-diff-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-slate-950 font-bold';
+                document.getElementById('mode-subtitle-display').innerText = `1P VS AI (${aiDifficulty.toUpperCase()})`;
+            });
+        });
+
+        // Sound Toggle
+        document.getElementById('btn-sound').addEventListener('click', () => {
+            audio.muted = !audio.muted;
+            document.getElementById('icon-sound-on').classList.toggle('hidden', audio.muted);
+            document.getElementById('icon-sound-off').classList.toggle('hidden', !audio.muted);
+        });
+
+        // Theme Toggle
+        document.getElementById('btn-theme').addEventListener('click', () => {
+            const themes = ['cyberpunk', 'synthwave', 'crt'];
+            const idx = (themes.indexOf(currentTheme) + 1) % themes.length;
+            currentTheme = themes[idx];
+        });
+
+        // Achievements Modal
+        document.getElementById('btn-achievements').addEventListener('click', () => {
+            const list = document.getElementById('achievements-list');
+            list.innerHTML = '';
+            ACHIEVEMENTS.forEach(a => {
+                const item = document.createElement('div');
+                item.className = 'p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex justify-between items-center';
+                item.innerHTML = `
+                    <div>
+                        <div class="font-bold text-xs text-amber-400 font-orbitron">${a.title}</div>
+                        <div class="text-xs text-slate-400">${a.desc}</div>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-1 rounded-lg ${a.unlocked ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-slate-500'}">
+                        ${a.unlocked ? 'UNLOCKED' : 'LOCKED'}
+                    </span>
+                `;
+                list.appendChild(item);
+            });
+            document.getElementById('modal-achievements').classList.remove('hidden');
+        });
+        document.getElementById('btn-close-achievements').addEventListener('click', () => {
+            document.getElementById('modal-achievements').classList.add('hidden');
+        });
+
+        // --- START ENGINE ---
+        loadAchievements();
+        populateModeGrid();
+        initMode('classic');
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>

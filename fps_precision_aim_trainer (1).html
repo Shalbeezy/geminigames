@@ -1,0 +1,2256 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPS Precision Aim Trainer</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            bg: '#0a0d14',
+                            card: '#121824',
+                            border: '#1e293b',
+                            accent: '#06b6d4',
+                            accentHover: '#0891b2',
+                            pink: '#ec4899',
+                            gold: '#f59e0b',
+                            success: '#10b981'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0a0d14;
+            color: #f3f4f6;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0d121d;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #06b6d4;
+        }
+
+        /* Canvas Arena Cursor Override */
+        #gameCanvas {
+            cursor: none;
+            touch-action: none;
+        }
+
+        /* Custom range sliders styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            background: #1e293b;
+            border-radius: 8px;
+            height: 6px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 18px;
+            width: 18px;
+            border-radius: 50%;
+            background: #06b6d4;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+            transition: transform 0.1s ease;
+        }
+        input[type=range]::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            background: #22d3ee;
+        }
+
+        .glow-effect {
+            box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+        }
+        .glow-accent {
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.4);
+        }
+        .glow-pink {
+            box-shadow: 0 0 15px rgba(236, 72, 153, 0.4);
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 0.8; }
+        }
+        .animate-pulse-glow {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased selection:bg-cyan-500 selection:text-white">
+
+    <!-- Top Esports Navigation Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Logo & Brand -->
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-cyan-500/30">
+                    <i class="fa-solid me-0 fa-crosshairs"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight tracking-wider bg-gradient-to-r from-white via-slate-200 to-cyan-400 bg-clip-text text-transparent">
+                        FPS PRECISION <span class="text-cyan-400 font-extrabold">AIM</span> TRAINER
+                    </h1>
+                    <p class="text-xs text-slate-400 flex items-center gap-2">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> v2.5 Esports Edition
+                    </p>
+                </div>
+            </div>
+
+            <!-- Dashboard Navigation Tabs -->
+            <nav class="hidden md:flex items-center space-x-1 bg-slate-950/60 p-1.5 rounded-xl border border-slate-800">
+                <button onclick="switchTab('play')" id="tab-play" class="nav-tab active px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 text-cyan-400 bg-slate-800 shadow-sm">
+                    <i class="fa-solid fa-gamepad"></i> Play Arena
+                </button>
+                <button onclick="switchTab('customization')" id="tab-customization" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <i class="fa-solid fa-sliders"></i> Target & Crosshair
+                </button>
+                <button onclick="switchTab('audio-visual')" id="tab-audio-visual" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <i class="fa-solid fa-palette"></i> Audio & Themes
+                </button>
+                <button onclick="switchTab('sens')" id="tab-sens" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <i class="fa-solid fa-calculator"></i> Sens Converter
+                </button>
+                <button onclick="switchTab('stats')" id="tab-stats" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800/50">
+                    <i class="fa-solid fa-chart-column"></i> Stats & Highscores
+                </button>
+            </nav>
+
+            <!-- Quick Action Badges -->
+            <div class="flex items-center space-x-3">
+                <div class="bg-slate-800/70 border border-slate-700/60 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400 text-xs"></i>
+                    <span class="text-xs font-mono text-slate-300">Best: <span id="quickHighscore" class="font-bold text-white">0</span></span>
+                </div>
+                <button id="toggleAudioBtn" onclick="toggleMute()" class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition" title="Toggle Sound">
+                    <i class="fa-solid fa-volume-high" id="muteIcon"></i>
+                </button>
+                <button onclick="toggleFullscreen()" class="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 hover:bg-slate-700 flex items-center justify-center text-slate-300 transition" title="Fullscreen Arena">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Bar -->
+        <div class="flex md:hidden overflow-x-auto px-2 py-2 bg-slate-950 border-t border-slate-800 space-x-1 text-xs">
+            <button onclick="switchTab('play')" id="mobile-tab-play" class="flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-cyan-400 bg-slate-800">Arena</button>
+            <button onclick="switchTab('customization')" id="mobile-tab-customization" class="flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-slate-400">Customizer</button>
+            <button onclick="switchTab('audio-visual')" id="mobile-tab-audio-visual" class="flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-slate-400">Themes</button>
+            <button onclick="switchTab('sens')" id="mobile-tab-sens" class="flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-slate-400">Sens Tool</button>
+            <button onclick="switchTab('stats')" id="mobile-tab-stats" class="flex-shrink-0 px-3 py-1.5 rounded-lg font-medium text-slate-400">Records</button>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow flex flex-col justify-center">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: PLAY ARENA VIEW                      -->
+        <!-- ========================================== -->
+        <div id="view-play" class="tab-view space-y-4">
+            
+            <!-- In-Game Realtime HUD & Control Toolbar -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-2xl shadow-xl backdrop-blur-md">
+                <!-- Score -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Score</span>
+                    <span id="hudScore" class="text-xl sm:text-2xl font-mono font-extrabold text-cyan-400">0</span>
+                </div>
+
+                <!-- Timer -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Time Left</span>
+                    <span id="hudTimer" class="text-xl sm:text-2xl font-mono font-extrabold text-amber-400">60.0s</span>
+                </div>
+
+                <!-- Accuracy -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Accuracy</span>
+                    <span id="hudAccuracy" class="text-xl sm:text-2xl font-mono font-extrabold text-emerald-400">100%</span>
+                </div>
+
+                <!-- Combo / Streak -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Streak Combo</span>
+                    <span id="hudStreak" class="text-xl sm:text-2xl font-mono font-extrabold text-pink-400">0x</span>
+                </div>
+
+                <!-- Hits / Misses -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Hits / Miss</span>
+                    <span id="hudHitsMisses" class="text-lg font-mono font-bold text-slate-200">
+                        <span class="text-emerald-400" id="hudHits">0</span> / <span class="text-rose-400" id="hudMisses">0</span>
+                    </span>
+                </div>
+
+                <!-- FPS Counter -->
+                <div class="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 flex flex-col items-center justify-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Engine FPS</span>
+                    <span id="hudFPS" class="text-xl sm:text-2xl font-mono font-extrabold text-slate-400">60</span>
+                </div>
+            </div>
+
+            <!-- Game Arena Canvas Workspace -->
+            <div id="canvasContainer" class="relative w-full aspect-[16/9] max-h-[70vh] rounded-2xl overflow-hidden border-2 border-slate-800 bg-slate-950 shadow-2xl transition-all">
+                
+                <!-- Main HTML5 Canvas -->
+                <canvas id="gameCanvas" class="w-full h-full block"></canvas>
+
+                <!-- Arena Start Overlay Screen -->
+                <div id="startOverlay" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-20">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-3xl font-extrabold shadow-lg shadow-cyan-500/40 mb-4 animate-bounce">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+                    <h2 id="overlayModeTitle" class="text-3xl font-black text-white tracking-wide mb-2">GRIDSHOT ARENA</h2>
+                    <p id="overlayModeDesc" class="text-slate-400 max-w-md text-sm mb-6">
+                        Rapid target acquisition & click rhythm. 3 targets stay on screen; shoot one to spawn another.
+                    </p>
+
+                    <!-- Primary Action Buttons -->
+                    <div class="flex flex-wrap items-center justify-center gap-4">
+                        <button onclick="startGame()" class="px-8 py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-base tracking-wider uppercase shadow-xl shadow-cyan-500/25 transition transform hover:scale-105 active:scale-95 flex items-center gap-3">
+                            <i class="fa-solid fa-play"></i> Start Challenge
+                        </button>
+                        <button onclick="switchTab('customization')" class="px-6 py-3.5 rounded-xl bg-slate-800 border border-slate-700 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition flex items-center gap-2">
+                            <i class="fa-solid fa-gear"></i> Customize Target
+                        </button>
+                    </div>
+
+                    <!-- Keyboard Quick Hints -->
+                    <div class="mt-8 flex items-center gap-4 text-xs text-slate-500">
+                        <span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono">ESC</kbd> Pause</span>
+                        <span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-300 font-mono">R</kbd> Quick Restart</span>
+                    </div>
+                </div>
+
+                <!-- Arena Pause Overlay Screen -->
+                <div id="pauseOverlay" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center z-30">
+                    <div class="p-8 rounded-3xl bg-slate-900 border border-slate-800 max-w-sm w-full shadow-2xl space-y-4">
+                        <div class="text-amber-400 text-4xl mb-2"><i class="fa-solid fa-circle-pause"></i></div>
+                        <h3 class="text-2xl font-bold text-white">CHALLENGE PAUSED</h3>
+                        <p class="text-xs text-slate-400">Take a breath, adjust your grip, and jump back in.</p>
+                        <div class="space-y-2 pt-2">
+                            <button onclick="resumeGame()" class="w-full py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold uppercase text-sm tracking-wider shadow-lg shadow-cyan-500/20">
+                                Resume (<kbd class="font-mono">ESC</kbd>)
+                            </button>
+                            <button onclick="restartGame()" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm border border-slate-700">
+                                Restart Game (<kbd class="font-mono">R</kbd>)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode Selector Deck -->
+            <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-sm font-bold uppercase text-slate-400 tracking-wider flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-cyan-400"></i> Choose Training Mode
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400">Duration:</span>
+                        <select id="gameDurationSelect" onchange="updateDurationSetting()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-cyan-500">
+                            <option value="15">15 Seconds (Sprint)</option>
+                            <option value="30">30 Seconds (Standard)</option>
+                            <option value="60" selected>60 Seconds (Benchmark)</option>
+                            <option value="120">120 Seconds (Endurance)</option>
+                            <option value="999999">Endless Sandbox</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <!-- Gridshot -->
+                    <button onclick="selectGameMode('gridshot')" id="modeBtn-gridshot" class="mode-btn active p-3 rounded-xl bg-slate-900 border-2 border-cyan-500 text-left hover:border-cyan-400 transition flex flex-col justify-between h-24 shadow-lg shadow-cyan-500/10">
+                        <div class="flex items-center justify-between text-cyan-400">
+                            <i class="fa-solid fa-grid-2 text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">Speed</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Gridshot</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">3 targets rapid flick</div>
+                        </div>
+                    </button>
+
+                    <!-- Spidershot -->
+                    <button onclick="selectGameMode('spidershot')" id="modeBtn-spidershot" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-indigo-400">
+                            <i class="fa-solid fa-spider text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800">Flick</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Spidershot</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">Center to outer reset</div>
+                        </div>
+                    </button>
+
+                    <!-- Microshot -->
+                    <button onclick="selectGameMode('microshot')" id="modeBtn-microshot" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-pink-400">
+                            <i class="fa-solid fa-expand text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-pink-950 text-pink-300 border border-pink-800">Micro</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Microshot</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">Small precision targets</div>
+                        </div>
+                    </button>
+
+                    <!-- Tracking -->
+                    <button onclick="selectGameMode('tracking')" id="modeBtn-tracking" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-amber-400">
+                            <i class="fa-solid fa-route text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">Smooth</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Tracking</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">Follow moving target</div>
+                        </div>
+                    </button>
+
+                    <!-- Target Switch -->
+                    <button onclick="selectGameMode('targetswitch')" id="modeBtn-targetswitch" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-emerald-400">
+                            <i class="fa-solid fa-arrows-split-up-and-left text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">Multi</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Target Switch</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">6 targets continuous</div>
+                        </div>
+                    </button>
+
+                    <!-- Reaction / Reflex -->
+                    <button onclick="selectGameMode('reflex')" id="modeBtn-reflex" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-violet-400">
+                            <i class="fa-solid fa-bolt text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-violet-950 text-violet-300 border border-violet-800">Reflex</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Reflex MS</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">Instant delay speed</div>
+                        </div>
+                    </button>
+
+                    <!-- Bouncing Targets -->
+                    <button onclick="selectGameMode('bouncing')" id="modeBtn-bouncing" class="mode-btn p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-left hover:border-slate-700 transition flex flex-col justify-between h-24">
+                        <div class="flex items-center justify-between text-rose-400">
+                            <i class="fa-solid fa-bounce text-lg"></i>
+                            <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">Physics</span>
+                        </div>
+                        <div>
+                            <div class="font-bold text-xs text-white">Bouncing</div>
+                            <div class="text-[10px] text-slate-400 leading-tight">Gravity physics targets</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 2: TARGET & CROSSHAIR CUSTOMIZATION     -->
+        <!-- ========================================== -->
+        <div id="view-customization" class="tab-view hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                <!-- Left Column: Controls Editor -->
+                <div class="lg:col-span-7 space-y-6">
+                    
+                    <!-- Target Style Box -->
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-bullseye text-cyan-400"></i> Target Appearance Settings
+                        </h3>
+
+                        <!-- Target Preset Shapes -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 mb-2">TARGET SHAPE PRESET</label>
+                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                <button onclick="setTargetShape('bullseye')" id="shapeBtn-bullseye" class="target-shape-btn active p-2.5 rounded-xl border-2 border-cyan-500 bg-slate-950 text-xs font-bold text-white flex flex-col items-center gap-1.5">
+                                    <i class="fa-solid fa-circle-dot text-cyan-400 text-lg"></i> Bullseye
+                                </button>
+                                <button onclick="setTargetShape('dot')" id="shapeBtn-dot" class="target-shape-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex flex-col items-center gap-1.5">
+                                    <i class="fa-solid fa-circle text-lg"></i> Solid Dot
+                                </button>
+                                <button onclick="setTargetShape('neon')" id="shapeBtn-neon" class="target-shape-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex flex-col items-center gap-1.5">
+                                    <i class="fa-solid fa-sun text-lg"></i> Neon Ring
+                                </button>
+                                <button onclick="setTargetShape('headshot')" id="shapeBtn-headshot" class="target-shape-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex flex-col items-center gap-1.5">
+                                    <i class="fa-solid fa-user-ninja text-lg"></i> Headshot
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Target Colors -->
+                        <div class="grid grid-cols-3 gap-3 pt-2">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Body Color</label>
+                                <input type="color" id="targetColorInput" value="#06b6d4" onchange="updateCustomizer()" class="w-full h-9 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Center Color</label>
+                                <input type="color" id="targetCenterColorInput" value="#ffffff" onchange="updateCustomizer()" class="w-full h-9 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Border Ring</label>
+                                <input type="color" id="targetBorderColorInput" value="#0284c7" onchange="updateCustomizer()" class="w-full h-9 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                            </div>
+                        </div>
+
+                        <!-- Target Radius Scale -->
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Target Size Scale</span>
+                                <span id="targetSizeVal" class="font-mono text-cyan-400 font-bold">35 px</span>
+                            </div>
+                            <input type="range" id="targetSizeSlider" min="15" max="80" value="35" oninput="updateCustomizer()" class="w-full">
+                        </div>
+                    </div>
+
+                    <!-- Crosshair Style Box -->
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-4">
+                        <h3 class="text-base font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-crosshairs text-pink-400"></i> Crosshair Studio
+                        </h3>
+
+                        <!-- Style Select -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button onclick="setCrosshairStyle('crosshair')" id="chBtn-crosshair" class="ch-style-btn active p-2 rounded-lg border-2 border-cyan-500 bg-slate-950 text-xs font-bold text-white text-center">
+                                Classic Cross
+                            </button>
+                            <button onclick="setCrosshairStyle('dot')" id="chBtn-dot" class="ch-style-btn p-2 rounded-lg border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 text-center">
+                                Dot Only
+                            </button>
+                            <button onclick="setCrosshairStyle('circle_dot')" id="chBtn-circle_dot" class="ch-style-btn p-2 rounded-lg border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 text-center">
+                                Circle & Dot
+                            </button>
+                            <button onclick="setCrosshairStyle('dynamic_gap')" id="chBtn-dynamic_gap" class="ch-style-btn p-2 rounded-lg border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 text-center">
+                                Dynamic Gap
+                            </button>
+                        </div>
+
+                        <!-- Crosshair Controls -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div>
+                                <label class="block text-xs text-slate-400 mb-1">Crosshair Color</label>
+                                <input type="color" id="chColorInput" value="#00ffcc" onchange="updateCustomizer()" class="w-full h-8 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                    <span>Size / Length</span>
+                                    <span id="chSizeVal" class="font-mono text-cyan-400">8 px</span>
+                                </div>
+                                <input type="range" id="chSizeSlider" min="2" max="25" value="8" oninput="updateCustomizer()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                    <span>Thickness</span>
+                                    <span id="chThicknessVal" class="font-mono text-cyan-400">2 px</span>
+                                </div>
+                                <input type="range" id="chThicknessSlider" min="1" max="8" value="2" oninput="updateCustomizer()" class="w-full">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                    <span>Center Gap</span>
+                                    <span id="chGapVal" class="font-mono text-cyan-400">4 px</span>
+                                </div>
+                                <input type="range" id="chGapSlider" min="0" max="20" value="4" oninput="updateCustomizer()" class="w-full">
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-6 pt-2">
+                            <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                                <input type="checkbox" id="chOutlineToggle" checked onchange="updateCustomizer()" class="rounded bg-slate-950 border-slate-800 text-cyan-500 focus:ring-0">
+                                Black Outline
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                                <input type="checkbox" id="chDotToggle" checked onchange="updateCustomizer()" class="rounded bg-slate-950 border-slate-800 text-cyan-500 focus:ring-0">
+                                Center Dot
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Live Interactive Preview -->
+                <div class="lg:col-span-5 flex flex-col h-full space-y-4">
+                    <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl flex-grow flex flex-col justify-between">
+                        <div>
+                            <h3 class="text-base font-bold text-white mb-2 flex items-center justify-between">
+                                <span><i class="fa-solid fa-eye text-emerald-400"></i> Live Preview</span>
+                                <span class="text-xs font-normal text-slate-400">Hover canvas to test cursor</span>
+                            </h3>
+                            <p class="text-xs text-slate-400 mb-4">See how your custom crosshair looks over your target style in real-time.</p>
+                        </div>
+
+                        <!-- Preview Canvas Container -->
+                        <div class="relative w-full aspect-square rounded-xl overflow-hidden border border-slate-800 bg-slate-950 flex items-center justify-center">
+                            <canvas id="previewCanvas" width="350" height="350" class="w-full h-full cursor-none block"></canvas>
+                        </div>
+
+                        <div class="mt-4 flex justify-end">
+                            <button onclick="switchTab('play')" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition">
+                                Apply & Play <i class="fa-solid fa-arrow-right ml-1"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 3: AUDIO & VISUAL THEMES               -->
+        <!-- ========================================== -->
+        <div id="view-audio-visual" class="tab-view hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Audio Synthesizer Controls -->
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-5">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-waveform text-amber-400"></i> Web Audio Synthesizer
+                    </h3>
+                    <p class="text-xs text-slate-400">High-performance synthetic audio generated programmatically via Web Audio API.</p>
+
+                    <!-- Hit Sound Selector -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">HIT SOUND PRESET</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setHitSound('headshot')" id="soundBtn-headshot" class="sound-preset-btn active p-2.5 rounded-xl border-2 border-cyan-500 bg-slate-950 text-xs font-bold text-white flex items-center justify-between">
+                                <span>Headshot Ding</span>
+                                <i class="fa-solid fa-play text-cyan-400" onclick="soundEngine.playHit(0); event.stopPropagation();"></i>
+                            </button>
+                            <button onclick="setHitSound('pop')" id="soundBtn-pop" class="sound-preset-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex items-center justify-between">
+                                <span>Clean Pop</span>
+                                <i class="fa-solid fa-play text-slate-400" onclick="soundEngine.playHit(0); event.stopPropagation();"></i>
+                            </button>
+                            <button onclick="setHitSound('laser')" id="soundBtn-laser" class="sound-preset-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex items-center justify-between">
+                                <span>Synth Laser</span>
+                                <i class="fa-solid fa-play text-slate-400" onclick="soundEngine.playHit(0); event.stopPropagation();"></i>
+                            </button>
+                            <button onclick="setHitSound('thud')" id="soundBtn-thud" class="sound-preset-btn p-2.5 rounded-xl border border-slate-800 bg-slate-950 text-xs font-bold text-slate-400 flex items-center justify-between">
+                                <span>Metallic Thud</span>
+                                <i class="fa-solid fa-play text-slate-400" onclick="soundEngine.playHit(0); event.stopPropagation();"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Volume Sliders -->
+                    <div class="space-y-3 pt-2">
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Master Volume</span>
+                                <span id="masterVolVal" class="font-mono text-cyan-400 font-bold">80%</span>
+                            </div>
+                            <input type="range" id="masterVolSlider" min="0" max="100" value="80" oninput="updateAudioSettings()" class="w-full">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>Hit Sound Volume</span>
+                                <span id="hitVolVal" class="font-mono text-cyan-400 font-bold">90%</span>
+                            </div>
+                            <input type="range" id="hitVolSlider" min="0" max="100" value="90" oninput="updateAudioSettings()" class="w-full">
+                        </div>
+                    </div>
+
+                    <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300 pt-2">
+                        <input type="checkbox" id="pitchStreakToggle" checked onchange="updateAudioSettings()" class="rounded bg-slate-950 border-slate-800 text-cyan-500 focus:ring-0">
+                        Dynamic Pitch Scaling on Combo Streaks (Pitch rises with hits)
+                    </label>
+                </div>
+
+                <!-- Visual Theme Arena Settings -->
+                <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-xl space-y-5">
+                    <h3 class="text-base font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-paint-roller text-violet-400"></i> Arena Visual Themes
+                    </h3>
+                    <p class="text-xs text-slate-400">Customize the arena background, grid overlay, and visual ambiance.</p>
+
+                    <!-- Theme Preset Cards -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-2">THEME PRESETS</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="setVisualTheme('cyberpunk')" id="themeBtn-cyberpunk" class="theme-btn active p-3 rounded-xl border-2 border-cyan-500 bg-slate-950 text-left">
+                                <div class="font-bold text-xs text-cyan-400">Dark Cyberpunk</div>
+                                <div class="text-[10px] text-slate-500">Neon grid & dark slate</div>
+                            </button>
+                            <button onclick="setVisualTheme('minimal')" id="themeBtn-minimal" class="theme-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left">
+                                <div class="font-bold text-xs text-slate-200">Minimal Contrast</div>
+                                <div class="text-[10px] text-slate-500">Flat charcoal gray</div>
+                            </button>
+                            <button onclick="setVisualTheme('synthwave')" id="themeBtn-synthwave" class="theme-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left">
+                                <div class="font-bold text-xs text-pink-400">Synthwave Grid</div>
+                                <div class="text-[10px] text-slate-500">Retro pink grid overlay</div>
+                            </button>
+                            <button onclick="setVisualTheme('matrix')" id="themeBtn-matrix" class="theme-btn p-3 rounded-xl border border-slate-800 bg-slate-950 text-left">
+                                <div class="font-bold text-xs text-emerald-400">Matrix Green</div>
+                                <div class="text-[10px] text-slate-500">Deep green radar feel</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Custom BG Color & Grid Toggle -->
+                    <div class="grid grid-cols-2 gap-4 pt-2">
+                        <div>
+                            <label class="block text-xs text-slate-400 mb-1">Custom Background</label>
+                            <input type="color" id="customBgColor" value="#0a0d14" onchange="updateCustomTheme()" class="w-full h-9 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
+                        </div>
+                        <div class="flex flex-col justify-end">
+                            <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-300 mb-2">
+                                <input type="checkbox" id="gridOverlayToggle" checked onchange="updateCustomTheme()" class="rounded bg-slate-950 border-slate-800 text-cyan-500 focus:ring-0">
+                                Tactical Grid Overlay
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 4: SENSITIVITY SCALE CONVERTER         -->
+        <!-- ========================================== -->
+        <div id="view-sens" class="tab-view hidden space-y-6">
+            <div class="max-w-3xl mx-auto bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-1">
+                        <i class="fa-solid fa-calculator text-cyan-400"></i> Sensitivity Converter
+                    </h3>
+                    <p class="text-xs text-slate-400">Convert your exact in-game sensitivity from popular competitive titles to Trainer scale.</p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Source Game Selection -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">SOURCE GAME</label>
+                        <select id="sensSourceGame" onchange="calcSensitivity()" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-xl p-3 focus:ring-1 focus:ring-cyan-500">
+                            <option value="valorant">Valorant</option>
+                            <option value="cs2" selected>CS2 / CS:GO / Source Engine</option>
+                            <option value="overwatch">Overwatch 2 / Apex Legends</option>
+                            <option value="rainbow">Rainbow Six Siege</option>
+                            <option value="fortnite">Fortnite (Slider %)</option>
+                        </select>
+                    </div>
+
+                    <!-- Input Sens Value -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">IN-GAME SENSITIVITY</label>
+                        <input type="number" id="sensInputValue" value="1.5" step="0.01" min="0.01" oninput="calcSensitivity()" class="w-full bg-slate-950 border border-slate-800 text-white font-mono text-sm rounded-xl p-3 focus:ring-1 focus:ring-cyan-500">
+                    </div>
+
+                    <!-- Mouse DPI -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">MOUSE DPI</label>
+                        <input type="number" id="sensDpiValue" value="800" step="50" min="100" oninput="calcSensitivity()" class="w-full bg-slate-950 border border-slate-800 text-white font-mono text-sm rounded-xl p-3 focus:ring-1 focus:ring-cyan-500">
+                    </div>
+
+                    <!-- eDPI Calculated -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 mb-1">EFFECTIVE DPI (eDPI)</label>
+                        <div id="sensEdpiResult" class="w-full bg-slate-950 border border-slate-800 text-cyan-400 font-mono font-bold text-base rounded-xl p-3 flex items-center">
+                            1200 eDPI
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Conversion Matrix Table -->
+                <div class="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 space-y-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Equivalent Sensitivities Across Titles</h4>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+                        <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Valorant</div>
+                            <div id="matrixVal" class="text-sm font-mono font-bold text-slate-200">0.471</div>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-[10px] text-slate-400">CS2 / CS:GO</div>
+                            <div id="matrixCS" class="text-sm font-mono font-bold text-slate-200">1.500</div>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Overwatch / Apex</div>
+                            <div id="matrixOW" class="text-sm font-mono font-bold text-slate-200">5.000</div>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-slate-900 border border-slate-800">
+                            <div class="text-[10px] text-slate-400">Trainer Multiplier</div>
+                            <div id="matrixTrainer" class="text-sm font-mono font-bold text-cyan-400">1.00x</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button onclick="applySensToTrainer()" class="px-6 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20">
+                        Apply Sensitivity To Trainer
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- TAB 5: STATS & HIGH SCORES                 -->
+        <!-- ========================================== -->
+        <div id="view-stats" class="tab-view hidden space-y-6">
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl space-y-6">
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-trophy text-amber-400"></i> Personal Best Records
+                        </h3>
+                        <p class="text-xs text-slate-400">High scores and accuracy metrics saved locally.</p>
+                    </div>
+                    <button onclick="resetAllStats()" class="px-3.5 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 text-xs font-semibold transition">
+                        <i class="fa-solid fa-trash-can mr-1"></i> Clear Local History
+                    </button>
+                </div>
+
+                <!-- High Score Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300">
+                        <thead class="bg-slate-950 text-xs uppercase text-slate-400 font-mono">
+                            <tr>
+                                <th class="p-3.5 rounded-l-lg">Game Mode</th>
+                                <th class="p-3.5">High Score</th>
+                                <th class="p-3.5">Max Accuracy</th>
+                                <th class="p-3.5">Max Combo</th>
+                                <th class="p-3.5 rounded-r-lg">Last Played</th>
+                            </tr>
+                        </thead>
+                        <tbody id="highscoresTableBody" class="divide-y divide-slate-800/60 font-mono text-xs">
+                            <!-- Populated dynamically via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================== -->
+    <!-- GAME OVER / SUMMARY MODAL OVERLAY          -->
+    <!-- ========================================== -->
+    <div id="gameOverModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-lg flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-6 my-auto animate-in fade-in zoom-in duration-200">
+            
+            <!-- Modal Header -->
+            <div class="text-center space-y-1">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-400 text-xs font-mono font-bold uppercase tracking-wider mb-1">
+                    <i class="fa-solid fa-flag-checkered"></i> Challenge Complete
+                </div>
+                <h2 id="summaryModeTitle" class="text-2xl font-black text-white uppercase tracking-wide">GRIDSHOT ARENA</h2>
+                <p id="summaryNewRecordBadge" class="hidden text-xs font-extrabold text-amber-400 animate-pulse">
+                    🏆 NEW PERSONAL HIGH SCORE!
+                </p>
+            </div>
+
+            <!-- Core Stats Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-500">Final Score</span>
+                    <div id="sumScore" class="text-2xl font-mono font-black text-cyan-400">0</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-500">Accuracy</span>
+                    <div id="sumAccuracy" class="text-2xl font-mono font-black text-emerald-400">0%</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-500">Kills / Sec (KPS)</span>
+                    <div id="sumKps" class="text-2xl font-mono font-black text-amber-400">0.00</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                    <span class="text-[10px] uppercase font-bold text-slate-500">Avg TTK / Reflex</span>
+                    <div id="sumTtk" class="text-2xl font-mono font-black text-pink-400">0 ms</div>
+                </div>
+            </div>
+
+            <!-- Heatmap & Shot Analysis Section -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center bg-slate-950/60 p-4 rounded-2xl border border-slate-800">
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-1 flex items-center gap-1.5">
+                        <i class="fa-solid fa-fire text-rose-500"></i> Click Distribution Heatmap
+                    </h4>
+                    <p class="text-[11px] text-slate-400 mb-3 leading-snug">
+                        Visual breakdown of off-target drift. Green glow indicates precise hits, red glow highlights missed clicks relative to target center.
+                    </p>
+
+                    <div class="space-y-1.5 text-xs font-mono">
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Total Shots Fired:</span>
+                            <span id="sumTotalShots" class="text-slate-200 font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Successful Hits:</span>
+                            <span id="sumHits" class="text-emerald-400 font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Missed Clicks:</span>
+                            <span id="sumMisses" class="text-rose-400 font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-slate-400">Max Streak Combo:</span>
+                            <span id="sumMaxStreak" class="text-pink-400 font-bold">0x</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Heatmap Summary Canvas -->
+                <div class="flex justify-center">
+                    <div class="w-48 h-48 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden relative shadow-inner">
+                        <canvas id="heatmapCanvas" width="200" height="200" class="w-full h-full block"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Bottom Actions -->
+            <div class="flex gap-3 justify-end pt-2">
+                <button onclick="closeSummaryAndPlayAgain()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm uppercase tracking-wider shadow-lg shadow-cyan-500/25 transition">
+                    <i class="fa-solid fa-rotate-right mr-2"></i> Play Again
+                </button>
+                <button onclick="closeSummaryModal()" class="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* =================================================================== */
+        /* SOUND ENGINE: WEB AUDIO API SYNTHESIZER (No External Asset Dependencies) */
+        /* =================================================================== */
+        class AudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.masterVol = 0.8;
+                this.hitVol = 0.9;
+                this.hitSoundType = 'headshot'; // 'headshot', 'pop', 'laser', 'thud'
+                this.pitchStreak = true;
+                this.isMuted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playHit(streak = 0) {
+                if (this.isMuted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const pitchMult = this.pitchStreak ? Math.min(1.8, 1 + streak * 0.025) : 1.0;
+
+                switch (this.hitSoundType) {
+                    case 'headshot': {
+                        // High crisp ding + sine resonance
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(1400 * pitchMult, now);
+                        osc.frequency.exponentialRampToValueAtTime(2200 * pitchMult, now + 0.06);
+
+                        gain.gain.setValueAtTime(0.4 * this.hitVol * this.masterVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.1);
+                        break;
+                    }
+                    case 'pop': {
+                        // Clean bubble pop
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(600 * pitchMult, now);
+                        osc.frequency.exponentialRampToValueAtTime(150 * pitchMult, now + 0.06);
+
+                        gain.gain.setValueAtTime(0.5 * this.hitVol * this.masterVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.06);
+                        break;
+                    }
+                    case 'laser': {
+                        // Futuristic synth sweep
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sawtooth';
+                        osc.frequency.setValueAtTime(1600 * pitchMult, now);
+                        osc.frequency.exponentialRampToValueAtTime(200 * pitchMult, now + 0.08);
+
+                        gain.gain.setValueAtTime(0.3 * this.hitVol * this.masterVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.08);
+                        break;
+                    }
+                    case 'thud': {
+                        // Low metallic punch
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(350 * pitchMult, now);
+                        osc.frequency.exponentialRampToValueAtTime(60 * pitchMult, now + 0.09);
+
+                        gain.gain.setValueAtTime(0.6 * this.hitVol * this.masterVol, now);
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(now);
+                        osc.stop(now + 0.09);
+                        break;
+                    }
+                }
+            }
+
+            playMiss() {
+                if (this.isMuted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(120, now);
+                osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+
+                gain.gain.setValueAtTime(0.25 * this.masterVol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+
+            playGameOver() {
+                if (this.isMuted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+                    gain.gain.setValueAtTime(0.3 * this.masterVol, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.2);
+                });
+            }
+        }
+
+        const soundEngine = new AudioEngine();
+
+        /* =================================================================== */
+        /* GAME CONFIG & STATE MANAGEMENT */
+        /* =================================================================== */
+        const gameConfig = {
+            mode: 'gridshot', // gridshot, spidershot, microshot, tracking, targetswitch, reflex, bouncing
+            duration: 60,     // seconds
+            
+            // Target appearance
+            targetShape: 'bullseye', // bullseye, dot, neon, headshot
+            targetColor: '#06b6d4',
+            targetCenterColor: '#ffffff',
+            targetBorderColor: '#0284c7',
+            targetSize: 35, // base radius px
+
+            // Crosshair
+            chStyle: 'crosshair', // crosshair, dot, circle_dot, dynamic_gap
+            chColor: '#00ffcc',
+            chSize: 8,
+            chThickness: 2,
+            chGap: 4,
+            chOutline: true,
+            chDot: true,
+
+            // Theme
+            theme: 'cyberpunk', // cyberpunk, minimal, synthwave, matrix
+            customBg: '#0a0d14',
+            showGrid: true,
+
+            // Sens
+            sensMultiplier: 1.0
+        };
+
+        const gameState = {
+            isRunning: false,
+            isPaused: false,
+            score: 0,
+            hits: 0,
+            misses: 0,
+            streak: 0,
+            maxStreak: 0,
+            startTime: 0,
+            timeRemaining: 60,
+            targets: [],      // Array of target objects
+            particles: [],    // Burst visual particles
+            floatingTexts: [],// Floating score popups
+            shots: [],        // Records shot coordinates for heatmap: {x, y, targetX, targetY, isHit, time}
+            
+            // Reflex mode variables
+            reflexState: 'idle', // waiting, active
+            reflexSpawnTime: 0,
+            reflexLatencies: [], // array of TTKs in ms
+
+            // Spidershot tracking state
+            spidershotNextCenter: true,
+
+            // Tracking mode variables
+            trackingTimeTotal: 0,
+            trackingTimeOnTarget: 0,
+
+            // FPS Measurement
+            lastFrameTime: performance.now(),
+            fps: 60
+        };
+
+        /* =================================================================== */
+        /* GAME MODES PRESET DESCRIPTIONS */
+        /* =================================================================== */
+        const MODE_INFO = {
+            gridshot: {
+                title: "GRIDSHOT ARENA",
+                desc: "3 targets stay active on canvas. Shooting one instantly spawns another at a random location. Train flick speed and muscle memory."
+            },
+            spidershot: {
+                title: "SPIDERSHOT ARENA",
+                desc: "Spawns a central target. Hitting it spawns an outer target at variable distances. Must flick out and return to center repeatedly."
+            },
+            microshot: {
+                title: "MICROSHOT ARENA",
+                desc: "Tiny targets spawn closely grouped together for fine-grained precision micro-adjustments."
+            },
+            tracking: {
+                title: "SMOOTH TRACKING",
+                desc: "Continuous smooth target movement. Keep your crosshair over the moving target to score continuous accuracy."
+            },
+            targetswitch: {
+                title: "TARGET SWITCHING",
+                desc: "6 targets active simultaneously. Rapidly clear targets in sequence to build fast multi-target switching speed."
+            },
+            reflex: {
+                title: "REFLEX / REACTION TIME",
+                desc: "A target appears after a random delay. Click as fast as humanly possible to measure your raw reaction time in ms."
+            },
+            bouncing: {
+                title: "BOUNCING TARGETS",
+                desc: "Targets move dynamically with gravity physics and edge bounces. Practice leading moving targets."
+            }
+        };
+
+        /* =================================================================== */
+        /* CANVAS RENDER & TARGET DRAWING LOGIC */
+        /* =================================================================== */
+        function drawTarget(ctx, target) {
+            const { x, y, radius, opacity = 1 } = target;
+            ctx.save();
+            ctx.globalAlpha = opacity;
+
+            switch (gameConfig.targetShape) {
+                case 'bullseye': {
+                    // Outer Ring
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetColor;
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = gameConfig.targetBorderColor;
+                    ctx.stroke();
+
+                    // Middle Ring
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 0.65, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetCenterColor;
+                    ctx.fill();
+
+                    // Inner Bullseye Dot
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 0.3, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetColor;
+                    ctx.fill();
+                    break;
+                }
+                case 'dot': {
+                    // Clean Solid Dot
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetColor;
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = gameConfig.targetBorderColor;
+                    ctx.stroke();
+
+                    // Center White Pinpoint
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 0.2, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetCenterColor;
+                    ctx.fill();
+                    break;
+                }
+                case 'neon': {
+                    // Glowing Neon Ring
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = gameConfig.targetColor;
+                    
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.lineWidth = 6;
+                    ctx.strokeStyle = gameConfig.targetColor;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius * 0.25, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetCenterColor;
+                    ctx.fill();
+                    break;
+                }
+                case 'headshot': {
+                    // Tactical Headshot Silhouette
+                    const headW = radius * 0.9;
+                    const headH = radius * 1.2;
+
+                    // Neck / Collar
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(x - headW * 0.4, y + headH * 0.4, headW * 0.8, headH * 0.4);
+
+                    // Skull Head
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, headW, headH, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = gameConfig.targetColor;
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = gameConfig.targetBorderColor;
+                    ctx.stroke();
+
+                    // Head Center Red Box
+                    ctx.beginPath();
+                    ctx.arc(x, y - headH * 0.2, radius * 0.35, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fill();
+                    break;
+                }
+            }
+
+            ctx.restore();
+        }
+
+        /* =================================================================== */
+        /* CROSSHAIR RENDER ENGINE */
+        /* =================================================================== */
+        function drawCrosshair(ctx, x, y, isHitmarker = false) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            const color = isHitmarker ? '#f59e0b' : gameConfig.chColor;
+            const size = gameConfig.chSize;
+            const thick = gameConfig.chThickness;
+            const gap = isHitmarker ? gameConfig.chGap + 3 : gameConfig.chGap;
+
+            const drawLineWithOutline = (x1, y1, x2, y2) => {
+                if (gameConfig.chOutline) {
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = thick + 2;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                }
+                ctx.strokeStyle = color;
+                ctx.lineWidth = thick;
+                ctx.beginPath();
+                ctx.moveTo(x1, y1);
+                ctx.lineTo(x2, y2);
+                ctx.stroke();
+            };
+
+            switch (gameConfig.chStyle) {
+                case 'crosshair':
+                case 'dynamic_gap': {
+                    // Top, Bottom, Left, Right crosshair lines
+                    drawLineWithOutline(0, -gap, 0, -gap - size);
+                    drawLineWithOutline(0, gap, 0, gap + size);
+                    drawLineWithOutline(-gap, 0, -gap - size, 0);
+                    drawLineWithOutline(gap, 0, gap + size, 0);
+
+                    if (gameConfig.chDot) {
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, thick, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    break;
+                }
+                case 'dot': {
+                    ctx.fillStyle = color;
+                    if (gameConfig.chOutline) {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, thick + 2, 0, Math.PI * 2);
+                        ctx.fillStyle = '#000000';
+                        ctx.fill();
+                    }
+                    ctx.beginPath();
+                    ctx.arc(0, 0, thick + 1, 0, Math.PI * 2);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                    break;
+                }
+                case 'circle_dot': {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thick;
+                    if (gameConfig.chOutline) {
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = thick + 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, gap + size, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = thick;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, gap + size, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    if (gameConfig.chDot) {
+                        ctx.fillStyle = color;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, thick + 1, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    break;
+                }
+            }
+
+            ctx.restore();
+        }
+
+        /* =================================================================== */
+        /* VISUAL EFFECTS & PARTICLES */
+        /* =================================================================== */
+        function createBurst(x, y, color) {
+            for (let i = 0; i < 12; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 5;
+                gameState.particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    radius: 2 + Math.random() * 3,
+                    color: color || gameConfig.targetColor,
+                    alpha: 1,
+                    life: 0.3 + Math.random() * 0.2
+                });
+            }
+        }
+
+        function createFloatingText(text, x, y, color = '#22d3ee') {
+            gameState.floatingTexts.push({
+                text,
+                x, y,
+                vy: -1.5,
+                alpha: 1,
+                color,
+                life: 0.6
+            });
+        }
+
+        /* =================================================================== */
+        /* GAME CORE ENGINE & MODE LOGIC */
+        /* =================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let mousePos = { x: 0, y: 0 };
+
+        function resizeCanvas() {
+            const container = document.getElementById('canvasContainer');
+            if (!container) return;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function getRandomCoord(margin = 80) {
+            const radius = gameConfig.targetSize;
+            const x = margin + Math.random() * (canvas.width - margin * 2);
+            const y = margin + Math.random() * (canvas.height - margin * 2);
+            return { x, y, radius };
+        }
+
+        function spawnTargetsForMode() {
+            gameState.targets = [];
+
+            switch (gameConfig.mode) {
+                case 'gridshot': {
+                    for (let i = 0; i < 3; i++) {
+                        const coord = getRandomCoord();
+                        gameState.targets.push({ ...coord, id: i });
+                    }
+                    break;
+                }
+                case 'spidershot': {
+                    gameState.spidershotNextCenter = true;
+                    gameState.targets.push({
+                        x: canvas.width / 2,
+                        y: canvas.height / 2,
+                        radius: gameConfig.targetSize,
+                        isCenter: true
+                    });
+                    break;
+                }
+                case 'microshot': {
+                    for (let i = 0; i < 3; i++) {
+                        const coord = getRandomCoord();
+                        gameState.targets.push({ ...coord, radius: gameConfig.targetSize * 0.45 });
+                    }
+                    break;
+                }
+                case 'tracking': {
+                    gameState.targets.push({
+                        x: canvas.width / 2,
+                        y: canvas.height / 2,
+                        vx: 3.5,
+                        vy: 2.5,
+                        radius: gameConfig.targetSize * 0.9
+                    });
+                    break;
+                }
+                case 'targetswitch': {
+                    for (let i = 0; i < 6; i++) {
+                        const coord = getRandomCoord();
+                        gameState.targets.push({ ...coord, id: i });
+                    }
+                    break;
+                }
+                case 'reflex': {
+                    gameState.reflexState = 'waiting';
+                    const delay = 1000 + Math.random() * 2000;
+                    setTimeout(() => {
+                        if (gameState.isRunning && gameConfig.mode === 'reflex') {
+                            const coord = getRandomCoord(120);
+                            gameState.targets = [{ ...coord, radius: gameConfig.targetSize * 0.8 }];
+                            gameState.reflexState = 'active';
+                            gameState.reflexSpawnTime = performance.now();
+                        }
+                    }, delay);
+                    break;
+                }
+                case 'bouncing': {
+                    for (let i = 0; i < 4; i++) {
+                        const coord = getRandomCoord();
+                        gameState.targets.push({
+                            ...coord,
+                            vx: (Math.random() - 0.5) * 6,
+                            vy: (Math.random() - 0.5) * 4,
+                            gravity: 0.15
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+
+        /* Mouse / Touch position tracker */
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+
+            if (e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            }
+
+            return {
+                x: (clientX - rect.left) * (canvas.width / rect.width),
+                y: (clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            mousePos = getCanvasMousePos(e);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            mousePos = getCanvasMousePos(e);
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (!gameState.isRunning || gameState.isPaused) return;
+            handleShot(mousePos.x, mousePos.y);
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if (!gameState.isRunning || gameState.isPaused) return;
+            mousePos = getCanvasMousePos(e);
+            handleShot(mousePos.x, mousePos.y);
+        });
+
+        function handleShot(shotX, shotY) {
+            let hitTargetIndex = -1;
+            let closestTarget = null;
+
+            for (let i = gameState.targets.length - 1; i >= 0; i--) {
+                const t = gameState.targets[i];
+                const dist = Math.hypot(shotX - t.x, shotY - t.y);
+                if (dist <= t.radius) {
+                    hitTargetIndex = i;
+                    closestTarget = t;
+                    break;
+                }
+            }
+
+            if (hitTargetIndex !== -1) {
+                // HIT!
+                gameState.hits++;
+                gameState.streak++;
+                if (gameState.streak > gameState.maxStreak) gameState.maxStreak = gameState.streak;
+                
+                const points = 100 + gameState.streak * 10;
+                gameState.score += points;
+
+                soundEngine.playHit(gameState.streak);
+                createBurst(closestTarget.x, closestTarget.y, gameConfig.targetColor);
+                createFloatingText(`+${points}`, closestTarget.x, closestTarget.y - 10, '#22d3ee');
+
+                // Record shot for heatmap
+                gameState.shots.push({
+                    x: shotX, y: shotY,
+                    targetX: closestTarget.x, targetY: closestTarget.y,
+                    isHit: true
+                });
+
+                // Handle Mode Respawn Logic
+                onTargetHit(hitTargetIndex, closestTarget);
+
+            } else {
+                // MISS!
+                if (gameConfig.mode !== 'tracking') {
+                    gameState.misses++;
+                    gameState.streak = 0;
+                    soundEngine.playMiss();
+                    createFloatingText(`MISS`, shotX, shotY, '#f43f5e');
+
+                    // Record miss shot relative to closest target or shot center
+                    const nearest = gameState.targets[0] || { x: canvas.width/2, y: canvas.height/2 };
+                    gameState.shots.push({
+                        x: shotX, y: shotY,
+                        targetX: nearest.x, targetY: nearest.y,
+                        isHit: false
+                    });
+                }
+            }
+
+            updateHUD();
+        }
+
+        function onTargetHit(index, target) {
+            switch (gameConfig.mode) {
+                case 'gridshot':
+                case 'microshot': {
+                    gameState.targets.splice(index, 1);
+                    const coord = getRandomCoord();
+                    const r = gameConfig.mode === 'microshot' ? gameConfig.targetSize * 0.45 : gameConfig.targetSize;
+                    gameState.targets.push({ ...coord, radius: r });
+                    break;
+                }
+                case 'spidershot': {
+                    gameState.targets = [];
+                    if (gameState.spidershotNextCenter) {
+                        // Spawn outer target
+                        const angle = Math.random() * Math.PI * 2;
+                        const dist = 140 + Math.random() * 220;
+                        const cx = canvas.width / 2 + Math.cos(angle) * dist;
+                        const cy = canvas.height / 2 + Math.sin(angle) * dist;
+                        gameState.targets.push({
+                            x: Math.max(60, Math.min(canvas.width - 60, cx)),
+                            y: Math.max(60, Math.min(canvas.height - 60, cy)),
+                            radius: gameConfig.targetSize,
+                            isCenter: false
+                        });
+                        gameState.spidershotNextCenter = false;
+                    } else {
+                        // Reset to center target
+                        gameState.targets.push({
+                            x: canvas.width / 2,
+                            y: canvas.height / 2,
+                            radius: gameConfig.targetSize,
+                            isCenter: true
+                        });
+                        gameState.spidershotNextCenter = true;
+                    }
+                    break;
+                }
+                case 'targetswitch': {
+                    gameState.targets.splice(index, 1);
+                    const coord = getRandomCoord();
+                    gameState.targets.push({ ...coord });
+                    break;
+                }
+                case 'reflex': {
+                    const ttk = performance.now() - gameState.reflexSpawnTime;
+                    gameState.reflexLatencies.push(ttk);
+                    createFloatingText(`${Math.round(ttk)} ms!`, target.x, target.y - 30, '#f59e0b');
+                    
+                    gameState.targets = [];
+                    gameState.reflexState = 'waiting';
+
+                    const delay = 1000 + Math.random() * 2000;
+                    setTimeout(() => {
+                        if (gameState.isRunning && gameConfig.mode === 'reflex') {
+                            const coord = getRandomCoord(120);
+                            gameState.targets = [{ ...coord, radius: gameConfig.targetSize * 0.8 }];
+                            gameState.reflexState = 'active';
+                            gameState.reflexSpawnTime = performance.now();
+                        }
+                    }, delay);
+                    break;
+                }
+                case 'bouncing': {
+                    gameState.targets.splice(index, 1);
+                    const coord = getRandomCoord();
+                    gameState.targets.push({
+                        ...coord,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 4,
+                        gravity: 0.15
+                    });
+                    break;
+                }
+            }
+        }
+
+        /* =================================================================== */
+        /* MAIN CANVAS RENDER & ANIMATION LOOP */
+        /* =================================================================== */
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            // FPS Calculation
+            const delta = (now - gameState.lastFrameTime) / 1000;
+            gameState.lastFrameTime = now;
+            gameState.fps = Math.round(1 / (delta || 0.016));
+
+            if (!gameState.isRunning || gameState.isPaused) {
+                // If not running, just clear background & render static background theme
+                drawArenaBackground();
+                return;
+            }
+
+            // Update Countdown Timer
+            const elapsed = (now - gameState.startTime) / 1000;
+            gameState.timeRemaining = Math.max(0, gameConfig.duration - elapsed);
+            if (gameState.timeRemaining <= 0) {
+                endGame();
+                return;
+            }
+
+            // Draw Background Theme
+            drawArenaBackground();
+
+            // Update & Render Targets
+            updateAndRenderTargets(delta);
+
+            // Update Particles
+            updateParticles();
+
+            // Update Floating Texts
+            updateFloatingTexts();
+
+            // Draw Crosshair at Mouse Location
+            drawCrosshair(ctx, mousePos.x, mousePos.y);
+
+            // Periodically refresh HUD
+            if (Math.floor(now) % 5 === 0) {
+                updateHUD();
+            }
+        }
+
+        function drawArenaBackground() {
+            ctx.fillStyle = gameConfig.customBg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (gameConfig.showGrid) {
+                ctx.strokeStyle = gameConfig.theme === 'synthwave' ? 'rgba(236, 72, 153, 0.12)' : 'rgba(255, 255, 255, 0.05)';
+                ctx.lineWidth = 1;
+
+                const gridSize = 40;
+                ctx.beginPath();
+                for (let x = 0; x < canvas.width; x += gridSize) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                }
+                for (let y = 0; y < canvas.height; y += gridSize) {
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                }
+                ctx.stroke();
+            }
+        }
+
+        function updateAndRenderTargets(delta) {
+            gameState.targets.forEach((t) => {
+                // Tracking Physics
+                if (gameConfig.mode === 'tracking') {
+                    t.x += t.vx;
+                    t.y += t.vy;
+
+                    if (t.x - t.radius <= 0 || t.x + t.radius >= canvas.width) t.vx *= -1;
+                    if (t.y - t.radius <= 0 || t.y + t.radius >= canvas.height) t.vy *= -1;
+
+                    // Check if mouse is hovering inside tracking target
+                    const dist = Math.hypot(mousePos.x - t.x, mousePos.y - t.y);
+                    gameState.trackingTimeTotal += delta;
+
+                    if (dist <= t.radius) {
+                        gameState.trackingTimeOnTarget += delta;
+                        gameState.score += Math.round(150 * delta);
+                        gameState.hits++;
+
+                        // Draw lock-on tracking aura
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.arc(t.x, t.y, t.radius + 8, 0, Math.PI * 2);
+                        ctx.strokeStyle = '#10b981';
+                        ctx.lineWidth = 3;
+                        ctx.stroke();
+                        ctx.restore();
+                    } else {
+                        gameState.misses++;
+                    }
+                }
+
+                // Bouncing Physics
+                if (gameConfig.mode === 'bouncing') {
+                    t.vy += t.gravity;
+                    t.x += t.vx;
+                    t.y += t.vy;
+
+                    if (t.x - t.radius <= 0 || t.x + t.radius >= canvas.width) t.vx *= -1;
+                    if (t.y + t.radius >= canvas.height) {
+                        t.y = canvas.height - t.radius;
+                        t.vy *= -0.85; // bounce decay
+                    }
+                    if (t.y - t.radius <= 0) t.vy *= -1;
+                }
+
+                drawTarget(ctx, t);
+            });
+        }
+
+        function updateParticles() {
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const p = gameState.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.03;
+
+                if (p.alpha <= 0) {
+                    gameState.particles.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function updateFloatingTexts() {
+            for (let i = gameState.floatingTexts.length - 1; i >= 0; i--) {
+                const ft = gameState.floatingTexts[i];
+                ft.y += ft.vy;
+                ft.alpha -= 0.025;
+
+                if (ft.alpha <= 0) {
+                    gameState.floatingTexts.splice(i, 1);
+                    continue;
+                }
+
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.fillStyle = ft.color;
+                ctx.font = 'bold 13px "JetBrains Mono", monospace';
+                ctx.fillText(ft.text, ft.x - 15, ft.y);
+                ctx.restore();
+            }
+        }
+
+        /* =================================================================== */
+        /* GAME LIFECYCLE & HUD MANAGEMENT */
+        /* =================================================================== */
+        function startGame() {
+            soundEngine.init();
+
+            gameState.isRunning = true;
+            gameState.isPaused = false;
+            gameState.score = 0;
+            gameState.hits = 0;
+            gameState.misses = 0;
+            gameState.streak = 0;
+            gameState.maxStreak = 0;
+            gameState.startTime = performance.now();
+            gameState.shots = [];
+            gameState.reflexLatencies = [];
+            gameState.trackingTimeTotal = 0;
+            gameState.trackingTimeOnTarget = 0;
+
+            document.getElementById('startOverlay').classList.add('hidden');
+            document.getElementById('pauseOverlay').classList.add('hidden');
+
+            spawnTargetsForMode();
+            updateHUD();
+        }
+
+        function pauseGame() {
+            if (!gameState.isRunning) return;
+            gameState.isPaused = true;
+            document.getElementById('pauseOverlay').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            if (!gameState.isRunning) return;
+            gameState.isPaused = false;
+            document.getElementById('pauseOverlay').classList.add('hidden');
+        }
+
+        function restartGame() {
+            startGame();
+        }
+
+        function endGame() {
+            gameState.isRunning = false;
+            soundEngine.playGameOver();
+            saveHighScore();
+            showSummaryModal();
+        }
+
+        function updateHUD() {
+            document.getElementById('hudScore').innerText = gameState.score.toLocaleString();
+            
+            const timerVal = gameConfig.duration > 100000 ? "∞" : `${gameState.timeRemaining.toFixed(1)}s`;
+            document.getElementById('hudTimer').innerText = timerVal;
+
+            let accuracy = 100;
+            const totalShots = gameState.hits + gameState.misses;
+            if (gameConfig.mode === 'tracking') {
+                accuracy = gameState.trackingTimeTotal > 0 ? Math.round((gameState.trackingTimeOnTarget / gameState.trackingTimeTotal) * 100) : 100;
+            } else if (totalShots > 0) {
+                accuracy = Math.round((gameState.hits / totalShots) * 100);
+            }
+
+            document.getElementById('hudAccuracy').innerText = `${accuracy}%`;
+            document.getElementById('hudStreak').innerText = `${gameState.streak}x`;
+            document.getElementById('hudHits').innerText = gameState.hits;
+            document.getElementById('hudMisses').innerText = gameState.misses;
+            document.getElementById('hudFPS').innerText = gameState.fps;
+        }
+
+        /* Keyboard Shortcuts Listener */
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' || e.key === ' ') {
+                if (gameState.isRunning) {
+                    if (gameState.isPaused) resumeGame();
+                    else pauseGame();
+                }
+            } else if (e.key === 'r' || e.key === 'R') {
+                if (gameState.isRunning) {
+                    restartGame();
+                }
+            }
+        });
+
+        /* =================================================================== */
+        /* POST-GAME SUMMARY & HEATMAP RENDER ENGINE */
+        /* =================================================================== */
+        function showSummaryModal() {
+            const modal = document.getElementById('gameOverModal');
+            modal.classList.remove('hidden');
+
+            document.getElementById('summaryModeTitle').innerText = MODE_INFO[gameConfig.mode].title;
+            document.getElementById('sumScore').innerText = gameState.score.toLocaleString();
+
+            const totalShots = gameState.hits + gameState.misses;
+            let accuracy = 100;
+            if (gameConfig.mode === 'tracking') {
+                accuracy = gameState.trackingTimeTotal > 0 ? Math.round((gameState.trackingTimeOnTarget / gameState.trackingTimeTotal) * 100) : 100;
+            } else if (totalShots > 0) {
+                accuracy = Math.round((gameState.hits / totalShots) * 100);
+            }
+            document.getElementById('sumAccuracy').innerText = `${accuracy}%`;
+
+            const durationPlayed = Math.min(gameConfig.duration, (performance.now() - gameState.startTime) / 1000);
+            const kps = durationPlayed > 0 ? (gameState.hits / durationPlayed).toFixed(2) : '0.00';
+            document.getElementById('sumKps').innerText = kps;
+
+            let avgTtk = 0;
+            if (gameConfig.mode === 'reflex' && gameState.reflexLatencies.length > 0) {
+                const sum = gameState.reflexLatencies.reduce((a, b) => a + b, 0);
+                avgTtk = Math.round(sum / gameState.reflexLatencies.length);
+            } else if (gameState.hits > 0) {
+                avgTtk = Math.round((durationPlayed * 1000) / gameState.hits);
+            }
+            document.getElementById('sumTtk').innerText = `${avgTtk} ms`;
+
+            document.getElementById('sumTotalShots').innerText = totalShots;
+            document.getElementById('sumHits').innerText = gameState.hits;
+            document.getElementById('sumMisses').innerText = gameState.misses;
+            document.getElementById('sumMaxStreak').innerText = `${gameState.maxStreak}x`;
+
+            // Draw Heatmap Canvas
+            renderHeatmap();
+        }
+
+        function renderHeatmap() {
+            const hCanvas = document.getElementById('heatmapCanvas');
+            const hCtx = hCanvas.getContext('2d');
+            const w = hCanvas.width;
+            const h = hCanvas.height;
+            const center = w / 2;
+
+            // Clear Canvas
+            hCtx.fillStyle = '#090d16';
+            hCtx.fillRect(0, 0, w, h);
+
+            // Draw Bullseye Grid Reference
+            hCtx.strokeStyle = '#1e293b';
+            hCtx.lineWidth = 1;
+            hCtx.beginPath();
+            hCtx.arc(center, center, 30, 0, Math.PI * 2);
+            hCtx.arc(center, center, 60, 0, Math.PI * 2);
+            hCtx.stroke();
+
+            hCtx.beginPath();
+            hCtx.moveTo(center, 0); hCtx.lineTo(center, h);
+            hCtx.moveTo(0, center); hCtx.lineTo(w, center);
+            hCtx.stroke();
+
+            // Render Heat Blobs
+            gameState.shots.forEach((s) => {
+                const dx = s.x - s.targetX;
+                const dy = s.y - s.targetY;
+                const hx = center + dx;
+                const hy = center + dy;
+
+                hCtx.save();
+                hCtx.globalCompositeOperation = 'lighter';
+                const rad = hCtx.createRadialGradient(hx, hy, 0, hx, hy, 12);
+                if (s.isHit) {
+                    rad.addColorStop(0, 'rgba(16, 185, 129, 0.6)');
+                    rad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+                } else {
+                    rad.addColorStop(0, 'rgba(244, 63, 94, 0.6)');
+                    rad.addColorStop(1, 'rgba(244, 63, 94, 0)');
+                }
+                hCtx.fillStyle = rad;
+                hCtx.beginPath();
+                hCtx.arc(hx, hy, 12, 0, Math.PI * 2);
+                hCtx.fill();
+                hCtx.restore();
+            });
+        }
+
+        function closeSummaryModal() {
+            document.getElementById('gameOverModal').classList.add('hidden');
+            document.getElementById('startOverlay').classList.remove('hidden');
+        }
+
+        function closeSummaryAndPlayAgain() {
+            closeSummaryModal();
+            startGame();
+        }
+
+        /* =================================================================== */
+        /* HIGH SCORES & STORAGE MANAGEMENT */
+        /* =================================================================== */
+        function getHighScores() {
+            const raw = localStorage.getItem('fps_aim_trainer_records');
+            return raw ? JSON.parse(raw) : {};
+        }
+
+        function saveHighScore() {
+            const records = getHighScores();
+            const currentModeRecord = records[gameConfig.mode] || { score: 0, accuracy: 0, maxStreak: 0, date: '-' };
+
+            let accuracy = 100;
+            const totalShots = gameState.hits + gameState.misses;
+            if (totalShots > 0) accuracy = Math.round((gameState.hits / totalShots) * 100);
+
+            const isNewBest = gameState.score > currentModeRecord.score;
+
+            if (isNewBest) {
+                records[gameConfig.mode] = {
+                    score: gameState.score,
+                    accuracy: accuracy,
+                    maxStreak: gameState.maxStreak,
+                    date: new Date().toLocaleDateString()
+                };
+                localStorage.setItem('fps_aim_trainer_records', JSON.stringify(records));
+                document.getElementById('summaryNewRecordBadge').classList.remove('hidden');
+            } else {
+                document.getElementById('summaryNewRecordBadge').classList.add('hidden');
+            }
+
+            updateQuickHighscoreDisplay();
+            renderHighscoresTable();
+        }
+
+        function updateQuickHighscoreDisplay() {
+            const records = getHighScores();
+            const rec = records[gameConfig.mode];
+            document.getElementById('quickHighscore').innerText = rec ? rec.score.toLocaleString() : '0';
+        }
+
+        function renderHighscoresTable() {
+            const tbody = document.getElementById('highscoresTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            const records = getHighScores();
+            const modes = ['gridshot', 'spidershot', 'microshot', 'tracking', 'targetswitch', 'reflex', 'bouncing'];
+
+            modes.forEach((m) => {
+                const rec = records[m] || { score: 0, accuracy: 0, maxStreak: 0, date: 'Never' };
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-800/40 transition';
+                tr.innerHTML = `
+                    <td class="p-3.5 font-bold text-white capitalize">${m}</td>
+                    <td class="p-3.5 text-cyan-400 font-bold">${rec.score.toLocaleString()}</td>
+                    <td class="p-3.5 text-emerald-400">${rec.accuracy}%</td>
+                    <td class="p-3.5 text-pink-400">${rec.maxStreak}x</td>
+                    <td class="p-3.5 text-slate-500">${rec.date}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function resetAllStats() {
+            if (confirm("Are you sure you want to clear all high scores and records?")) {
+                localStorage.removeItem('fps_aim_trainer_records');
+                renderHighscoresTable();
+                updateQuickHighscoreDisplay();
+            }
+        }
+
+        /* =================================================================== */
+        /* SENSITIVITY CALCULATOR MATRIX */
+        /* =================================================================== */
+        function calcSensitivity() {
+            const game = document.getElementById('sensSourceGame').value;
+            const val = parseFloat(document.getElementById('sensInputValue').value) || 1.0;
+            const dpi = parseFloat(document.getElementById('sensDpiValue').value) || 800;
+
+            let edpi = val * dpi;
+            document.getElementById('sensEdpiResult').innerText = `${Math.round(edpi)} eDPI`;
+
+            let valSens = 0, csSens = 0, owSens = 0;
+
+            switch (game) {
+                case 'valorant':
+                    valSens = val;
+                    csSens = val * 3.1818;
+                    owSens = val * 10.60;
+                    break;
+                case 'cs2':
+                    csSens = val;
+                    valSens = val / 3.1818;
+                    owSens = val * 3.3333;
+                    break;
+                case 'overwatch':
+                    owSens = val;
+                    valSens = val / 10.60;
+                    csSens = val / 3.3333;
+                    break;
+                default:
+                    csSens = val;
+                    valSens = val / 3.1818;
+                    owSens = val * 3.3333;
+            }
+
+            document.getElementById('matrixVal').innerText = valSens.toFixed(3);
+            document.getElementById('matrixCS').innerText = csSens.toFixed(3);
+            document.getElementById('matrixOW').innerText = owSens.toFixed(3);
+            document.getElementById('matrixTrainer').innerText = `${(valSens * 2.1).toFixed(2)}x`;
+        }
+
+        function applySensToTrainer() {
+            const valSens = parseFloat(document.getElementById('matrixVal').innerText) || 1.0;
+            gameConfig.sensMultiplier = valSens * 2.1;
+            switchTab('play');
+        }
+
+        /* =================================================================== */
+        /* LIVE CUSTOMIZER PREVIEW ENGINE */
+        /* =================================================================== */
+        const pCanvas = document.getElementById('previewCanvas');
+        const pCtx = pCanvas ? pCanvas.getContext('2d') : null;
+        let previewMousePos = { x: 175, y: 175 };
+
+        if (pCanvas) {
+            pCanvas.addEventListener('mousemove', (e) => {
+                const rect = pCanvas.getBoundingClientRect();
+                previewMousePos = {
+                    x: (e.clientX - rect.left) * (pCanvas.width / rect.width),
+                    y: (e.clientY - rect.top) * (pCanvas.height / rect.height)
+                };
+            });
+        }
+
+        function renderCustomizerPreview() {
+            if (!pCtx) return;
+            pCtx.fillStyle = gameConfig.customBg;
+            pCtx.fillRect(0, 0, pCanvas.width, pCanvas.height);
+
+            if (gameConfig.showGrid) {
+                pCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                pCtx.lineWidth = 1;
+                for (let x = 0; x < pCanvas.width; x += 30) {
+                    pCtx.beginPath(); pCtx.moveTo(x, 0); pCtx.lineTo(x, pCanvas.height); pCtx.stroke();
+                }
+                for (let y = 0; y < pCanvas.height; y += 30) {
+                    pCtx.beginPath(); pCtx.moveTo(0, y); pCtx.lineTo(pCanvas.width, y); pCtx.stroke();
+                }
+            }
+
+            // Draw Sample Target in Center
+            drawTarget(pCtx, { x: 175, y: 175, radius: gameConfig.targetSize });
+
+            // Draw Custom Crosshair at Preview Cursor
+            drawCrosshair(pCtx, previewMousePos.x, previewMousePos.y);
+
+            requestAnimationFrame(renderCustomizerPreview);
+        }
+
+        function updateCustomizer() {
+            gameConfig.targetColor = document.getElementById('targetColorInput').value;
+            gameConfig.targetCenterColor = document.getElementById('targetCenterColorInput').value;
+            gameConfig.targetBorderColor = document.getElementById('targetBorderColorInput').value;
+            gameConfig.targetSize = parseInt(document.getElementById('targetSizeSlider').value);
+            document.getElementById('targetSizeVal').innerText = `${gameConfig.targetSize} px`;
+
+            gameConfig.chColor = document.getElementById('chColorInput').value;
+            gameConfig.chSize = parseInt(document.getElementById('chSizeSlider').value);
+            document.getElementById('chSizeVal').innerText = `${gameConfig.chSize} px`;
+
+            gameConfig.chThickness = parseInt(document.getElementById('chThicknessSlider').value);
+            document.getElementById('chThicknessVal').innerText = `${gameConfig.chThickness} px`;
+
+            gameConfig.chGap = parseInt(document.getElementById('chGapSlider').value);
+            document.getElementById('chGapVal').innerText = `${gameConfig.chGap} px`;
+
+            gameConfig.chOutline = document.getElementById('chOutlineToggle').checked;
+            gameConfig.chDot = document.getElementById('chDotToggle').checked;
+        }
+
+        function setTargetShape(shape) {
+            gameConfig.targetShape = shape;
+            document.querySelectorAll('.target-shape-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-2', 'border-cyan-500');
+                btn.classList.add('border', 'border-slate-800');
+            });
+            const activeBtn = document.getElementById(`shapeBtn-${shape}`);
+            if (activeBtn) activeBtn.classList.add('active', 'border-2', 'border-cyan-500');
+        }
+
+        function setCrosshairStyle(style) {
+            gameConfig.chStyle = style;
+            document.querySelectorAll('.ch-style-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-2', 'border-cyan-500');
+                btn.classList.add('border', 'border-slate-800');
+            });
+            const activeBtn = document.getElementById(`chBtn-${style}`);
+            if (activeBtn) activeBtn.classList.add('active', 'border-2', 'border-cyan-500');
+        }
+
+        function setHitSound(type) {
+            soundEngine.hitSoundType = type;
+            document.querySelectorAll('.sound-preset-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-2', 'border-cyan-500');
+                btn.classList.add('border', 'border-slate-800');
+            });
+            const activeBtn = document.getElementById(`soundBtn-${type}`);
+            if (activeBtn) activeBtn.classList.add('active', 'border-2', 'border-cyan-500');
+            soundEngine.playHit(0);
+        }
+
+        function updateAudioSettings() {
+            soundEngine.masterVol = parseInt(document.getElementById('masterVolSlider').value) / 100;
+            document.getElementById('masterVolVal').innerText = `${document.getElementById('masterVolSlider').value}%`;
+
+            soundEngine.hitVol = parseInt(document.getElementById('hitVolSlider').value) / 100;
+            document.getElementById('hitVolVal').innerText = `${document.getElementById('hitVolSlider').value}%`;
+
+            soundEngine.pitchStreak = document.getElementById('pitchStreakToggle').checked;
+        }
+
+        function setVisualTheme(theme) {
+            gameConfig.theme = theme;
+            document.querySelectorAll('.theme-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-2', 'border-cyan-500');
+                btn.classList.add('border', 'border-slate-800');
+            });
+            const activeBtn = document.getElementById(`themeBtn-${theme}`);
+            if (activeBtn) activeBtn.classList.add('active', 'border-2', 'border-cyan-500');
+
+            switch (theme) {
+                case 'cyberpunk':
+                    gameConfig.customBg = '#0a0d14';
+                    gameConfig.showGrid = true;
+                    break;
+                case 'minimal':
+                    gameConfig.customBg = '#111827';
+                    gameConfig.showGrid = false;
+                    break;
+                case 'synthwave':
+                    gameConfig.customBg = '#180e29';
+                    gameConfig.showGrid = true;
+                    break;
+                case 'matrix':
+                    gameConfig.customBg = '#03140c';
+                    gameConfig.showGrid = true;
+                    break;
+            }
+            document.getElementById('customBgColor').value = gameConfig.customBg;
+            document.getElementById('gridOverlayToggle').checked = gameConfig.showGrid;
+        }
+
+        function updateCustomTheme() {
+            gameConfig.customBg = document.getElementById('customBgColor').value;
+            gameConfig.showGrid = document.getElementById('gridOverlayToggle').checked;
+        }
+
+        function selectGameMode(modeKey) {
+            gameConfig.mode = modeKey;
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-2', 'border-cyan-500');
+                btn.classList.add('border', 'border-slate-800');
+            });
+            const activeBtn = document.getElementById(`modeBtn-${modeKey}`);
+            if (activeBtn) activeBtn.classList.add('active', 'border-2', 'border-cyan-500');
+
+            const info = MODE_INFO[modeKey];
+            document.getElementById('overlayModeTitle').innerText = info.title;
+            document.getElementById('overlayModeDesc').innerText = info.desc;
+
+            updateQuickHighscoreDisplay();
+            if (gameState.isRunning) {
+                startGame();
+            }
+        }
+
+        function updateDurationSetting() {
+            gameConfig.duration = parseInt(document.getElementById('gameDurationSelect').value);
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(view => view.classList.add('hidden'));
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active', 'text-cyan-400', 'bg-slate-800');
+                tab.classList.add('text-slate-400');
+            });
+
+            const selectedView = document.getElementById(`view-${tabId}`);
+            if (selectedView) selectedView.classList.remove('hidden');
+
+            const selectedTab = document.getElementById(`tab-${tabId}`);
+            if (selectedTab) selectedTab.classList.add('active', 'text-cyan-400', 'bg-slate-800');
+
+            if (tabId === 'stats') {
+                renderHighscoresTable();
+            }
+        }
+
+        function toggleMute() {
+            soundEngine.isMuted = !soundEngine.isMuted;
+            const icon = document.getElementById('muteIcon');
+            if (soundEngine.isMuted) {
+                icon.className = 'fa-solid fa-volume-xmark text-rose-400';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-slate-300';
+            }
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {});
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        }
+
+        /* =================================================================== */
+        /* APPLICATION INITIALIZATION ENTRY POINT */
+        /* =================================================================== */
+        window.onload = function() {
+            resizeCanvas();
+            renderCustomizerPreview();
+            calcSensitivity();
+            renderHighscoresTable();
+            updateQuickHighscoreDisplay();
+
+            // Kick off animation loop
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,2630 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shear Magic: Hair Salon Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 for 3D WebGL Rendering -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        fredoka: ['Fredoka', 'cursive', 'sans-serif']
+                    },
+                    colors: {
+                        salon: {
+                            bg: '#121120',
+                            panel: '#1d1b31',
+                            accent: '#f43f5e',
+                            gold: '#fbbf24'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts & Font Awesome -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            background: radial-gradient(circle at top center, #252240 0%, #121120 100%);
+        }
+        .glass-panel {
+            background: rgba(29, 27, 49, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .tool-btn {
+            transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .tool-btn:hover {
+            transform: translateY(-2px);
+        }
+        .tool-btn.active {
+            background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+            color: white;
+            border-color: #fda4af;
+            box-shadow: 0 6px 20px -4px rgba(244, 63, 94, 0.6);
+            transform: translateY(-3px) scale(1.04);
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        .polaroid-frame {
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.65);
+            transition: transform 0.3s ease;
+        }
+        .polaroid-frame:hover {
+            transform: rotate(-1deg) scale(1.02);
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 12px rgba(244, 63, 94, 0.3); }
+            50% { box-shadow: 0 0 24px rgba(244, 63, 94, 0.7); }
+        }
+        .glow-active {
+            animation: pulseGlow 2.2s infinite;
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans h-screen w-screen flex flex-col justify-between">
+
+    <!-- TOP NAVIGATION HEADER -->
+    <header class="glass-panel px-4 py-2.5 flex items-center justify-between border-b border-slate-800/80 z-20">
+        <!-- Brand Logo -->
+        <div class="flex items-center space-x-2.5">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-pink-500 via-rose-500 to-amber-400 flex items-center justify-center shadow-lg">
+                <i class="fa-solid fa-scissors text-white text-base transform -rotate-12"></i>
+            </div>
+            <div>
+                <h1 class="font-fredoka text-lg sm:text-xl font-bold tracking-wide bg-gradient-to-r from-pink-300 via-rose-200 to-amber-200 bg-clip-text text-transparent">
+                    Shear Magic <span class="text-xs font-sans font-black px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-300 border border-pink-500/40 align-middle">3D</span>
+                </h1>
+                <p class="text-[10px] text-slate-400 hidden sm:block">360° 3D Hair Salon & Texture Studio</p>
+            </div>
+        </div>
+
+        <!-- Mode Switcher (Freestyle vs Client Requests) -->
+        <div class="flex items-center bg-slate-900/80 p-1 rounded-2xl border border-slate-700/70">
+            <button id="modeFreestyleBtn" onclick="setGameMode('freestyle')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-white bg-pink-600 shadow-md">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Freestyle
+            </button>
+            <button id="modeRequestBtn" onclick="setGameMode('request')" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white">
+                <i class="fa-solid fa-star mr-1"></i> Client Request
+            </button>
+        </div>
+
+        <!-- Right Controls: Tips Counter, Lookbook, Audio, Reset -->
+        <div class="flex items-center space-x-2 sm:space-x-3">
+            <!-- Tips Earned -->
+            <div class="flex items-center space-x-1.5 bg-amber-500/15 border border-amber-500/30 px-2.5 py-1.5 rounded-xl">
+                <i class="fa-solid fa-coins text-amber-400 text-xs"></i>
+                <span id="totalTipsEarned" class="text-xs font-bold text-amber-300">$0</span>
+            </div>
+
+            <!-- Lookbook Gallery Button -->
+            <button onclick="openLookbookModal()" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-pink-300 transition relative" title="Salon Lookbook">
+                <i class="fa-solid fa-images text-sm"></i>
+                <span id="lookbookBadge" class="absolute -top-1.5 -right-1.5 bg-pink-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">0</span>
+            </button>
+
+            <!-- Sound Toggle -->
+            <button id="audioToggleBtn" onclick="toggleAudio()" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-slate-300 transition" title="Toggle Sound FX">
+                <i id="audioIcon" class="fa-solid fa-volume-high text-sm text-pink-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN STUDIO WORKSPACE -->
+    <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+        <!-- LEFT SIDEBAR: CLIENT SELECTOR & HAIR TEXTURE INFO -->
+        <aside class="glass-panel lg:w-72 border-b lg:border-b-0 lg:border-r border-slate-800/80 p-3 flex flex-col justify-between z-10 overflow-y-auto custom-scrollbar max-h-44 lg:max-h-none">
+            <div class="space-y-3">
+                <!-- Client Switcher -->
+                <div class="flex items-start justify-between gap-2">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400 pt-1">Clients (10)</span>
+                    <div id="clientSelectorContainer" class="flex flex-wrap justify-end gap-1 max-w-[165px]"></div>
+                </div>
+
+                <!-- Hair Type & Texture Card -->
+                <div class="bg-slate-900/75 rounded-2xl p-3 border border-slate-700/60 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span id="badgeClientName" class="font-fredoka text-base font-bold text-white">Maya</span>
+                        <span id="badgeHairTypeName" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-300 border border-pink-500/30">Type 1A Pin-Straight</span>
+                    </div>
+                    <p id="badgeHairTypeDesc" class="text-[11px] text-slate-400 leading-relaxed">
+                        Sleek, glossy 3D strands with high specular shine & fluid swing.
+                    </p>
+                    <div class="pt-1 flex items-center justify-between gap-2">
+                        <button onclick="resetClientHair()" class="flex-1 py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-rotate-left text-pink-400"></i>
+                            <span>Reset Hair</span>
+                        </button>
+                        <button onclick="sweepAllClippings()" class="py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[11px] font-semibold text-slate-200 border border-slate-700 transition" title="Sweep Floor Clippings">
+                            <i class="fa-solid fa-broom text-amber-400"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Client Request Target Card (Visible in Request Mode) -->
+                <div id="requestCardOverlay" class="hidden bg-gradient-to-br from-rose-950/90 to-purple-950/90 rounded-2xl p-3 border border-pink-500/40 shadow-lg space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span id="targetClientName" class="text-xs font-bold text-pink-300">Maya's Wish:</span>
+                        <span class="text-xs font-extrabold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                            Match: <span id="styleMatchPercent">0%</span>
+                        </span>
+                    </div>
+                    <div id="targetHairstyleTag" class="font-fredoka text-sm font-bold text-white">Silky Crimson Bob</div>
+                    <p id="targetDescription" class="text-[11px] text-slate-300 italic">"Cut my pin-straight hair into a glossy crimson bob!"</p>
+                    <button onclick="completeClientRequest()" class="w-full py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-extrabold text-xs shadow-lg transition transform active:scale-95">
+                        <i class="fa-solid fa-check-circle mr-1"></i> Finish & Collect Tip
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3D Controls Tip -->
+            <div class="hidden lg:block bg-slate-900/50 rounded-xl p-2.5 border border-slate-800 text-[11px] text-slate-400 space-y-1 mt-3">
+                <div class="font-bold text-slate-300 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-cube text-pink-400"></i>
+                    <span>3D Salon Controls</span>
+                </div>
+                <p>• <strong>Left Drag:</strong> Cut, dye & style hair</p>
+                <p>• <strong>Right Drag / Shift+Drag:</strong> Rotate 360°</p>
+                <p>• <strong>Scroll / Pinch:</strong> Zoom in & out</p>
+            </div>
+        </aside>
+
+        <!-- CENTER 3D WEBGL VIEWPORT -->
+        <div class="flex-1 relative flex items-center justify-center p-2 sm:p-4 overflow-hidden">
+            <div id="canvasContainer" class="relative w-full h-full rounded-3xl overflow-hidden glass-panel border border-slate-700/60 shadow-2xl flex items-center justify-center bg-slate-950">
+                <div id="threeMount" class="w-full h-full touch-none cursor-crosshair"></div>
+
+                <!-- 3D CAMERA & TURNTABLE HUD BAR -->
+                <div class="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 glass-panel px-3 py-2 rounded-2xl border border-slate-700/70">
+                    <!-- Pointer Mode Switch (Use Tool vs Orbit 3D View) -->
+                    <div class="flex items-center space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
+                        <button id="pointerToolModeBtn" onclick="setPointerInteractionMode('tool')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-pink-600 text-white shadow transition flex items-center space-x-1">
+                            <i class="fa-solid fa-hand-sparkles"></i>
+                            <span>Style Hair</span>
+                        </button>
+                        <button id="pointerOrbitModeBtn" onclick="setPointerInteractionMode('orbit')" class="px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition flex items-center space-x-1">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>Rotate 3D</span>
+                        </button>
+                    </div>
+
+                    <!-- 360° Turntable Slider -->
+                    <div class="hidden sm:flex items-center space-x-2 flex-1 max-w-xs px-2">
+                        <i class="fa-solid fa-rotate text-pink-400 text-xs"></i>
+                        <input id="turntableSlider" type="range" min="-180" max="180" value="0" oninput="onTurntableInput(this.value)" class="w-full accent-pink-500 h-1.5 bg-slate-800 rounded-lg cursor-pointer" title="360° Chair Rotation">
+                    </div>
+
+                    <!-- Quick Camera Angles & Zoom -->
+                    <div class="flex items-center space-x-1">
+                        <button onclick="setCameraPreset('front')" class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition">Front</button>
+                        <button onclick="setCameraPreset('left')" class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition">Left</button>
+                        <button onclick="setCameraPreset('back')" class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition">Back</button>
+                        <button onclick="setCameraPreset('right')" class="px-2 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition">Right</button>
+                        <button onclick="adjustCameraZoom(-0.8)" class="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition" title="Zoom In"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+                        <button onclick="adjustCameraZoom(0.8)" class="p-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-slate-700/60 transition" title="Zoom Out"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT SIDEBAR: ACCESSORIES, DYE PALETTE & PHOTO BOOTH -->
+        <aside class="glass-panel lg:w-72 border-t lg:border-t-0 lg:border-l border-slate-800/80 p-3 flex flex-col justify-between z-10 overflow-y-auto custom-scrollbar max-h-44 lg:max-h-none">
+            <div class="space-y-3">
+                <!-- Brush Radius Size Selector -->
+                <div class="flex items-center justify-between bg-slate-900/75 px-3 py-2 rounded-2xl border border-slate-700/60">
+                    <span class="text-xs font-bold text-slate-300">Tool Brush Size</span>
+                    <div class="flex items-center space-x-1 bg-slate-800 p-1 rounded-lg">
+                        <button id="sizeS" onclick="setBrushSize(15)" class="px-2 py-0.5 text-[10px] font-bold rounded text-slate-400 hover:text-white">S</button>
+                        <button id="sizeM" onclick="setBrushSize(30)" class="px-2 py-0.5 text-[10px] font-bold rounded bg-pink-600 text-white shadow">M</button>
+                        <button id="sizeL" onclick="setBrushSize(50)" class="px-2 py-0.5 text-[10px] font-bold rounded text-slate-400 hover:text-white">L</button>
+                    </div>
+                </div>
+
+                <!-- Hair Dye Color Swatches (Shown when Hair Dye is active) -->
+                <div id="dyePalettePanel" class="hidden bg-slate-900/85 p-3 rounded-2xl border border-pink-500/40 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-pink-300"><i class="fa-solid fa-palette mr-1"></i> Salon Dye Colors</span>
+                        <button id="rainbowBtn" onclick="toggleRainbowMode()" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-gradient-to-r from-rose-500 via-amber-400 via-emerald-400 to-indigo-500 text-slate-950 shadow">
+                            Rainbow
+                        </button>
+                    </div>
+                    <div id="colorSwatches" class="grid grid-cols-8 gap-1.5 pt-1"></div>
+                </div>
+
+                <!-- 3D Wearable Salon Accessories -->
+                <div class="bg-slate-900/75 p-3 rounded-2xl border border-slate-700/60 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">3D Accessories</span>
+                        <button onclick="clearAccessories()" class="text-[10px] text-slate-400 hover:text-pink-400 font-semibold">Clear</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5">
+                        <button id="acc-catEars" onclick="toggleAccessory('catEars')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">🐱</span>
+                            <span class="text-[10px] font-semibold">Cat Ears</span>
+                        </button>
+                        <button id="acc-flowerCrown" onclick="toggleAccessory('flowerCrown')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">🌸</span>
+                            <span class="text-[10px] font-semibold">Flowers</span>
+                        </button>
+                        <button id="acc-starClips" onclick="toggleAccessory('starClips')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">⭐</span>
+                            <span class="text-[10px] font-semibold">Star Clips</span>
+                        </button>
+                        <button id="acc-glasses" onclick="toggleAccessory('glasses')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">🕶️</span>
+                            <span class="text-[10px] font-semibold">Shades</span>
+                        </button>
+                        <button id="acc-crown" onclick="toggleAccessory('crown')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">👑</span>
+                            <span class="text-[10px] font-semibold">Tiara</span>
+                        </button>
+                        <button id="acc-bow" onclick="toggleAccessory('bow')" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 flex flex-col items-center space-y-1 transition">
+                            <span class="text-base">🎀</span>
+                            <span class="text-[10px] font-semibold">Bow</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Polaroid Photo Booth Capture Button -->
+            <div class="pt-2">
+                <button onclick="takePolaroidPhoto()" class="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-fredoka font-bold text-sm shadow-lg glow-active flex items-center justify-center space-x-2 transition transform active:scale-95">
+                    <i class="fa-solid fa-camera-retro"></i>
+                    <span>Snap 3D Polaroid</span>
+                </button>
+            </div>
+        </aside>
+    </main>
+
+    <!-- BOTTOM 10-TOOL SALON DOCK -->
+    <footer class="glass-panel border-t border-slate-800/80 px-3 py-2.5 z-20">
+        <div class="max-w-5xl mx-auto flex items-center justify-start sm:justify-center space-x-2 overflow-x-auto custom-scrollbar pb-1 sm:pb-0">
+            <button id="tool-scissors" onclick="selectTool('scissors')" class="tool-btn active flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-scissors text-base mb-1"></i>
+                <span class="text-[10px] font-bold">Scissors</span>
+            </button>
+            <button id="tool-clippers" onclick="selectTool('clippers')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-bolt text-base mb-1 text-amber-400"></i>
+                <span class="text-[10px] font-bold">Clippers</span>
+            </button>
+            <button id="tool-growth" onclick="selectTool('growth')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-flask text-base mb-1 text-emerald-400"></i>
+                <span class="text-[10px] font-bold">Grow Tonic</span>
+            </button>
+            <button id="tool-dye" onclick="selectTool('dye')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-spray-can-sparkles text-base mb-1 text-pink-400"></i>
+                <span class="text-[10px] font-bold">Hair Dye</span>
+            </button>
+            <button id="tool-curl" onclick="selectTool('curl')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-wave-square text-base mb-1 text-purple-400"></i>
+                <span class="text-[10px] font-bold">Curl Iron</span>
+            </button>
+            <button id="tool-straight" onclick="selectTool('straight')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-grip-lines text-base mb-1 text-sky-400"></i>
+                <span class="text-[10px] font-bold">Flat Iron</span>
+            </button>
+            <button id="tool-comb" onclick="selectTool('comb')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-align-justify text-base mb-1 text-indigo-300"></i>
+                <span class="text-[10px] font-bold">Comb</span>
+            </button>
+            <button id="tool-wash" onclick="selectTool('wash')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-shower text-base mb-1 text-blue-400"></i>
+                <span class="text-[10px] font-bold">Shampoo</span>
+            </button>
+            <button id="tool-dryer" onclick="selectTool('dryer')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-wind text-base mb-1 text-orange-400"></i>
+                <span class="text-[10px] font-bold">Blow Dry</span>
+            </button>
+            <button id="tool-broom" onclick="selectTool('broom')" class="tool-btn flex-shrink-0 px-3 py-2 rounded-2xl bg-slate-800/90 border border-slate-700/70 flex flex-col items-center min-w-[66px]">
+                <i class="fa-solid fa-broom text-base mb-1 text-yellow-300"></i>
+                <span class="text-[10px] font-bold">Broom</span>
+            </button>
+        </div>
+    </footer>
+
+    <!-- CUSTOM TOAST NOTIFICATION -->
+    <div id="customToast" class="hidden fixed top-16 right-4 z-50 glass-panel border border-pink-500/50 rounded-2xl px-4 py-3 shadow-2xl flex items-center space-x-3 max-w-xs">
+        <div id="toastIcon" class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-base">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div>
+            <div id="toastTitle" class="text-xs font-bold text-white">Action Complete</div>
+            <div id="toastMessage" class="text-[11px] text-slate-300">Updated successfully.</div>
+        </div>
+    </div>
+
+    <!-- POLAROID PHOTO PREVIEW MODAL -->
+    <div id="photoPreviewModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white text-slate-900 p-4 rounded-2xl max-w-sm w-full polaroid-frame space-y-3">
+            <div class="rounded-xl overflow-hidden bg-slate-900 border border-slate-200">
+                <img id="polaroidImg" src="" alt="3D Salon Snapshot" class="w-full h-64 object-cover">
+            </div>
+            <div class="text-center space-y-0.5">
+                <div id="polaroidCaption" class="font-fredoka text-lg font-bold text-slate-800">Maya ✨ Shear Magic 3D</div>
+                <div id="polaroidHairStamp" class="text-xs font-bold text-pink-600">Type 1A Pin-Straight</div>
+            </div>
+            <div class="flex items-center space-x-2 pt-1">
+                <a id="downloadPhotoBtn" href="#" download="shear-magic-3d-look.png" class="flex-1 py-2.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-bold text-xs text-center shadow transition">
+                    <i class="fa-solid fa-download mr-1"></i> Save PNG
+                </a>
+                <button onclick="closePhotoPreview()" class="px-4 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SALON LOOKBOOK GALLERY MODAL -->
+    <div id="lookbookModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="glass-panel border border-slate-700 rounded-3xl max-w-2xl w-full p-5 space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between">
+                <h2 class="font-fredoka text-xl font-bold text-white flex items-center space-x-2">
+                    <i class="fa-solid fa-images text-pink-400"></i>
+                    <span>3D Salon Lookbook</span>
+                </h2>
+                <button onclick="closeLookbookModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div id="lookbookGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto custom-scrollbar pr-1"></div>
+        </div>
+    </div>
+
+    <!-- MAIN 3D GAME LOGIC SCRIPT -->
+    <script>
+        // ==========================================
+        // 1. DATA STRUCTURES & 6 DISTINCT CLIENT HAIR TYPES
+        // ==========================================
+        const CLIENTS = [
+            {
+                id: 'maya',
+                name: 'Maya',
+                typeBadge: 'Type 1A Pin-Straight',
+                typeCategory: '1A',
+                typeDesc: 'Sleek, glossy 3D strands with high specular shine & fluid swing.',
+                skinColor: '#fce3d3',
+                skinShadow: '#e2bfa8',
+                eyeColor: '#2563eb',
+                lipColor: '#f43f5e',
+                outfitColor: '#ec4899',
+                hairColor: { r: 42, g: 30, b: 24 },
+                hairTexture: 'straight',
+                startLength: 16,
+                challenge: {
+                    tag: 'Silky Crimson Bob',
+                    desc: 'Cut my pin-straight hair into a glossy crimson bob!',
+                    targetLength: 8,
+                    targetCurl: 0.0,
+                    targetColor: { r: 225, g: 29, b: 72 }
+                }
+            },
+            {
+                id: 'leo',
+                name: 'Leo',
+                typeBadge: 'Type 2B Beachy Wave',
+                typeCategory: '2B',
+                typeDesc: 'Medium 3D S-wave geometry with natural tousled volume.',
+                skinColor: '#e0ac69',
+                skinShadow: '#c69252',
+                eyeColor: '#059669',
+                lipColor: '#c07a50',
+                outfitColor: '#0284c7',
+                hairColor: { r: 217, g: 119, b: 6 },
+                hairTexture: 'wavy',
+                startLength: 14,
+                challenge: {
+                    tag: 'Surfer Cyan Waves',
+                    desc: 'Keep my beachy waves flowing with bright cyan dye!',
+                    targetLength: 12,
+                    targetCurl: 0.4,
+                    targetColor: { r: 6, g: 182, b: 212 }
+                }
+            },
+            {
+                id: 'zara',
+                name: 'Zara',
+                typeBadge: 'Type 3C Corkscrew Curls',
+                typeCategory: '3C',
+                typeDesc: 'Springy 3D helical ringlets that elongate when wet & straighten with heat.',
+                skinColor: '#c48d5d',
+                skinShadow: '#a67245',
+                eyeColor: '#7c3aed',
+                lipColor: '#be123c',
+                outfitColor: '#9333ea',
+                hairColor: { r: 120, g: 53, b: 15 },
+                hairTexture: 'curly',
+                startLength: 15,
+                challenge: {
+                    tag: 'Pastel Purple Ringlets',
+                    desc: 'Dye my springy corkscrew curls vibrant pastel purple!',
+                    targetLength: 14,
+                    targetCurl: 0.85,
+                    targetColor: { r: 168, g: 85, b: 247 }
+                }
+            },
+            {
+                id: 'amara',
+                name: 'Amara',
+                typeBadge: 'Type 4C Coily Afro Crown',
+                typeCategory: '4C',
+                typeDesc: '360° radial 3D micro-coils defying gravity; shrinks when wet.',
+                skinColor: '#4a2e16',
+                skinShadow: '#321d0b',
+                eyeColor: '#d97706',
+                lipColor: '#9f1239',
+                outfitColor: '#10b981',
+                hairColor: { r: 28, g: 22, b: 22 },
+                hairTexture: 'coily',
+                startLength: 11,
+                challenge: {
+                    tag: 'Golden Afro Blowout',
+                    desc: 'Blow out my 4C coily crown & dye it shimmering gold!',
+                    targetLength: 12,
+                    targetCurl: 1.0,
+                    targetColor: { r: 234, g: 179, b: 8 }
+                }
+            },
+            {
+                id: 'kai',
+                name: 'Kai',
+                typeBadge: 'Wolf-Cut Spiky Layers',
+                typeCategory: 'wolf',
+                typeDesc: 'Staggered multi-tier 3D lengths with wispy tapered spikes.',
+                skinColor: '#fef3c7',
+                skinShadow: '#ecd896',
+                eyeColor: '#475569',
+                lipColor: '#f87171',
+                outfitColor: '#6366f1',
+                hairColor: { r: 75, g: 85, b: 99 },
+                hairTexture: 'spiky',
+                startLength: 13,
+                challenge: {
+                    tag: 'Electric Emerald Shag',
+                    desc: 'Style my layered wolf-cut into an emerald green shag!',
+                    targetLength: 9,
+                    targetCurl: 0.2,
+                    targetColor: { r: 16, g: 185, b: 129 }
+                }
+            },
+            {
+                id: 'chloe',
+                name: 'Chloe',
+                typeBadge: 'Type 2A Curtain Bangs',
+                typeCategory: '2A',
+                typeDesc: 'Long cascading 3D waves with face-framing parted curtain bangs.',
+                skinColor: '#f8fafc',
+                skinShadow: '#cbd5e1',
+                eyeColor: '#0284c7',
+                lipColor: '#fb7185',
+                outfitColor: '#f43f5e',
+                hairColor: { r: 245, g: 158, b: 11 },
+                hairTexture: 'wavy',
+                startLength: 17,
+                challenge: {
+                    tag: 'Sunset Orange Curtain Waves',
+                    desc: 'Blend sunset orange dye into my long curtain bang waves!',
+                    targetLength: 15,
+                    targetCurl: 0.35,
+                    targetColor: { r: 249, g: 115, b: 22 }
+                }
+            },
+            {
+                id: 'marcus',
+                name: 'Marcus',
+                shortLabel: 'Mr',
+                typeBadge: 'Textured Fade & Quiff',
+                typeCategory: 'quiff',
+                typeDesc: 'Clean tapered fade on the sides with a voluminous swept-up top quiff.',
+                skinColor: '#d99b66',
+                skinShadow: '#b87d4b',
+                eyeColor: '#1e3a8a',
+                lipColor: '#b56555',
+                outfitColor: '#0f172a',
+                hairColor: { r: 58, g: 40, b: 28 },
+                hairTexture: 'straight',
+                facialHair: 'beard',
+                startLength: 10,
+                challenge: {
+                    tag: 'Frosted Platinum Quiff',
+                    desc: 'Dye my top quiff icy platinum white and keep my fade sharp!',
+                    targetLength: 7,
+                    targetCurl: 0.1,
+                    targetColor: { r: 241, g: 245, b: 249 }
+                }
+            },
+            {
+                id: 'devon',
+                name: 'Devon',
+                shortLabel: 'De',
+                typeBadge: 'High-Top Coily Fade',
+                typeCategory: 'hightop',
+                typeDesc: 'Close-cropped tapered sides topped with a sculpted 4C coily high-top crown.',
+                skinColor: '#5c381c',
+                skinShadow: '#40240f',
+                eyeColor: '#78350f',
+                lipColor: '#883948',
+                outfitColor: '#dc2626',
+                hairColor: { r: 24, g: 20, b: 20 },
+                hairTexture: 'coily',
+                facialHair: 'goatee',
+                startLength: 11,
+                challenge: {
+                    tag: 'Neon Ruby High-Top',
+                    desc: 'Shape my coily high-top fade and dye the crown bright ruby red!',
+                    targetLength: 8,
+                    targetCurl: 1.0,
+                    targetColor: { r: 244, g: 63, b: 94 }
+                }
+            },
+            {
+                id: 'liam',
+                name: 'Liam',
+                shortLabel: 'Li',
+                typeBadge: 'Side-Part Pompadour',
+                typeCategory: 'pompadour',
+                typeDesc: 'Tapered barber sides with a sleek, glossy side-swept gentleman’s pompadour.',
+                skinColor: '#f5d0b5',
+                skinShadow: '#d9b194',
+                eyeColor: '#047857',
+                lipColor: '#c9786b',
+                outfitColor: '#1d4ed8',
+                hairColor: { r: 146, g: 84, b: 36 },
+                hairTexture: 'straight',
+                facialHair: 'none',
+                startLength: 9,
+                challenge: {
+                    tag: 'Royal Blue Pompadour',
+                    desc: 'Style a sharp royal blue side-part pompadour with sleek shine!',
+                    targetLength: 7,
+                    targetCurl: 0.05,
+                    targetColor: { r: 59, g: 130, b: 246 }
+                }
+            },
+            {
+                id: 'mateo',
+                name: 'Mateo',
+                shortLabel: 'Mt',
+                typeBadge: 'Curly Burst-Fade Mullet',
+                typeCategory: 'curlymullet',
+                typeDesc: 'Short burst fade around the ears with bouncy 3C curls on top and a flowing back.',
+                skinColor: '#c98b5b',
+                skinShadow: '#a86e42',
+                eyeColor: '#4c1d95',
+                lipColor: '#b05d56',
+                outfitColor: '#7c3aed',
+                hairColor: { r: 38, g: 28, b: 24 },
+                hairTexture: 'curly',
+                facialHair: 'goatee',
+                startLength: 14,
+                challenge: {
+                    tag: 'Electric Violet Mullet',
+                    desc: 'Keep my curly burst-fade mullet flowing with electric violet dye!',
+                    targetLength: 9,
+                    targetCurl: 0.85,
+                    targetColor: { r: 139, g: 92, b: 246 }
+                }
+            }
+        ];
+
+        const COLOR_SWATCHES = [
+            '#f43f5e', '#ec4899', '#d946ef', '#a855f7',
+            '#6366f1', '#3b82f6', '#06b6d4', '#14b8a6',
+            '#10b981', '#84cc16', '#eab308', '#f97316',
+            '#78350f', '#38bdf8', '#ffffff', '#1e293b'
+        ];
+
+        // ==========================================
+        // 2. AUDIO SYNTHESIZER (WEB AUDIO API)
+        // ==========================================
+        let audioCtx = null;
+        let isMuted = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            if (isMuted) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'snip') {
+                const bufferSize = audioCtx.sampleRate * 0.05;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'highpass';
+                filter.frequency.value = 2500;
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start(now);
+            } else if (type === 'buzz') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, now);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'spray') {
+                const bufferSize = audioCtx.sampleRate * 0.08;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 3500;
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start(now);
+            } else if (type === 'magic') {
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                const note = notes[Math.floor(Math.random() * notes.length)];
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(note, now);
+                gain.gain.setValueAtTime(0.14, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'water') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(300 + Math.random() * 300, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.06);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.06);
+            } else if (type === 'dryer') {
+                const bufferSize = audioCtx.sampleRate * 0.1;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+                const noise = audioCtx.createBufferSource();
+                noise.buffer = buffer;
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 800;
+
+                const gain = audioCtx.createGain();
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(audioCtx.destination);
+                noise.start(now);
+            } else if (type === 'camera') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0.28, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'fanfare') {
+                const arpeggio = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+                arpeggio.forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                    gain.gain.setValueAtTime(0.24, now + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.08 + 0.3);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.08);
+                    osc.stop(now + idx * 0.08 + 0.3);
+                });
+            }
+        }
+
+        function toggleAudio() {
+            isMuted = !isMuted;
+            document.getElementById('audioIcon').className = isMuted
+                ? 'fa-solid fa-volume-xmark text-slate-500'
+                : 'fa-solid fa-volume-high text-pink-400';
+        }
+
+        function showToast(title, message, iconClass = 'fa-circle-check') {
+            const toast = document.getElementById('customToast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            document.getElementById('toastIcon').innerHTML = `<i class="fa-solid ${iconClass}"></i>`;
+
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // ==========================================
+        // 3. THREE.JS 3D SCENE, CAMERA, LIGHTING & STUDIO
+        // ==========================================
+        let scene, camera, renderer, raycaster;
+        let headGroup, clientCharacterMeshes = {}, accessoryMeshes = {};
+        let hairInstancedMesh, coilInstancedMesh, foamInstancedMesh;
+        let clippingsInstancedMesh, particlesInstancedMesh;
+        let toolCursorMesh, dustMotesPoints;
+
+        const MAX_HAIR_SEGMENTS = 3600;
+        const MAX_COIL_PUFFS = 2600;
+        const MAX_FOAM_BUBBLES = 1200;
+        const MAX_CLIPPINGS = 400;
+        const MAX_PARTICLES = 250;
+
+        // 3D Head & Floor Constants
+        const HEAD_CENTER = new THREE.Vector3(0, 0.45, 0);
+        const HEAD_RADII = new THREE.Vector3(0.95, 1.18, 1.02);
+        const SEGMENT_LEN = 0.145;
+        const FLOOR_Y = -2.45;
+
+        // Camera Spherical Orbit State
+        let camTheta = 0.0;
+        let camPhi = 1.48;
+        let camRadius = 5.4;
+        let targetCamTheta = 0.0;
+        let targetCamPhi = 1.48;
+        let targetCamRadius = 5.4;
+        const camLookTarget = new THREE.Vector3(0, 0.25, 0);
+
+        // Pointer & Interaction Mode State
+        let pointerMode = 'tool'; // 'tool' or 'orbit'
+        let isPointerDown = false;
+        let isOrbitDragging = false;
+        let prevClientX = 0;
+        let prevClientY = 0;
+        let ndcMouse = new THREE.Vector2(0, 0);
+        let prevNdcMouse = new THREE.Vector2(0, 0);
+        let current3DCursorPos = new THREE.Vector3(0, 0.5, 1.2);
+        let lastPinchDist = 0;
+
+        // Game & Tool State
+        let currentClientIdx = 0;
+        let gameMode = 'freestyle';
+        let currentTool = 'scissors';
+        let brushRadius = 30;
+        let chosenColor = '#f43f5e';
+        let isRainbowMode = false;
+        let rainbowHue = 0;
+
+        let hairStrands3D = [];
+        let hairClippings3D = [];
+        let particles3D = [];
+
+        let activeAccessories = {
+            catEars: false,
+            flowerCrown: false,
+            starClips: false,
+            glasses: false,
+            crown: false,
+            bow: false
+        };
+
+        let totalTips = 0;
+        let savedLookbookPhotos = [];
+        let blinkTimer = 0;
+        let isBlinking = false;
+        let surpriseTimer = 0;
+
+        // Reusable Scratch Math Objects (Zero GC Overhead)
+        const _dummy = new THREE.Object3D();
+        const _upVec = new THREE.Vector3(0, 1, 0);
+        const _dirVec = new THREE.Vector3();
+        const _midVec = new THREE.Vector3();
+        const _quat = new THREE.Quaternion();
+        const _color = new THREE.Color();
+        const _rayPoint = new THREE.Vector3();
+        const _floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y);
+        const _headSphere = new THREE.Sphere(HEAD_CENTER, 1.35);
+
+        function initThreeScene() {
+            const mount = document.getElementById('threeMount');
+            const w = mount.clientWidth || 800;
+            const h = mount.clientHeight || 600;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color('#121120');
+            scene.fog = new THREE.FogExp2('#121120', 0.045);
+
+            camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 60);
+            updateCameraTransform(true);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+            renderer.setSize(w, h);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            mount.innerHTML = '';
+            mount.appendChild(renderer.domElement);
+
+            raycaster = new THREE.Raycaster();
+
+            // 1. Studio Three-Point + Rim Lighting
+            const hemiLight = new THREE.HemisphereLight(0xfff1f2, 0x1e1b4b, 0.85);
+            scene.add(hemiLight);
+
+            const keyLight = new THREE.DirectionalLight(0xffffff, 0.95);
+            keyLight.position.set(3.5, 5.5, 5.0);
+            keyLight.castShadow = true;
+            keyLight.shadow.mapSize.width = 1024;
+            keyLight.shadow.mapSize.height = 1024;
+            scene.add(keyLight);
+
+            const rimLightPink = new THREE.PointLight(0xf43f5e, 1.1, 16);
+            rimLightPink.position.set(-4.0, 2.5, -3.5);
+            scene.add(rimLightPink);
+
+            const rimLightPurple = new THREE.PointLight(0xa855f7, 0.9, 16);
+            rimLightPurple.position.set(4.0, 2.0, -3.5);
+            scene.add(rimLightPurple);
+
+            // 2. Build 3D Salon Environment, Chair & Vanity Mirror
+            build3DSalonStudio();
+
+            // 3. Build 3D Stylized Client Head & 6 Wearable 3D Accessories
+            build3DClientCharacter();
+
+            // 4. Build High-Speed 3D Instanced Hair, Coils, Foam, Clippings & Particles
+            build3DInstancedSystems();
+
+            // 5. Build 3D Tool Cursor Sphere Indicator
+            const cursorGeo = new THREE.SphereGeometry(0.32, 20, 16);
+            const cursorMat = new THREE.MeshBasicMaterial({
+                color: 0xf43f5e,
+                transparent: true,
+                opacity: 0.25,
+                wireframe: true
+            });
+            toolCursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
+            scene.add(toolCursorMesh);
+        }
+
+        function build3DSalonStudio() {
+            const studioGroup = new THREE.Group();
+
+            // Salon Floor
+            const floorGeo = new THREE.CircleGeometry(14, 48);
+            const floorMat = new THREE.MeshStandardMaterial({
+                color: 0x161829,
+                roughness: 0.35,
+                metalness: 0.25
+            });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = FLOOR_Y;
+            floor.receiveShadow = true;
+            studioGroup.add(floor);
+
+            // Glowing Floor Rug Ring
+            const rugGeo = new THREE.RingGeometry(2.0, 2.15, 48);
+            const rugMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, side: THREE.DoubleSide, transparent: true, opacity: 0.45 });
+            const rug = new THREE.Mesh(rugGeo, rugMat);
+            rug.rotation.x = -Math.PI / 2;
+            rug.position.y = FLOOR_Y + 0.005;
+            studioGroup.add(rug);
+
+            // 3D Salon Styling Chair
+            const chairMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.45, metalness: 0.2 });
+            const chromeMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.2, metalness: 0.85 });
+
+            // Chair Base & Hydraulic Column
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 0.12, 32), chromeMat);
+            base.position.y = FLOOR_Y + 0.06;
+            studioGroup.add(base);
+
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 1.1, 20), chromeMat);
+            pole.position.y = FLOOR_Y + 0.65;
+            studioGroup.add(pole);
+
+            // Chair Seat Cushion
+            const seat = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.1, 0.32, 32), chairMat);
+            seat.position.set(0, -1.25, -0.05);
+            studioGroup.add(seat);
+
+            // Chair Backrest
+            const backrest = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.25, 0.28), chairMat);
+            backrest.position.set(0, -0.55, -0.95);
+            studioGroup.add(backrest);
+
+            // Illuminated 3D Salon Vanity Mirror in Background
+            const mirrorGroup = new THREE.Group();
+            mirrorGroup.position.set(0, 0.65, -4.6);
+
+            const mirrorGlass = new THREE.Mesh(
+                new THREE.CircleGeometry(2.6, 48),
+                new THREE.MeshStandardMaterial({ color: 0x26243d, roughness: 0.15, metalness: 0.6 })
+            );
+            mirrorGroup.add(mirrorGlass);
+
+            const mirrorRim = new THREE.Mesh(
+                new THREE.TorusGeometry(2.65, 0.12, 16, 48),
+                new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.3, metalness: 0.5 })
+            );
+            mirrorGroup.add(mirrorRim);
+
+            // Warm Vanity Light Bulbs
+            const bulbGeo = new THREE.SphereGeometry(0.11, 12, 12);
+            const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+            for (let i = 0; i < 14; i++) {
+                const a = (i / 14) * Math.PI * 2;
+                const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+                bulb.position.set(Math.cos(a) * 2.65, Math.sin(a) * 2.65, 0.12);
+                mirrorGroup.add(bulb);
+            }
+            studioGroup.add(mirrorGroup);
+
+            // Floating Golden Ambient Dust Motes
+            const moteCount = 90;
+            const motePositions = new Float32Array(moteCount * 3);
+            for (let i = 0; i < moteCount; i++) {
+                motePositions[i * 3] = (Math.random() - 0.5) * 9;
+                motePositions[i * 3 + 1] = FLOOR_Y + Math.random() * 6.5;
+                motePositions[i * 3 + 2] = (Math.random() - 0.5) * 9;
+            }
+            const moteGeo = new THREE.BufferGeometry();
+            moteGeo.setAttribute('position', new THREE.BufferAttribute(motePositions, 3));
+            const moteMat = new THREE.PointsMaterial({ color: 0xfef08a, size: 0.06, transparent: true, opacity: 0.6 });
+            dustMotesPoints = new THREE.Points(moteGeo, moteMat);
+            studioGroup.add(dustMotesPoints);
+
+            scene.add(studioGroup);
+        }
+
+        function build3DClientCharacter() {
+            headGroup = new THREE.Group();
+            headGroup.position.copy(HEAD_CENTER);
+
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xfce3d3, roughness: 0.55, metalness: 0.05 });
+            const shadowSkinMat = new THREE.MeshStandardMaterial({ color: 0xe2bfa8, roughness: 0.6 });
+            const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+            const pupilMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.2 });
+            const darkPupilMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+            const lipMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.35 });
+            const outfitMat = new THREE.MeshStandardMaterial({ color: 0xec4899, roughness: 0.5 });
+            const capeMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45 });
+
+            clientCharacterMeshes = { skinMat, shadowSkinMat, pupilMat, lipMat, outfitMat };
+
+            // Sculpted 3D Head (Smooth ellipsoid with tapered chin)
+            const headGeo = new THREE.SphereGeometry(1.0, 36, 32);
+            const posAttr = headGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                let x = posAttr.getX(i);
+                let y = posAttr.getY(i);
+                let z = posAttr.getZ(i);
+                if (y < 0) {
+                    const taper = 1.0 + y * 0.14;
+                    x *= taper;
+                    z *= (1.0 + y * 0.08);
+                }
+                posAttr.setXYZ(i, x * HEAD_RADII.x, y * HEAD_RADII.y, z * HEAD_RADII.z);
+            }
+            headGeo.computeVertexNormals();
+            const headMesh = new THREE.Mesh(headGeo, skinMat);
+            headMesh.castShadow = true;
+            headMesh.receiveShadow = true;
+            headGroup.add(headMesh);
+
+            // Ears
+            const earGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            earGeo.scale(0.55, 1.0, 0.7);
+            const leftEar = new THREE.Mesh(earGeo, shadowSkinMat);
+            leftEar.position.set(-0.96, -0.05, 0.0);
+            const rightEar = new THREE.Mesh(earGeo, shadowSkinMat);
+            rightEar.position.set(0.96, -0.05, 0.0);
+            headGroup.add(leftEar, rightEar);
+
+            // Cute Blush Cheeks
+            const blushMat = new THREE.MeshBasicMaterial({ color: 0xf43f5e, transparent: true, opacity: 0.25 });
+            const blushGeo = new THREE.SphereGeometry(0.18, 16, 12);
+            blushGeo.scale(1.2, 0.7, 0.3);
+            const leftBlush = new THREE.Mesh(blushGeo, blushMat);
+            leftBlush.position.set(-0.46, -0.16, 0.88);
+            leftBlush.rotation.y = -0.35;
+            const rightBlush = new THREE.Mesh(blushGeo, blushMat);
+            rightBlush.position.set(0.46, -0.16, 0.88);
+            rightBlush.rotation.y = 0.35;
+            headGroup.add(leftBlush, rightBlush);
+
+            // Expressive 3D Eyes + Pupils + Eyebrows
+            const eyeSockets = [];
+            const eyebrows = [];
+            [-0.36, 0.36].forEach((ex) => {
+                const eyeGroup = new THREE.Group();
+                eyeGroup.position.set(ex, 0.1, 0.92);
+
+                const eyeball = new THREE.Mesh(new THREE.SphereGeometry(0.15, 20, 16), eyeWhiteMat);
+                eyeball.scale.set(1.0, 1.05, 0.65);
+                eyeGroup.add(eyeball);
+
+                const iris = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), pupilMat);
+                iris.position.set(0, 0, 0.08);
+                iris.scale.set(1.0, 1.0, 0.5);
+                eyeGroup.add(iris);
+
+                const centerPupil = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 12), darkPupilMat);
+                centerPupil.position.set(0, 0, 0.115);
+                eyeGroup.add(centerPupil);
+
+                const catchlight = new THREE.Mesh(new THREE.SphereGeometry(0.02, 8, 8), eyeWhiteMat);
+                catchlight.position.set(-0.025, 0.025, 0.13);
+                eyeGroup.add(catchlight);
+
+                headGroup.add(eyeGroup);
+                eyeSockets.push({ eyeGroup, iris, centerPupil, catchlight });
+
+                // Eyebrow
+                const brow = new THREE.Mesh(
+                    new THREE.TorusGeometry(0.15, 0.024, 8, 16, Math.PI * 0.75),
+                    new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.7 })
+                );
+                brow.position.set(ex, 0.24, 0.95);
+                brow.rotation.z = Math.PI * 0.12;
+                headGroup.add(brow);
+                eyebrows.push(brow);
+            });
+            clientCharacterMeshes.eyeSockets = eyeSockets;
+            clientCharacterMeshes.eyebrows = eyebrows;
+
+            // Cute 3D Nose
+            const nose = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 12), shadowSkinMat);
+            nose.scale.set(0.9, 0.8, 1.2);
+            nose.position.set(0, -0.08, 1.04);
+            headGroup.add(nose);
+
+            // Expressive 3D Mouth (Smile & Surprise O-mouth)
+            const smileMouth = new THREE.Mesh(
+                new THREE.TorusGeometry(0.15, 0.032, 10, 20, Math.PI * 0.8),
+                lipMat
+            );
+            smileMouth.position.set(0, -0.34, 0.94);
+            smileMouth.rotation.z = Math.PI * 1.1;
+            headGroup.add(smileMouth);
+
+            const surpriseMouth = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), lipMat);
+            surpriseMouth.scale.set(1.0, 1.2, 0.5);
+            surpriseMouth.position.set(0, -0.38, 0.94);
+            surpriseMouth.visible = false;
+            headGroup.add(surpriseMouth);
+
+            clientCharacterMeshes.smileMouth = smileMouth;
+            clientCharacterMeshes.surpriseMouth = surpriseMouth;
+
+            // Neck, Salon Cape & Shoulders
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.65, 24), shadowSkinMat);
+            neck.position.set(0, -1.25, -0.04);
+            headGroup.add(neck);
+
+            const shoulders = new THREE.Mesh(new THREE.SphereGeometry(1.32, 32, 24), outfitMat);
+            shoulders.scale.set(1.15, 0.52, 0.75);
+            shoulders.position.set(0, -1.78, -0.05);
+            headGroup.add(shoulders);
+
+            const salonCape = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.48, 0.75, 32, 1, true), capeMat);
+            salonCape.position.set(0, -1.62, -0.02);
+            headGroup.add(salonCape);
+
+            // Optional Male Facial Hair Meshes (Hidden by default for existing clients)
+            const facialHairMat = new THREE.MeshStandardMaterial({ color: 0x2a1e18, roughness: 0.8 });
+            const beardMesh = new THREE.Mesh(
+                new THREE.TorusGeometry(0.54, 0.085, 10, 24, Math.PI * 0.88),
+                facialHairMat
+            );
+            beardMesh.position.set(0, -0.44, 0.62);
+            beardMesh.rotation.set(0.35, 0, Math.PI * 1.06);
+            beardMesh.scale.set(1.0, 1.15, 0.9);
+            beardMesh.visible = false;
+            headGroup.add(beardMesh);
+
+            const goateeGroup = new THREE.Group();
+            const chinPatch = new THREE.Mesh(new THREE.SphereGeometry(0.14, 14, 12), facialHairMat);
+            chinPatch.scale.set(1.1, 1.25, 0.55);
+            chinPatch.position.set(0, -0.64, 0.86);
+            const stache = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.032, 8, 16, Math.PI * 0.75), facialHairMat);
+            stache.position.set(0, -0.26, 0.99);
+            stache.rotation.z = Math.PI * 0.12;
+            goateeGroup.add(chinPatch, stache);
+            goateeGroup.visible = false;
+            headGroup.add(goateeGroup);
+
+            clientCharacterMeshes.facialHairMat = facialHairMat;
+            clientCharacterMeshes.beardMesh = beardMesh;
+            clientCharacterMeshes.goateeGroup = goateeGroup;
+
+            // Build 3D Wearable Accessories Attached to Head
+            build3DAccessories(headGroup);
+
+            scene.add(headGroup);
+        }
+
+        function build3DAccessories(parentGroup) {
+            // 1. 3D Cat Ears
+            const catEarsGroup = new THREE.Group();
+            const earOuterMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 });
+            const earInnerMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.4 });
+            [-0.55, 0.55].forEach((xPos, idx) => {
+                const pair = new THREE.Group();
+                const outer = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.48, 4), earOuterMat);
+                const inner = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.32, 4), earInnerMat);
+                inner.position.set(0, -0.03, 0.06);
+                pair.add(outer, inner);
+                pair.position.set(xPos, 1.18, 0.12);
+                pair.rotation.z = idx === 0 ? 0.32 : -0.32;
+                pair.rotation.y = idx === 0 ? 0.2 : -0.2;
+                catEarsGroup.add(pair);
+            });
+            catEarsGroup.visible = false;
+            parentGroup.add(catEarsGroup);
+            accessoryMeshes.catEars = catEarsGroup;
+
+            // 2. 3D Flower Crown
+            const flowerGroup = new THREE.Group();
+            const petalColors = [0xf43f5e, 0xfbbf24, 0xec4899, 0xa855f7, 0x38bdf8];
+            const centerMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.3 });
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const blossom = new THREE.Group();
+                const petalMat = new THREE.MeshStandardMaterial({ color: petalColors[i % petalColors.length], roughness: 0.4 });
+                for (let p = 0; p < 5; p++) {
+                    const pa = (p / 5) * Math.PI * 2;
+                    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), petalMat);
+                    petal.position.set(Math.cos(pa) * 0.09, Math.sin(pa) * 0.09, 0);
+                    blossom.add(petal);
+                }
+                const core = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 10), centerMat);
+                core.position.z = 0.03;
+                blossom.add(core);
+
+                blossom.position.set(Math.cos(angle) * 0.98, 0.72, Math.sin(angle) * 1.02);
+                blossom.lookAt(0, 0.72, 0);
+                blossom.rotateY(Math.PI);
+                flowerGroup.add(blossom);
+            }
+            flowerGroup.visible = false;
+            parentGroup.add(flowerGroup);
+            accessoryMeshes.flowerCrown = flowerGroup;
+
+            // 3. 3D Star Clips
+            const starGroup = new THREE.Group();
+            const starMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.35, roughness: 0.2, metalness: 0.7 });
+            [-0.86, 0.86].forEach((xPos, idx) => {
+                const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), starMat);
+                star.scale.set(1.0, 1.0, 0.35);
+                star.position.set(xPos, 0.48, 0.52);
+                star.rotation.y = idx === 0 ? -0.6 : 0.6;
+                starGroup.add(star);
+            });
+            starGroup.visible = false;
+            parentGroup.add(starGroup);
+            accessoryMeshes.starClips = starGroup;
+
+            // 4. 3D Stylish Sunglasses
+            const glassesGroup = new THREE.Group();
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.2, metalness: 0.5 });
+            const lensMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.1, metalness: 0.85 });
+            [-0.36, 0.36].forEach((xPos) => {
+                const rim = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.03, 10, 24), frameMat);
+                const lens = new THREE.Mesh(new THREE.CircleGeometry(0.21, 24), lensMat);
+                rim.position.set(xPos, 0.1, 1.05);
+                lens.position.set(xPos, 0.1, 1.045);
+                glassesGroup.add(rim, lens);
+            });
+            const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.04), frameMat);
+            bridge.position.set(0, 0.14, 1.06);
+            glassesGroup.add(bridge);
+            glassesGroup.visible = false;
+            parentGroup.add(glassesGroup);
+            accessoryMeshes.glasses = glassesGroup;
+
+            // 5. 3D Royal Tiara
+            const crownGroup = new THREE.Group();
+            const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.2, metalness: 0.85 });
+            const gemMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, emissive: 0xbe123c, emissiveIntensity: 0.4, roughness: 0.1 });
+            const band = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.62, 0.16, 24, 1, true), goldMat);
+            band.material.side = THREE.DoubleSide;
+            crownGroup.add(band);
+            for (let i = 0; i < 7; i++) {
+                const a = (i / 7) * Math.PI * 2;
+                const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.24, 4), goldMat);
+                spike.position.set(Math.cos(a) * 0.56, 0.18, Math.sin(a) * 0.56);
+                crownGroup.add(spike);
+            }
+            const frontGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), gemMat);
+            frontGem.position.set(0, 0.06, 0.61);
+            crownGroup.add(frontGem);
+            crownGroup.position.set(0, 1.15, 0.05);
+            crownGroup.rotation.x = 0.12;
+            crownGroup.visible = false;
+            parentGroup.add(crownGroup);
+            accessoryMeshes.crown = crownGroup;
+
+            // 6. 3D Satin Ribbon Bow
+            const bowGroup = new THREE.Group();
+            const bowMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, roughness: 0.35 });
+            const leftLoop = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 16), bowMat);
+            leftLoop.rotation.z = -Math.PI / 2;
+            leftLoop.position.set(-0.22, 0, 0);
+            const rightLoop = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.42, 16), bowMat);
+            rightLoop.rotation.z = Math.PI / 2;
+            rightLoop.position.set(0.22, 0, 0);
+            const knot = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 14), bowMat);
+            bowGroup.add(leftLoop, rightLoop, knot);
+            bowGroup.position.set(0.45, 1.05, 0.35);
+            bowGroup.rotation.set(0.2, 0.35, -0.35);
+            bowGroup.visible = false;
+            parentGroup.add(bowGroup);
+            accessoryMeshes.bow = bowGroup;
+        }
+
+        function build3DInstancedSystems() {
+            // 1. Sleek Tapered Cylinder Segments for Straight, Wavy, Curly & Wolf-Cut Strands
+            const segGeo = new THREE.CylinderGeometry(0.85, 1.0, 1.0, 8, 1);
+            const segMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.32,
+                metalness: 0.08
+            });
+            hairInstancedMesh = new THREE.InstancedMesh(segGeo, segMat, MAX_HAIR_SEGMENTS);
+            hairInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            hairInstancedMesh.castShadow = true;
+            scene.add(hairInstancedMesh);
+
+            // 2. Plush Coily Afro Puff Clusters for Type 4C Coily Crown
+            const coilGeo = new THREE.IcosahedronGeometry(1.0, 1);
+            const coilMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.85,
+                metalness: 0.02
+            });
+            coilInstancedMesh = new THREE.InstancedMesh(coilGeo, coilMat, MAX_COIL_PUFFS);
+            coilInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            coilInstancedMesh.castShadow = true;
+            scene.add(coilInstancedMesh);
+
+            // 3. White Shampoo Lather Bubbles
+            const foamGeo = new THREE.SphereGeometry(1.0, 8, 8);
+            const foamMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.2,
+                transparent: true,
+                opacity: 0.88
+            });
+            foamInstancedMesh = new THREE.InstancedMesh(foamGeo, foamMat, MAX_FOAM_BUBBLES);
+            foamInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            scene.add(foamInstancedMesh);
+
+            // 4. Cut 3D Hair Clippings on Floor
+            const clipGeo = new THREE.CylinderGeometry(0.024, 0.02, 0.22, 6);
+            const clipMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 });
+            clippingsInstancedMesh = new THREE.InstancedMesh(clipGeo, clipMat, MAX_CLIPPINGS);
+            clippingsInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            scene.add(clippingsInstancedMesh);
+
+            // 5. 3D Sparkles, Dye Mist & Water Droplets
+            const partGeo = new THREE.SphereGeometry(0.045, 8, 8);
+            const partMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            particlesInstancedMesh = new THREE.InstancedMesh(partGeo, partMat, MAX_PARTICLES);
+            particlesInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            scene.add(particlesInstancedMesh);
+        }
+
+        // ==========================================
+        // 4. 3D HAIR GENERATION & VERLET PHYSICS PER HAIRSTYLE
+        // ==========================================
+        function createHairStrandsForClient(client) {
+            hairStrands3D = [];
+            hairClippings3D = [];
+
+            const cat = client.typeCategory;
+            const totalStrands = (cat === '4C' || cat === 'hightop') ? 185 : 165;
+
+            // Golden-angle Fibonacci distribution over the 3D scalp dome (keeping face region clear)
+            const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+            for (let i = 0; i < totalStrands; i++) {
+                const t = i / totalStrands;
+                const maxPolar = (cat === '4C' || cat === 'hightop') ? 2.05 : 2.15;
+                const phi = Math.acos(1 - t * (1 - Math.cos(maxPolar)));
+                const theta = i * goldenAngle;
+
+                const nx = Math.sin(phi) * Math.cos(theta);
+                const ny = Math.cos(phi);
+                const nz = Math.sin(phi) * Math.sin(theta);
+
+                const isFaceFront = (nz > 0.32 && ny < 0.54);
+                const isCurtainBangZone = (cat === '2A' && nz > 0.45 && ny >= 0.36 && ny <= 0.62 && Math.abs(nx) > 0.12);
+
+                if (isFaceFront && !isCurtainBangZone) continue;
+
+                const anchor = new THREE.Vector3(
+                    HEAD_CENTER.x + nx * (HEAD_RADII.x - 0.03),
+                    HEAD_CENTER.y + ny * (HEAD_RADII.y - 0.03),
+                    HEAD_CENTER.z + nz * (HEAD_RADII.z - 0.03)
+                );
+
+                const normalDir = new THREE.Vector3(nx, ny, nz).normalize();
+
+                let nodeCount = client.startLength;
+                let isTopSculpt = false;
+
+                if (cat === 'wolf') {
+                    if (ny > 0.65) nodeCount = 6;
+                    else if (ny > 0.15) nodeCount = 10;
+                    else nodeCount = client.startLength;
+                } else if (isCurtainBangZone) {
+                    nodeCount = 7;
+                } else if (cat === 'quiff') {
+                    if (ny >= 0.48 && Math.abs(nx) < 0.68) {
+                        nodeCount = client.startLength;
+                        isTopSculpt = true;
+                    } else {
+                        nodeCount = ny > 0.25 ? 3 : 2;
+                    }
+                } else if (cat === 'hightop') {
+                    if (ny >= 0.52 && Math.abs(nx) < 0.66) {
+                        nodeCount = client.startLength;
+                        isTopSculpt = true;
+                    } else {
+                        nodeCount = 2;
+                    }
+                } else if (cat === 'pompadour') {
+                    if (ny >= 0.46 && Math.abs(nx) < 0.68) {
+                        nodeCount = client.startLength;
+                        isTopSculpt = true;
+                    } else {
+                        nodeCount = ny > 0.25 ? 3 : 2;
+                    }
+                } else if (cat === 'curlymullet') {
+                    if (ny >= 0.48) {
+                        nodeCount = 9;
+                    } else if (nz <= -0.32) {
+                        nodeCount = client.startLength;
+                    } else {
+                        nodeCount = 2;
+                    }
+                }
+
+                let initialCurl = 0.0;
+                if (cat === '3C' || cat === 'curlymullet') initialCurl = 0.92;
+                else if (cat === '4C' || cat === 'hightop') initialCurl = 1.0;
+                else if (cat === '2B' || cat === '2A') initialCurl = 0.42;
+                else if (cat === 'wolf' || cat === 'quiff') initialCurl = 0.18;
+
+                const nodes = [];
+                for (let j = 0; j < nodeCount; j++) {
+                    const step = j * SEGMENT_LEN;
+                    let px = anchor.x + normalDir.x * (0.12 + step * 0.45);
+                    let py = anchor.y + normalDir.y * 0.12 - step * 0.85;
+                    let pz = anchor.z + normalDir.z * (0.12 + step * 0.45);
+
+                    if (cat === '4C') {
+                        px = anchor.x + normalDir.x * (step * 0.72);
+                        py = anchor.y + normalDir.y * (step * 0.72);
+                        pz = anchor.z + normalDir.z * (step * 0.72);
+                    } else if (cat === 'hightop' && isTopSculpt) {
+                        px = anchor.x + nx * (step * 0.28);
+                        py = anchor.y + step * 0.82;
+                        pz = anchor.z + nz * (step * 0.28);
+                    } else if (cat === 'quiff' && isTopSculpt) {
+                        px = anchor.x + nx * (step * 0.25);
+                        py = anchor.y + step * 0.78;
+                        pz = anchor.z + (nz + 0.35) * (step * 0.38);
+                    } else if (cat === 'pompadour' && isTopSculpt) {
+                        px = anchor.x + (step * 0.65);
+                        py = anchor.y + step * 0.48;
+                        pz = anchor.z + (nz + 0.15) * (step * 0.32);
+                    } else if (isCurtainBangZone) {
+                        const partSign = nx >= 0 ? 1 : -1;
+                        px = anchor.x + partSign * (j * 0.065);
+                        py = anchor.y - j * 0.11;
+                        pz = anchor.z + 0.06;
+                    }
+
+                    nodes.push({
+                        pos: new THREE.Vector3(px, py, pz),
+                        oldPos: new THREE.Vector3(px, py, pz),
+                        r: client.hairColor.r,
+                        g: client.hairColor.g,
+                        b: client.hairColor.b,
+                        curl: initialCurl,
+                        isWet: 0,
+                        foam: 0
+                    });
+                }
+
+                hairStrands3D.push({
+                    anchor,
+                    normalDir,
+                    typeCategory: cat,
+                    isBang: isCurtainBangZone,
+                    isTopSculpt,
+                    phase: i * 0.73,
+                    nodes
+                });
+            }
+        }
+
+        function updateHairPhysics3D(timeSec) {
+            const baseGravity = 0.0085;
+
+            for (let s = 0; s < hairStrands3D.length; s++) {
+                const strand = hairStrands3D[s];
+                const nodes = strand.nodes;
+                if (nodes.length === 0) continue;
+
+                nodes[0].pos.copy(strand.anchor);
+                nodes[0].oldPos.copy(strand.anchor);
+
+                const cat = strand.typeCategory;
+
+                for (let i = 1; i < nodes.length; i++) {
+                    const n = nodes[i];
+
+                    const vx = (n.pos.x - n.oldPos.x) * 0.90;
+                    const vy = (n.pos.y - n.oldPos.y) * 0.90;
+                    const vz = (n.pos.z - n.oldPos.z) * 0.90;
+
+                    n.oldPos.copy(n.pos);
+
+                    let grav = baseGravity;
+                    if (n.isWet > 0.1) {
+                        if (cat === '3C' || cat === 'curlymullet') grav = baseGravity * 1.85;
+                        else if (cat === '4C' || cat === 'hightop') grav = baseGravity * 0.65;
+                        else grav = baseGravity * 1.45;
+                    }
+
+                    n.pos.x += vx;
+                    n.pos.y += vy - grav;
+                    n.pos.z += vz;
+
+                    if (i <= 3) {
+                        const lift = (cat === '4C' || cat === 'hightop') ? 0.018 : (cat === 'wolf' ? 0.012 : 0.006);
+                        n.pos.addScaledVector(strand.normalDir, lift);
+                    }
+
+                    if (cat === '4C' || (cat === 'hightop' && strand.isTopSculpt)) {
+                        const radialStrength = n.isWet > 0.4 ? 0.005 : 0.016;
+                        n.pos.addScaledVector(strand.normalDir, radialStrength);
+                        if (cat === 'hightop' && n.isWet <= 0.4) {
+                            n.pos.y += 0.012;
+                        }
+                    } else if (cat === 'quiff' && strand.isTopSculpt && n.isWet <= 0.4) {
+                        n.pos.y += 0.014;
+                        n.pos.z += 0.004;
+                    } else if (cat === 'pompadour' && strand.isTopSculpt && n.isWet <= 0.4) {
+                        n.pos.y += 0.011;
+                        n.pos.x += 0.008;
+                    }
+
+                    const breeze = Math.sin(timeSec * 1.8 + strand.phase + i * 0.3) * 0.0012;
+                    n.pos.x += breeze;
+                }
+
+                const segTargetLen = ((cat === '4C' || cat === 'hightop') && nodes[1] && nodes[1].isWet > 0.4)
+                    ? SEGMENT_LEN * 0.68
+                    : SEGMENT_LEN;
+
+                for (let pass = 0; pass < 3; pass++) {
+                    nodes[0].pos.copy(strand.anchor);
+
+                    for (let i = 0; i < nodes.length - 1; i++) {
+                        const p1 = nodes[i].pos;
+                        const p2 = nodes[i + 1].pos;
+
+                        _dirVec.subVectors(p2, p1);
+                        const dist = _dirVec.length() || 0.0001;
+                        const diff = (dist - segTargetLen) / dist;
+
+                        if (i === 0) {
+                            p2.addScaledVector(_dirVec, -diff);
+                        } else {
+                            p1.addScaledVector(_dirVec, 0.5 * diff);
+                            p2.addScaledVector(_dirVec, -0.5 * diff);
+                        }
+
+                        const dx = (p2.x - HEAD_CENTER.x) / (HEAD_RADII.x * 1.01);
+                        const dy = (p2.y - HEAD_CENTER.y) / (HEAD_RADII.y * 1.01);
+                        const dz = (p2.z - HEAD_CENTER.z) / (HEAD_RADII.z * 1.01);
+                        const ellipDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                        if (ellipDist < 1.0 && ellipDist > 0.0001) {
+                            const inv = 1.0 / ellipDist;
+                            p2.x = HEAD_CENTER.x + dx * inv * (HEAD_RADII.x * 1.01);
+                            p2.y = HEAD_CENTER.y + dy * inv * (HEAD_RADII.y * 1.01);
+                            p2.z = HEAD_CENTER.z + dz * inv * (HEAD_RADII.z * 1.01);
+                        }
+
+                        if (p2.y < -1.12) {
+                            const sdx = p2.x / 1.38;
+                            const sdz = p2.z / 0.92;
+                            const sDist = Math.sqrt(sdx * sdx + sdz * sdz);
+                            if (sDist < 1.0 && sDist > 0.0001) {
+                                p2.x = (sdx / sDist) * 1.38;
+                                p2.z = (sdz / sDist) * 0.92;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 5. SYNC 3D HAIR STRANDS & HAIRSTYLE GEOMETRY TO GPU INSTANCES
+        // ==========================================
+        function sync3DInstances(dt) {
+            let segIdx = 0;
+            let coilIdx = 0;
+            let foamIdx = 0;
+
+            for (let s = 0; s < hairStrands3D.length; s++) {
+                const strand = hairStrands3D[s];
+                const nodes = strand.nodes;
+                const cat = strand.typeCategory;
+
+                for (let i = 0; i < nodes.length - 1; i++) {
+                    const n1 = nodes[i];
+                    const n2 = nodes[i + 1];
+
+                    let r = n1.r / 255;
+                    let g = n1.g / 255;
+                    let b = n1.b / 255;
+
+                    if (n1.isWet > 0.05) {
+                        const wetFactor = 1.0 - n1.isWet * 0.32;
+                        r *= wetFactor;
+                        g *= wetFactor;
+                        b *= wetFactor;
+                    }
+
+                    if ((cat === '1A' || cat === 'pompadour') && i >= 3 && i <= 5 && n1.isWet < 0.25) {
+                        r = Math.min(1, r + 0.22);
+                        g = Math.min(1, g + 0.22);
+                        b = Math.min(1, b + 0.22);
+                    }
+
+                    _color.setRGB(r, g, b);
+
+                    let p1x = n1.pos.x, p1y = n1.pos.y, p1z = n1.pos.z;
+                    let p2x = n2.pos.x, p2y = n2.pos.y, p2z = n2.pos.z;
+
+                    const effectiveCurl = n1.isWet > 0.5 && (cat === '3C' || cat === 'curlymullet') ? n1.curl * 0.35 : n1.curl;
+
+                    if ((cat === '3C' || cat === 'curlymullet') && effectiveCurl > 0.25 && segIdx < MAX_HAIR_SEGMENTS) {
+                        const rad = 0.052 * effectiveCurl;
+                        const a1 = i * 1.75 + strand.phase;
+                        const a2 = (i + 1) * 1.75 + strand.phase;
+                        p1x += Math.cos(a1) * rad;
+                        p1z += Math.sin(a1) * rad;
+                        p2x += Math.cos(a2) * rad;
+                        p2z += Math.sin(a2) * rad;
+                    } else if ((cat === '2B' || cat === '2A' || effectiveCurl > 0.1) && cat !== '4C' && cat !== 'hightop') {
+                        const waveAmp = 0.045 * Math.max(effectiveCurl, 0.2);
+                        const w1 = Math.sin(i * 1.15 + strand.phase) * waveAmp;
+                        const w2 = Math.sin((i + 1) * 1.15 + strand.phase) * waveAmp;
+                        p1x += strand.normalDir.z * w1;
+                        p1z -= strand.normalDir.x * w1;
+                        p2x += strand.normalDir.z * w2;
+                        p2z -= strand.normalDir.x * w2;
+                    }
+
+                    if ((cat === '4C' || (cat === 'hightop' && strand.isTopSculpt)) && coilIdx < MAX_COIL_PUFFS) {
+                        const puffScale = (0.075 - i * 0.002) * (n1.isWet > 0.4 ? 0.72 : 1.0);
+                        _dummy.position.set(p1x, p1y, p1z);
+                        _dummy.rotation.set(i * 0.8 + strand.phase, strand.phase, i * 0.5);
+                        _dummy.scale.setScalar(Math.max(0.032, puffScale));
+                        _dummy.updateMatrix();
+                        coilInstancedMesh.setMatrixAt(coilIdx, _dummy.matrix);
+                        coilInstancedMesh.setColorAt(coilIdx, _color);
+                        coilIdx++;
+                    } else if (segIdx < MAX_HAIR_SEGMENTS) {
+                        _midVec.set((p1x + p2x) * 0.5, (p1y + p2y) * 0.5, (p1z + p2z) * 0.5);
+                        _dirVec.set(p2x - p1x, p2y - p1y, p2z - p1z);
+                        const len = _dirVec.length() || 0.001;
+                        _dirVec.divideScalar(len);
+                        _quat.setFromUnitVectors(_upVec, _dirVec);
+
+                        const baseThick = cat === 'wolf'
+                            ? Math.max(0.012, 0.044 - (i / nodes.length) * 0.032)
+                            : Math.max(0.018, 0.042 - i * 0.0014);
+
+                        _dummy.position.copy(_midVec);
+                        _dummy.quaternion.copy(_quat);
+                        _dummy.scale.set(baseThick, len * 1.08, baseThick);
+                        _dummy.updateMatrix();
+                        hairInstancedMesh.setMatrixAt(segIdx, _dummy.matrix);
+                        hairInstancedMesh.setColorAt(segIdx, _color);
+                        segIdx++;
+                    }
+
+                    if (n1.foam > 0.15 && foamIdx < MAX_FOAM_BUBBLES) {
+                        _dummy.position.set(p1x, p1y, p1z);
+                        _dummy.rotation.set(0, 0, 0);
+                        _dummy.scale.setScalar(0.055 * n1.foam);
+                        _dummy.updateMatrix();
+                        foamInstancedMesh.setMatrixAt(foamIdx, _dummy.matrix);
+                        foamIdx++;
+                    }
+                }
+            }
+
+            hairInstancedMesh.count = segIdx;
+            hairInstancedMesh.instanceMatrix.needsUpdate = true;
+            if (hairInstancedMesh.instanceColor) hairInstancedMesh.instanceColor.needsUpdate = true;
+
+            coilInstancedMesh.count = coilIdx;
+            coilInstancedMesh.instanceMatrix.needsUpdate = true;
+            if (coilInstancedMesh.instanceColor) coilInstancedMesh.instanceColor.needsUpdate = true;
+
+            foamInstancedMesh.count = foamIdx;
+            foamInstancedMesh.instanceMatrix.needsUpdate = true;
+
+            const clipCount = Math.min(hairClippings3D.length, MAX_CLIPPINGS);
+            for (let i = 0; i < clipCount; i++) {
+                const c = hairClippings3D[i];
+                if (c.pos.y > FLOOR_Y + 0.03) {
+                    c.vel.y -= 9.8 * dt;
+                    c.pos.addScaledVector(c.vel, dt);
+                    c.rot.x += 5.0 * dt;
+                    c.rot.z += 4.0 * dt;
+                } else {
+                    c.pos.y = FLOOR_Y + 0.03;
+                    c.vel.multiplyScalar(0.7);
+                }
+
+                _dummy.position.copy(c.pos);
+                _dummy.rotation.set(c.rot.x, c.rot.y, c.rot.z);
+                _dummy.scale.set(1, c.lenScale, 1);
+                _dummy.updateMatrix();
+                clippingsInstancedMesh.setMatrixAt(i, _dummy.matrix);
+                clippingsInstancedMesh.setColorAt(i, c.color);
+            }
+            clippingsInstancedMesh.count = clipCount;
+            clippingsInstancedMesh.instanceMatrix.needsUpdate = true;
+            if (clippingsInstancedMesh.instanceColor) clippingsInstancedMesh.instanceColor.needsUpdate = true;
+
+            for (let i = particles3D.length - 1; i >= 0; i--) {
+                const p = particles3D[i];
+                p.pos.addScaledVector(p.vel, dt);
+                p.life -= 2.2 * dt;
+                if (p.life <= 0) {
+                    particles3D.splice(i, 1);
+                }
+            }
+            const partCount = Math.min(particles3D.length, MAX_PARTICLES);
+            for (let i = 0; i < partCount; i++) {
+                const p = particles3D[i];
+                _dummy.position.copy(p.pos);
+                _dummy.rotation.set(0, 0, 0);
+                _dummy.scale.setScalar(Math.max(0.01, p.life));
+                _dummy.updateMatrix();
+                particlesInstancedMesh.setMatrixAt(i, _dummy.matrix);
+                particlesInstancedMesh.setColorAt(i, p.color);
+            }
+            particlesInstancedMesh.count = partCount;
+            particlesInstancedMesh.instanceMatrix.needsUpdate = true;
+            if (particlesInstancedMesh.instanceColor) particlesInstancedMesh.instanceColor.needsUpdate = true;
+        }
+
+        // ==========================================
+        // 6. 3D RAYCASTING TOOL INTERACTION ENGINE
+        // ==========================================
+        function update3DCursorAndTools() {
+            if (!raycaster || !camera) return;
+
+            raycaster.setFromCamera(ndcMouse, camera);
+            const ray = raycaster.ray;
+
+            const worldBrushRadius = brushRadius * 0.0115;
+            const worldBrushRadiusSq = worldBrushRadius * worldBrushRadius;
+
+            if (currentTool === 'broom') {
+                if (ray.intersectPlane(_floorPlane, _rayPoint)) {
+                    current3DCursorPos.copy(_rayPoint);
+                }
+            } else if (ray.intersectSphere(_headSphere, _rayPoint)) {
+                current3DCursorPos.copy(_rayPoint);
+            } else {
+                ray.at(camRadius - 0.3, current3DCursorPos);
+            }
+
+            if (toolCursorMesh) {
+                toolCursorMesh.position.copy(current3DCursorPos);
+                toolCursorMesh.scale.setScalar(worldBrushRadius / 0.32);
+                toolCursorMesh.visible = !isOrbitDragging;
+            }
+
+            if (!isPointerDown || isOrbitDragging || pointerMode === 'orbit') return;
+
+            const distCamToHead = camera.position.distanceTo(HEAD_CENTER);
+            const maxDepthT = distCamToHead + 0.42;
+
+            if (currentTool === 'broom') {
+                let swept = false;
+                for (let i = hairClippings3D.length - 1; i >= 0; i--) {
+                    if (hairClippings3D[i].pos.distanceTo(current3DCursorPos) < worldBrushRadius * 1.8) {
+                        hairClippings3D.splice(i, 1);
+                        swept = true;
+                    }
+                }
+                if (swept) {
+                    spawnParticles3D(current3DCursorPos, 0xfbbf24, 3);
+                }
+                return;
+            }
+
+            if (currentTool === 'scissors') {
+                let cutAny = false;
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 1; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT) {
+                            if (ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq * 0.72) {
+                                const severed = nodes.splice(i);
+                                cutAny = true;
+                                if (severed.length > 0) {
+                                    spawnHairClipping3D(severed[0]);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (cutAny) {
+                    playSound('snip');
+                    surpriseTimer = 0.85;
+                    calculateStyleMatch();
+                }
+            } else if (currentTool === 'clippers') {
+                let buzzed = false;
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 1; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT) {
+                            if (ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq && nodes.length > 2) {
+                                const cutIdx = Math.max(2, i);
+                                const severed = nodes.splice(cutIdx);
+                                buzzed = true;
+                                if (severed.length > 0) {
+                                    spawnHairClipping3D(severed[0]);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (buzzed) {
+                    playSound('buzz');
+                    spawnParticles3D(current3DCursorPos, 0x94a3b8, 2);
+                    calculateStyleMatch();
+                }
+            } else if (currentTool === 'growth') {
+                let grew = false;
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const strand = hairStrands3D[s];
+                    const nodes = strand.nodes;
+                    const tip = nodes[nodes.length - 1];
+                    if (!tip) continue;
+
+                    const tAlongRay = _rayPoint.subVectors(tip.pos, ray.origin).dot(ray.direction);
+                    if (tAlongRay > 0 && tAlongRay <= maxDepthT + 0.3) {
+                        if (ray.distanceSqToPoint(tip.pos) < worldBrushRadiusSq * 1.4 && nodes.length < 22) {
+                            const newPos = tip.pos.clone().addScaledVector(strand.normalDir, 0.05);
+                            newPos.y -= SEGMENT_LEN * 0.75;
+                            nodes.push({
+                                pos: newPos,
+                                oldPos: newPos.clone(),
+                                r: tip.r, g: tip.g, b: tip.b,
+                                curl: tip.curl, isWet: tip.isWet, foam: 0
+                            });
+                            grew = true;
+                        }
+                    }
+                }
+                if (grew) {
+                    playSound('magic');
+                    spawnParticles3D(current3DCursorPos, 0x34d399, 3);
+                    calculateStyleMatch();
+                }
+            } else if (currentTool === 'dye') {
+                let rgb = hexToRgb(chosenColor);
+                if (isRainbowMode) {
+                    rainbowHue = (rainbowHue + 4) % 360;
+                    rgb = hslToRgb(rainbowHue / 360, 0.9, 0.58);
+                }
+
+                let dyed = false;
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 0; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT) {
+                            if (ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq) {
+                                n.r = Math.round(n.r * 0.72 + rgb.r * 0.28);
+                                n.g = Math.round(n.g * 0.72 + rgb.g * 0.28);
+                                n.b = Math.round(n.b * 0.72 + rgb.b * 0.28);
+                                dyed = true;
+                            }
+                        }
+                    }
+                }
+                if (dyed) {
+                    playSound('spray');
+                    const hexInt = (rgb.r << 16) | (rgb.g << 8) | rgb.b;
+                    spawnParticles3D(current3DCursorPos, hexInt, 3);
+                    calculateStyleMatch();
+                }
+            } else if (currentTool === 'curl') {
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 0; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT && ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq) {
+                            n.curl = Math.min(1.0, n.curl + 0.14);
+                        }
+                    }
+                }
+                playSound('spray');
+                spawnParticles3D(current3DCursorPos, 0xfb7185, 2);
+                calculateStyleMatch();
+            } else if (currentTool === 'straight') {
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 0; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT && ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq) {
+                            n.curl = Math.max(0.0, n.curl - 0.18);
+                        }
+                    }
+                }
+                playSound('spray');
+                spawnParticles3D(current3DCursorPos, 0x38bdf8, 2);
+                calculateStyleMatch();
+            } else if (currentTool === 'comb') {
+                const dx = (ndcMouse.x - prevNdcMouse.x) * 1.4;
+                const dy = (ndcMouse.y - prevNdcMouse.y) * 1.4;
+                const rightAxis = new THREE.Vector3(Math.cos(camTheta), 0, -Math.sin(camTheta));
+
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 1; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT && ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq * 1.3) {
+                            n.pos.addScaledVector(rightAxis, dx);
+                            n.pos.y += dy;
+                        }
+                    }
+                }
+            } else if (currentTool === 'wash') {
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const nodes = hairStrands3D[s].nodes;
+                    for (let i = 0; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT && ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq * 1.2) {
+                            n.isWet = 1.0;
+                            n.foam = Math.min(1.0, n.foam + 0.22);
+                        }
+                    }
+                }
+                playSound('water');
+                spawnParticles3D(current3DCursorPos, 0x60a5fa, 4);
+            } else if (currentTool === 'dryer') {
+                const forwardWind = new THREE.Vector3(-Math.sin(camTheta), 0.25, -Math.cos(camTheta));
+                for (let s = 0; s < hairStrands3D.length; s++) {
+                    const strand = hairStrands3D[s];
+                    const nodes = strand.nodes;
+                    for (let i = 1; i < nodes.length; i++) {
+                        const n = nodes[i];
+                        const tAlongRay = _rayPoint.subVectors(n.pos, ray.origin).dot(ray.direction);
+                        if (tAlongRay > 0 && tAlongRay <= maxDepthT + 0.2 && ray.distanceSqToPoint(n.pos) < worldBrushRadiusSq * 1.6) {
+                            n.pos.addScaledVector(strand.normalDir, 0.032);
+                            n.pos.addScaledVector(forwardWind, 0.025);
+                            n.isWet = Math.max(0, n.isWet - 0.12);
+                            n.foam = Math.max(0, n.foam - 0.18);
+                        }
+                    }
+                }
+                playSound('dryer');
+                spawnParticles3D(current3DCursorPos, 0xfdba74, 3);
+            }
+        }
+
+        function spawnHairClipping3D(node) {
+            if (hairClippings3D.length >= MAX_CLIPPINGS) {
+                hairClippings3D.shift();
+            }
+            hairClippings3D.push({
+                pos: node.pos.clone(),
+                vel: new THREE.Vector3((Math.random() - 0.5) * 1.4, Math.random() * 0.6, (Math.random() - 0.5) * 1.4),
+                rot: new THREE.Vector3(Math.random() * 3, Math.random() * 3, Math.random() * 3),
+                lenScale: 0.7 + Math.random() * 0.8,
+                color: new THREE.Color(node.r / 255, node.g / 255, node.b / 255)
+            });
+        }
+
+        function spawnParticles3D(originPos, hexColor, count = 3) {
+            for (let i = 0; i < count; i++) {
+                if (particles3D.length >= MAX_PARTICLES) particles3D.shift();
+                particles3D.push({
+                    pos: originPos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35, (Math.random() - 0.5) * 0.35)),
+                    vel: new THREE.Vector3((Math.random() - 0.5) * 0.9, Math.random() * 0.8 + 0.2, (Math.random() - 0.5) * 0.9),
+                    color: new THREE.Color(hexColor),
+                    life: 1.0
+                });
+            }
+        }
+
+        // ==========================================
+        // 7. 3D CAMERA ORBIT, TURNTABLE & EXPRESSIONS
+        // ==========================================
+        function updateCameraTransform(immediate = false) {
+            if (immediate) {
+                camTheta = targetCamTheta;
+                camPhi = targetCamPhi;
+                camRadius = targetCamRadius;
+            } else {
+                camTheta += (targetCamTheta - camTheta) * 0.16;
+                camPhi += (targetCamPhi - camPhi) * 0.16;
+                camRadius += (targetCamRadius - camRadius) * 0.16;
+            }
+
+            if (!camera) return;
+            camera.position.x = camLookTarget.x + camRadius * Math.sin(camPhi) * Math.sin(camTheta);
+            camera.position.y = camLookTarget.y + camRadius * Math.cos(camPhi);
+            camera.position.z = camLookTarget.z + camRadius * Math.sin(camPhi) * Math.cos(camTheta);
+            camera.lookAt(camLookTarget);
+        }
+
+        function setPointerInteractionMode(mode) {
+            pointerMode = mode;
+            const toolBtn = document.getElementById('pointerToolModeBtn');
+            const orbitBtn = document.getElementById('pointerOrbitModeBtn');
+            const mount = document.getElementById('threeMount');
+
+            if (mode === 'tool') {
+                toolBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-pink-600 text-white shadow transition flex items-center space-x-1';
+                orbitBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition flex items-center space-x-1';
+                if (mount) mount.style.cursor = 'crosshair';
+            } else {
+                orbitBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold bg-purple-600 text-white shadow transition flex items-center space-x-1';
+                toolBtn.className = 'px-2.5 py-1 rounded-lg text-[11px] font-bold text-slate-400 hover:text-white transition flex items-center space-x-1';
+                if (mount) mount.style.cursor = 'grab';
+            }
+        }
+
+        function onTurntableInput(degVal) {
+            targetCamTheta = (Number(degVal) * Math.PI) / 180;
+        }
+
+        function setCameraPreset(view) {
+            targetCamPhi = 1.48;
+            if (view === 'front') targetCamTheta = 0;
+            else if (view === 'left') targetCamTheta = -Math.PI / 2;
+            else if (view === 'right') targetCamTheta = Math.PI / 2;
+            else if (view === 'back') targetCamTheta = Math.PI;
+
+            const slider = document.getElementById('turntableSlider');
+            if (slider) slider.value = Math.round((targetCamTheta * 180) / Math.PI);
+        }
+
+        function adjustCameraZoom(delta) {
+            targetCamRadius = Math.max(3.4, Math.min(8.5, targetCamRadius + delta));
+        }
+
+        function updateClientFacialAnimation(dt) {
+            if (!clientCharacterMeshes.eyeSockets) return;
+
+            blinkTimer += dt;
+            if (blinkTimer > 3.6) {
+                isBlinking = true;
+                if (blinkTimer > 3.74) {
+                    isBlinking = false;
+                    blinkTimer = 0;
+                }
+            }
+            if (surpriseTimer > 0) surpriseTimer -= dt;
+
+            const lookOffsetX = THREE.MathUtils.clamp(ndcMouse.x * 0.035, -0.035, 0.035);
+            const lookOffsetY = THREE.MathUtils.clamp(ndcMouse.y * 0.03, -0.03, 0.03);
+
+            clientCharacterMeshes.eyeSockets.forEach((sock) => {
+                sock.eyeGroup.scale.y = isBlinking ? 0.1 : 1.0;
+                sock.iris.position.x = lookOffsetX;
+                sock.iris.position.y = lookOffsetY;
+                sock.centerPupil.position.x = lookOffsetX * 1.15;
+                sock.centerPupil.position.y = lookOffsetY * 1.15;
+                sock.catchlight.position.x = lookOffsetX * 1.15 - 0.025;
+                sock.catchlight.position.y = lookOffsetY * 1.15 + 0.025;
+            });
+
+            const isSurprised = surpriseTimer > 0;
+            clientCharacterMeshes.eyebrows.forEach((brow) => {
+                brow.position.y = isSurprised ? 0.28 : 0.24;
+            });
+            clientCharacterMeshes.smileMouth.visible = !isSurprised;
+            clientCharacterMeshes.surpriseMouth.visible = isSurprised;
+        }
+
+        // ==========================================
+        // 8. GAME MODES, CLIENT CHALLENGES & PHOTO BOOTH
+        // ==========================================
+        function setGameMode(mode) {
+            gameMode = mode;
+            const freeBtn = document.getElementById('modeFreestyleBtn');
+            const reqBtn = document.getElementById('modeRequestBtn');
+            const cardOverlay = document.getElementById('requestCardOverlay');
+
+            if (mode === 'freestyle') {
+                freeBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-white bg-pink-600 shadow-md';
+                reqBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white';
+                cardOverlay.classList.add('hidden');
+            } else {
+                reqBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-white bg-pink-600 shadow-md';
+                freeBtn.className = 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all text-slate-400 hover:text-white';
+                cardOverlay.classList.remove('hidden');
+                updateRequestCardUI();
+                calculateStyleMatch();
+            }
+        }
+
+        function updateRequestCardUI() {
+            const client = CLIENTS[currentClientIdx];
+            document.getElementById('targetClientName').textContent = `${client.name}'s Wish:`;
+            document.getElementById('targetHairstyleTag').textContent = client.challenge.tag;
+            document.getElementById('targetDescription').textContent = `"${client.challenge.desc}"`;
+        }
+
+        function calculateStyleMatch() {
+            if (gameMode !== 'request' || hairStrands3D.length === 0) return;
+
+            const client = CLIENTS[currentClientIdx];
+            const challenge = client.challenge;
+
+            let totalNodes = 0;
+            let totalCurl = 0;
+            let avgR = 0, avgG = 0, avgB = 0;
+
+            for (let s = 0; s < hairStrands3D.length; s++) {
+                const nodes = hairStrands3D[s].nodes;
+                totalNodes += nodes.length;
+                for (let i = 0; i < nodes.length; i++) {
+                    totalCurl += nodes[i].curl;
+                    avgR += nodes[i].r;
+                    avgG += nodes[i].g;
+                    avgB += nodes[i].b;
+                }
+            }
+
+            const avgLength = totalNodes / hairStrands3D.length;
+            const nodeCount = Math.max(1, totalNodes);
+            avgR /= nodeCount;
+            avgG /= nodeCount;
+            avgB /= nodeCount;
+            const avgCurl = totalCurl / nodeCount;
+
+            const lengthDiff = Math.abs(avgLength - challenge.targetLength);
+            const lengthScore = Math.max(0, 1 - lengthDiff / 10);
+
+            const curlDiff = Math.abs(avgCurl - challenge.targetCurl);
+            const curlScore = Math.max(0, 1 - curlDiff);
+
+            const colorDist = Math.hypot(avgR - challenge.targetColor.r, avgG - challenge.targetColor.g, avgB - challenge.targetColor.b);
+            const colorScore = Math.max(0, 1 - colorDist / 200);
+
+            const overallMatch = Math.round((lengthScore * 0.4 + curlScore * 0.3 + colorScore * 0.3) * 100);
+            document.getElementById('styleMatchPercent').textContent = `${overallMatch}%`;
+        }
+
+        function completeClientRequest() {
+            const matchTxt = document.getElementById('styleMatchPercent').textContent;
+            const matchVal = parseInt(matchTxt, 10) || 50;
+
+            const earnedTip = Math.round(matchVal * 0.8 + 15);
+            totalTips += earnedTip;
+            document.getElementById('totalTipsEarned').textContent = `$${totalTips}`;
+
+            playSound('fanfare');
+            showToast('3D Makeover Complete! 🎉', `Style Match: ${matchVal}% | Tip: +$${earnedTip}`, 'fa-trophy');
+
+            selectClient((currentClientIdx + 1) % CLIENTS.length);
+        }
+
+        function takePolaroidPhoto() {
+            playSound('camera');
+
+            if (toolCursorMesh) toolCursorMesh.visible = false;
+            renderer.render(scene, camera);
+            const photoUrl = renderer.domElement.toDataURL('image/png');
+            if (toolCursorMesh) toolCursorMesh.visible = true;
+
+            document.getElementById('polaroidImg').src = photoUrl;
+            document.getElementById('downloadPhotoBtn').href = photoUrl;
+
+            const client = CLIENTS[currentClientIdx];
+            document.getElementById('polaroidCaption').textContent = `${client.name} ✨ Shear Magic 3D`;
+            document.getElementById('polaroidHairStamp').textContent = client.typeBadge;
+
+            savedLookbookPhotos.push({
+                url: photoUrl,
+                clientName: client.name,
+                hairBadge: client.typeBadge,
+                date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+
+            document.getElementById('lookbookBadge').textContent = savedLookbookPhotos.length;
+            document.getElementById('photoPreviewModal').classList.remove('hidden');
+        }
+
+        function closePhotoPreview() {
+            document.getElementById('photoPreviewModal').classList.add('hidden');
+        }
+
+        function openLookbookModal() {
+            const grid = document.getElementById('lookbookGrid');
+            grid.innerHTML = '';
+
+            if (savedLookbookPhotos.length === 0) {
+                grid.innerHTML = '<div class="col-span-3 text-center py-8 text-slate-500 font-bold text-xs">No saved 3D photos yet! Click "Snap 3D Polaroid" to build your gallery.</div>';
+            } else {
+                savedLookbookPhotos.forEach(photo => {
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-2 rounded-xl polaroid-frame text-slate-800 text-center relative';
+                    card.innerHTML = `
+                        <img src="${photo.url}" class="w-full h-36 object-cover rounded bg-slate-100 mb-2">
+                        <div class="font-fredoka text-xs font-bold">${photo.clientName}</div>
+                        <div class="text-[9px] text-pink-600 font-black">${photo.hairBadge}</div>
+                        <div class="text-[8px] text-slate-400 font-semibold">${photo.date}</div>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+
+            document.getElementById('lookbookModal').classList.remove('hidden');
+        }
+
+        function closeLookbookModal() {
+            document.getElementById('lookbookModal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 9. CLIENT SELECTION, TOOLS & 3D ACCESSORIES UI
+        // ==========================================
+        function setupColorSwatches() {
+            const container = document.getElementById('colorSwatches');
+            if (!container) return;
+            container.innerHTML = '';
+
+            COLOR_SWATCHES.forEach(color => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `w-6 h-6 rounded-full border-2 transition transform hover:scale-110 ${
+                    !isRainbowMode && chosenColor === color
+                        ? 'border-white scale-110 ring-2 ring-pink-400'
+                        : 'border-slate-700'
+                }`;
+                btn.style.backgroundColor = color;
+                btn.title = color;
+                btn.onclick = () => {
+                    chosenColor = color;
+                    isRainbowMode = false;
+                    const rainbowBtn = document.getElementById('rainbowBtn');
+                    if (rainbowBtn) rainbowBtn.classList.remove('ring-2', 'ring-white');
+                    setupColorSwatches();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function selectTool(toolName) {
+            currentTool = toolName;
+            setPointerInteractionMode('tool');
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.getElementById(`tool-${toolName}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const dyePanel = document.getElementById('dyePalettePanel');
+            if (dyePanel) {
+                dyePanel.classList.toggle('hidden', toolName !== 'dye');
+            }
+        }
+
+        function setBrushSize(size) {
+            brushRadius = size;
+            const sizes = { 15: 'sizeS', 30: 'sizeM', 50: 'sizeL' };
+            Object.entries(sizes).forEach(([val, id]) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.className = Number(val) === size
+                    ? 'px-2 py-0.5 text-[10px] font-bold rounded bg-pink-600 text-white shadow'
+                    : 'px-2 py-0.5 text-[10px] font-bold rounded text-slate-400 hover:text-white';
+            });
+        }
+
+        function toggleRainbowMode() {
+            isRainbowMode = !isRainbowMode;
+            const rainbowBtn = document.getElementById('rainbowBtn');
+            if (rainbowBtn) {
+                rainbowBtn.classList.toggle('ring-2', isRainbowMode);
+                rainbowBtn.classList.toggle('ring-white', isRainbowMode);
+            }
+            setupColorSwatches();
+        }
+
+        function resetClientHair() {
+            const client = CLIENTS[currentClientIdx];
+            createHairStrandsForClient(client);
+            particles3D = [];
+            calculateStyleMatch();
+            showToast('3D Hair Reset', `Restored ${client.name}'s natural ${client.typeBadge}!`, 'fa-rotate-left');
+        }
+
+        function sweepAllClippings() {
+            hairClippings3D = [];
+            playSound('magic');
+            showToast('Salon Floor Clean!', 'All 3D hair clippings swept away.', 'fa-broom');
+        }
+
+        function toggleAccessory(accKey) {
+            activeAccessories[accKey] = !activeAccessories[accKey];
+            if (accessoryMeshes[accKey]) {
+                accessoryMeshes[accKey].visible = activeAccessories[accKey];
+            }
+            const btn = document.getElementById(`acc-${accKey}`);
+            if (btn) {
+                btn.classList.toggle('border-purple-400', activeAccessories[accKey]);
+                btn.classList.toggle('bg-purple-500/25', activeAccessories[accKey]);
+            }
+            playSound('magic');
+        }
+
+        function clearAccessories() {
+            Object.keys(activeAccessories).forEach(key => {
+                activeAccessories[key] = false;
+                if (accessoryMeshes[key]) accessoryMeshes[key].visible = false;
+                const btn = document.getElementById(`acc-${key}`);
+                if (btn) {
+                    btn.classList.remove('border-purple-400', 'bg-purple-500/25');
+                }
+            });
+        }
+
+        function selectClient(index) {
+            currentClientIdx = index;
+            const client = CLIENTS[index];
+
+            if (clientCharacterMeshes.skinMat) {
+                clientCharacterMeshes.skinMat.color.set(client.skinColor);
+                clientCharacterMeshes.shadowSkinMat.color.set(client.skinShadow);
+                clientCharacterMeshes.pupilMat.color.set(client.eyeColor);
+                clientCharacterMeshes.lipMat.color.set(client.lipColor);
+                clientCharacterMeshes.outfitMat.color.set(client.outfitColor);
+            }
+
+            if (clientCharacterMeshes.facialHairMat) {
+                clientCharacterMeshes.facialHairMat.color.setRGB(
+                    client.hairColor.r / 255,
+                    client.hairColor.g / 255,
+                    client.hairColor.b / 255
+                );
+                clientCharacterMeshes.beardMesh.visible = client.facialHair === 'beard';
+                clientCharacterMeshes.goateeGroup.visible = client.facialHair === 'goatee';
+            }
+
+            document.getElementById('badgeClientName').textContent = client.name;
+            document.getElementById('badgeHairTypeName').textContent = client.typeBadge;
+            document.getElementById('badgeHairTypeDesc').textContent = client.typeDesc;
+
+            createHairStrandsForClient(client);
+            updateClientSelectorUI();
+
+            if (gameMode === 'request') {
+                updateRequestCardUI();
+                calculateStyleMatch();
+            }
+        }
+
+        function updateClientSelectorUI() {
+            const container = document.getElementById('clientSelectorContainer');
+            container.innerHTML = '';
+
+            CLIENTS.forEach((c, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `w-7 h-7 rounded-xl font-bold text-[11px] transition border flex items-center justify-center ${
+                    idx === currentClientIdx
+                    ? 'bg-pink-600 text-white border-pink-400 shadow'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                }`;
+                btn.textContent = c.shortLabel || c.name[0];
+                btn.title = `${c.name} (${c.typeBadge})`;
+                btn.onclick = () => selectClient(idx);
+                container.appendChild(btn);
+            });
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 244, g: 63, b: 94 };
+        }
+
+        function hslToRgb(h, s, l) {
+            let r, g, b;
+            if (s === 0) {
+                r = g = b = l;
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1 / 6) return p + (q - p) * 6 * t;
+                    if (t < 1 / 2) return q;
+                    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1 / 3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1 / 3);
+            }
+            return { r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) };
+        }
+
+        // ==========================================
+        // 10. VIEWPORT RESIZE, MOUSE & TOUCH EVENTS
+        // ==========================================
+        function onWindowResize() {
+            const mount = document.getElementById('threeMount');
+            if (!mount || !renderer || !camera) return;
+            const w = mount.clientWidth || 800;
+            const h = mount.clientHeight || 600;
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, h);
+        }
+
+        function updateNDCFromClientCoords(clientX, clientY) {
+            const mount = document.getElementById('threeMount');
+            const rect = mount.getBoundingClientRect();
+            prevNdcMouse.copy(ndcMouse);
+            ndcMouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            ndcMouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+        }
+
+        function setup3DPointerControls() {
+            const mount = document.getElementById('threeMount');
+            mount.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            mount.addEventListener('mousedown', (e) => {
+                initAudio();
+                prevClientX = e.clientX;
+                prevClientY = e.clientY;
+                updateNDCFromClientCoords(e.clientX, e.clientY);
+
+                if (e.button === 2 || e.button === 1 || e.shiftKey || e.altKey || pointerMode === 'orbit') {
+                    isOrbitDragging = true;
+                    mount.style.cursor = 'grabbing';
+                } else {
+                    isPointerDown = true;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                updateNDCFromClientCoords(e.clientX, e.clientY);
+
+                if (isOrbitDragging) {
+                    const dx = e.clientX - prevClientX;
+                    const dy = e.clientY - prevClientY;
+                    targetCamTheta -= dx * 0.0085;
+                    targetCamPhi = THREE.MathUtils.clamp(targetCamPhi - dy * 0.0075, 0.55, 2.05);
+
+                    const wrappedDeg = ((((targetCamTheta * 180) / Math.PI + 180) % 360 + 360) % 360) - 180;
+                    const slider = document.getElementById('turntableSlider');
+                    if (slider) slider.value = Math.round(wrappedDeg);
+                }
+
+                prevClientX = e.clientX;
+                prevClientY = e.clientY;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isPointerDown = false;
+                isOrbitDragging = false;
+                mount.style.cursor = pointerMode === 'orbit' ? 'grab' : 'crosshair';
+            });
+
+            mount.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                adjustCameraZoom(e.deltaY * 0.003);
+            }, { passive: false });
+
+            mount.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                initAudio();
+                if (e.touches.length === 1) {
+                    const t = e.touches[0];
+                    prevClientX = t.clientX;
+                    prevClientY = t.clientY;
+                    updateNDCFromClientCoords(t.clientX, t.clientY);
+                    if (pointerMode === 'orbit') {
+                        isOrbitDragging = true;
+                    } else {
+                        isPointerDown = true;
+                    }
+                } else if (e.touches.length === 2) {
+                    isPointerDown = false;
+                    isOrbitDragging = true;
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    prevClientX = (t1.clientX + t2.clientX) * 0.5;
+                    prevClientY = (t1.clientY + t2.clientY) * 0.5;
+                    lastPinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                }
+            }, { passive: false });
+
+            mount.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (e.touches.length === 1) {
+                    const t = e.touches[0];
+                    updateNDCFromClientCoords(t.clientX, t.clientY);
+                    if (isOrbitDragging) {
+                        const dx = t.clientX - prevClientX;
+                        const dy = t.clientY - prevClientY;
+                        targetCamTheta -= dx * 0.0085;
+                        targetCamPhi = THREE.MathUtils.clamp(targetCamPhi - dy * 0.0075, 0.55, 2.05);
+                    }
+                    prevClientX = t.clientX;
+                    prevClientY = t.clientY;
+                } else if (e.touches.length === 2) {
+                    const t1 = e.touches[0];
+                    const t2 = e.touches[1];
+                    const midX = (t1.clientX + t2.clientX) * 0.5;
+                    const midY = (t1.clientY + t2.clientY) * 0.5;
+                    const pinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+
+                    targetCamTheta -= (midX - prevClientX) * 0.008;
+                    targetCamPhi = THREE.MathUtils.clamp(targetCamPhi - (midY - prevClientY) * 0.007, 0.55, 2.05);
+                    if (lastPinchDist > 0) {
+                        adjustCameraZoom((lastPinchDist - pinchDist) * 0.015);
+                    }
+
+                    prevClientX = midX;
+                    prevClientY = midY;
+                    lastPinchDist = pinchDist;
+                }
+            }, { passive: false });
+
+            window.addEventListener('touchend', () => {
+                isPointerDown = false;
+                isOrbitDragging = false;
+                lastPinchDist = 0;
+            });
+        }
+
+        // ==========================================
+        // 11. MAIN 3D ANIMATION LOOP
+        // ==========================================
+        let lastTime = performance.now();
+
+        function animate3D(now) {
+            requestAnimationFrame(animate3D);
+
+            const dt = Math.min(0.033, (now - lastTime) / 1000);
+            lastTime = now;
+            const timeSec = now * 0.001;
+
+            updateCameraTransform(false);
+
+            if (dustMotesPoints) {
+                dustMotesPoints.rotation.y = timeSec * 0.04;
+            }
+
+            updateClientFacialAnimation(dt);
+            update3DCursorAndTools();
+            updateHairPhysics3D(timeSec);
+            sync3DInstances(dt);
+
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // ==========================================
+        // 12. INITIALIZATION ON WINDOW LOAD
+        // ==========================================
+        window.addEventListener('load', () => {
+            try {
+                initThreeScene();
+                setup3DPointerControls();
+                window.addEventListener('resize', onWindowResize);
+
+                setupColorSwatches();
+                selectClient(0);
+
+                requestAnimationFrame(animate3D);
+            } catch (err) {
+                console.error('3D Salon Initialization Error:', err);
+                showToast('WebGL Notice', 'Unable to start 3D studio renderer.', 'fa-triangle-exclamation');
+            }
+        });
+    </script>
+</body>
+</html>
