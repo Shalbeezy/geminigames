@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LexiFind: Procedural Word Search Engine</title>
+    <!-- Tailwind CSS for robust, modern layout design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts pairing -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #090d16;
+            user-select: none;
+        }
+        .heading-font {
+            font-family: 'Space Grotesk', sans-serif;
+        }
+        /* Custom scrollbars for the word category menu lists */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden antialiased">
+
+    <!-- Top Dashboard Header Navigation -->
+    <header class="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 px-6 py-4 flex flex-wrap justify-between items-center shadow-2xl gap-4 sticky top-0 z-40">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl text-cyan-400">🧩</span>
+            <h1 class="heading-font text-xl md:text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">LEXIFIND</h1>
+        </div>
+
+        <!-- Real-time Stat HUD Display Metrics -->
+        <div class="flex items-center space-x-4 md:space-x-6 text-sm font-mono">
+            <div class="bg-slate-950 px-4 py-1.5 rounded-xl border border-slate-800 flex items-center space-x-2">
+                <span class="text-slate-500 font-semibold">FOUND:</span>
+                <span id="hud-found" class="text-emerald-400 font-bold text-lg">0/0</span>
+            </div>
+            <div class="bg-slate-950 px-4 py-1.5 rounded-xl border border-slate-800 flex items-center space-x-2">
+                <span class="text-slate-500 font-semibold">TIME:</span>
+                <span id="hud-timer" class="text-amber-400 font-bold text-lg">00:00</span>
+            </div>
+            <div class="bg-slate-950 px-4 py-1.5 rounded-xl border border-slate-800 flex items-center space-x-2">
+                <span class="text-slate-500 font-semibold">CATEGORY:</span>
+                <span id="hud-category" class="text-cyan-400 font-bold text-sm uppercase tracking-wide">Space</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Application Section -->
+    <main class="flex-grow p-4 md:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Left Panel: Interactive Matrix Word Search Board Grid Area -->
+        <section class="lg:col-span-7 bg-slate-900/40 p-4 md:p-6 rounded-3xl border border-slate-800/80 shadow-2xl flex flex-col items-center justify-center w-full aspect-square max-w-[640px] mx-auto">
+            <div class="relative w-full h-full flex justify-center items-center">
+                <!-- HTML5 Interactivity Canvas Matrix Layer -->
+                <canvas id="gridCanvas" width="540" height="540" class="block bg-slate-950/60 rounded-2xl border border-slate-800 cursor-pointer shadow-inner max-w-full max-h-full"></canvas>
+            </div>
+        </section>
+
+        <!-- Right Panel: Side Deck for Words Targets & Controls Management -->
+        <section class="lg:col-span-5 flex flex-col space-y-6 w-full">
+            
+            <!-- Contextual Operational Utility Toolbox -->
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-4 shadow-xl">
+                <div class="text-xs text-slate-400 max-w-xs">
+                    <span class="font-bold text-slate-200">How to Play:</span> Click or touch letters on the board, drag a straight line segment across hidden target word paths, and let go to validate!
+                </div>
+                <button id="btn-regenerate" class="bg-slate-800 hover:bg-slate-700 active:scale-95 text-xs font-semibold tracking-wider px-4 py-2.5 rounded-xl border border-slate-700 text-slate-200 transition">
+                    🔄 REGENERATE GRID
+                </button>
+            </div>
+
+            <!-- Target Words Checklist Deck Component -->
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col space-y-4">
+                <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+                    <div>
+                        <h3 class="heading-font text-lg font-bold text-white">Target Words List</h3>
+                        <p class="text-xs text-slate-400 mt-0.5">Locate all listed items below inside the puzzle matrix bounds.</p>
+                    </div>
+                    <span id="completion-badge" class="text-xs bg-slate-950 border border-slate-800 px-3 py-1 rounded-full text-slate-500 font-mono">IN PROGRESS</span>
+                </div>
+
+                <!-- Live Dynamic Target Word Items Grid Element Container -->
+                <div id="word-list-container" class="grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto pr-1 text-sm font-mono">
+                    <!-- Script elements injection template payload -->
+                </div>
+            </div>
+
+            <!-- Category Filter Expansion Deck Module -->
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col space-y-4">
+                <div>
+                    <h3 class="heading-font text-base font-bold text-white">Select Puzzle Theme Category</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Switching categories generates a fresh randomized matrix puzzle instantly.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 text-xs font-semibold">
+                    <button class="category-tab-btn bg-cyan-600 text-white p-3 rounded-xl border border-cyan-500/30 text-left transition" data-category="space">
+                        🚀 SPACE EXPLORATION
+                    </button>
+                    <button class="category-tab-btn bg-slate-950 hover:bg-slate-800 text-slate-400 p-3 rounded-xl border border-slate-800 text-left transition" data-category="coding">
+                        💻 PROGRAMMING DEV
+                    </button>
+                    <button class="category-tab-btn bg-slate-950 hover:bg-slate-800 text-slate-400 p-3 rounded-xl border border-slate-800 text-left transition" data-category="nature">
+                        🌿 WILD NATURE
+                    </button>
+                    <button class="category-tab-btn bg-slate-950 hover:bg-slate-800 text-slate-400 p-3 rounded-xl border border-slate-800 text-left transition" data-category="foods">
+                        🍕 CULINARY DELIGHTS
+                    </button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Live Toast Feed Interaction Alert Banner -->
+    <div id="toast-banner" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 bg-slate-900 border border-slate-800 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 z-50 pointer-events-none text-xs font-mono">
+        <span id="toast-icon" class="text-lg">✨</span>
+        <div>
+            <p id="toast-msg" class="text-slate-200 font-bold">Awesome! Found item.</p>
+        </div>
+    </div>
+
+    <!-- Match Clear Success Overlay Screen Container -->
+    <div id="victory-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl">
+            <span class="text-5xl block mb-3 animate-bounce">👑</span>
+            <h3 class="heading-font text-2xl font-bold text-white tracking-tight">Puzzle Completed!</h3>
+            <p class="text-xs text-slate-400 mt-1 mb-4 font-mono">You successfully found every single hidden hidden entry matrix index.</p>
+            
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 mb-6 text-sm font-mono grid grid-cols-2 gap-2 text-left">
+                <div><span class="text-slate-500">Total Time:</span> <span id="modal-time" class="text-amber-400 font-bold">00:00</span></div>
+                <div><span class="text-slate-500">Category:</span> <span id="modal-cat" class="text-cyan-400 font-bold uppercase">Space</span></div>
+            </div>
+
+            <button id="btn-modal-next" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 font-bold py-3 rounded-xl text-white tracking-wider text-sm transition">
+                PLAY NEXT PUZZLE
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer System Status Bar Branding -->
+    <footer class="bg-slate-950 py-3 text-center text-xs text-slate-600 border-t border-slate-900/80">
+        LexiFind Core Word Search Matrix Generation Suite • Engine v3.1.2
+    </footer>
+
+    <!-- Comprehensive Game Core Logic Controllers Script -->
+    <script>
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Static Category Vocabularies Repositories
+        const wordPools = {
+            space: ["GALAXY", "ORBIT", "NEBULA", "PLANET", "COMET", "METEOR", "PULSAR", "COSMOS", "QUASAR", "ROCKET"],
+            coding: ["PYTHON", "SCRIPT", "MATRIX", "ARRAY", "VECTOR", "KERNEL", "BINARY", "BUFFER", "RENDER", "OBJECT"],
+            nature: ["FOREST", "CANYON", "RIVER", "TUNDRA", "DESERT", "ALPINE", "MEADOW", "OCEAN", "JUNGLE", "BONSAI"],
+            foods: ["BURGER", "PIZZA", "WAFFLE", "CHEESE", "CHIPS", "DONUT", "PASTA", "TACO", "SUSHI", "NUGGET"]
+        };
+
+        // Application Interactive Structural Parameters Mapping State
+        let state = {
+            activeCategory: "space",
+            gridSize: 11,               // 11x11 letter search matrix arena boundary width/height
+            gridMatrix: [],             // 2D alphanumeric nested tracking data sets arrays
+            targetWords: [],            // List items chosen for placement in current round
+            foundWords: [],             // Words successfully traced out and completed by player
+            
+            // Core Session Progress Parameters
+            elapsedSeconds: 0,
+            timerIntervalRef: null,
+            gameActive: false
+        };
+
+        // Track drag tracking structural configurations coordinates markers
+        let interactionState = {
+            isDragging: false,
+            startCell: null,   // {r, c} data structures object references mapping inputs
+            currentCell: null, // {r, c}
+            cellWidth: 0,
+            cellHeight: 0
+        };
+
+        // Permanent locked highlights for words discovered previously
+        let permanentHighlights = []; // Array of tracking lines segments {start: {r,c}, end: {r,c}, color}
+
+        // Palette maps tracking highlights arrays
+        const highlightColors = [
+            "rgba(6, 182, 212, 0.25)",  // Cyan transparency
+            "rgba(16, 185, 129, 0.25)", // Emerald transparency
+            "rgba(245, 158, 11, 0.25)", // Amber transparency
+            "rgba(139, 92, 246, 0.25)", // Violet transparency
+            "rgba(236, 72, 153, 0.25)"  // Pink transparency
+        ];
+
+        // --- Algorithmic Matrix Generation & Word Matrix Layout Compiler Engine ---
+        function generateProceduralWordSearchMatrix() {
+            const size = state.gridSize;
+            
+            // 1. Initialize fresh blank empty canvas map sets structure matrices arrays
+            state.gridMatrix = Array.from({ length: size }, () => Array(size).fill(null));
+            permanentHighlights = [];
+            state.foundWords = [];
+
+            // 2. Sample words elements randomly from our theme configurations repositories pools lists
+            const sourcePool = wordPools[state.activeCategory];
+            // Sort to place larger strings first, increasing baseline algorithm insertion hit efficiency bounds
+            state.targetWords = [...sourcePool].sort((a, b) => b.length - a.length);
+
+            // Possible linear alignment structural direction displacement offsets coordinate pairs
+            const displacementDirections = [
+                { dr: 0,  dc: 1 },  // Horizontal Left-to-Right
+                { dr: 1,  dc: 0 },  // Vertical Top-to-Bottom
+                { dr: 1,  dc: 1 },  // Diagonal Forward Downward
+                { dr: -1, dc: 1 },  // Diagonal Reverse Upward
+                { dr: 0,  dc: -1 }, // Horizontal Reverse Right-to-Left
+                { dr: -1, dc: 0 }  // Vertical Reverse Bottom-to-Top
+            ];
+
+            // Try fitting strings inside 2D matrix bounding arrays dynamically
+            state.targetWords.forEach(word => {
+                let placedSuccessfully = false;
+                let calculationAttempts = 0;
+
+                while (!placedSuccessfully && calculationAttempts < 150) {
+                    calculationAttempts++;
+                    
+                    const direction = displacementDirections[Math.floor(Math.random() * displacementDirections.length)];
+                    const startRow = Math.floor(Math.random() * size);
+                    const startCol = Math.floor(Math.random() * size);
+
+                    // Cross-check linear boundary containment fits bounds constraints 
+                    const endRow = startRow + direction.dr * (word.length - 1);
+                    const endCol = startCol + direction.dc * (word.length - 1);
+
+                    if (endRow >= 0 && endRow < size && endCol >= 0 && endCol < size) {
+                        // Validate structural letter overlapping compatibility states checks inside array parameters
+                        let conflictDetected = false;
+                        for (let i = 0; i < word.length; i++) {
+                            const targetChar = state.gridMatrix[startRow + direction.dr * i][startCol + direction.dc * i];
+                            if (targetChar !== null && targetChar !== word[i]) {
+                                conflictDetected = true;
+                                break;
+                            }
+                        }
+
+                        if (!conflictDetected) {
+                            // Committing text arrays nodes down onto structural matrix layout indices layers cleanly
+                            for (let i = 0; i < word.length; i++) {
+                                state.gridMatrix[startRow + direction.dr * i][startCol + direction.dc * i] = word[i];
+                            }
+                            placedSuccessfully = true;
+                        }
+                    }
+                }
+            });
+
+            // Fill all unallocated blank null spaces with random filler letters
+            const alphabetCharacters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    if (state.gridMatrix[r][c] === null) {
+                        state.gridMatrix[r][c] = alphabetCharacters[Math.floor(Math.random() * alphabetCharacters.length)];
+                    }
+                }
+            }
+
+            state.gameActive = true;
+            resetSessionTimer();
+            syncInteractiveUI();
+        }
+
+        // --- Core UI State Synchronization Pipeline ---
+        function syncInteractiveUI() {
+            document.getElementById('hud-category').innerText = state.activeCategory;
+            document.getElementById('hud-found').innerText = `${state.foundWords.length}/${state.targetWords.length}`;
+            
+            // Build dynamic DOM target lists components inside layout views panels decks elements
+            const container = document.getElementById('word-list-container');
+            container.innerHTML = "";
+
+            state.targetWords.forEach(word => {
+                const isFound = state.foundWords.includes(word);
+                const itemNode = document.createElement('div');
+                
+                if (isFound) {
+                    itemNode.className = "bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 line-through px-3 py-1.5 rounded-lg text-center font-bold tracking-wide opacity-60";
+                } else {
+                    itemNode.className = "bg-slate-950/80 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-lg text-center tracking-wide font-medium";
+                }
+                itemNode.innerText = word;
+                container.appendChild(itemNode);
+            });
+
+            const badge = document.getElementById('completion-badge');
+            if (state.foundWords.length === state.targetWords.length && state.targetWords.length > 0) {
+                badge.className = "text-xs bg-emerald-500/10 border border-emerald-500/30 px-3 py-1 rounded-full text-emerald-400 font-bold font-mono tracking-wider animate-bounce";
+                badge.innerText = "COMPLETED";
+                triggerVictoryScreen();
+            } else {
+                badge.className = "text-xs bg-slate-950 border border-slate-800 px-3 py-1 rounded-full text-slate-500 font-mono";
+                badge.innerText = "IN PROGRESS";
+            }
+        }
+
+        function triggerToastAlert(msg, isSuccess = true) {
+            const toast = document.getElementById('toast-banner');
+            document.getElementById('toast-msg').innerText = msg;
+            document.getElementById('toast-icon').innerText = isSuccess ? "✨" : "❌";
+            
+            toast.className = isSuccess 
+                ? "fixed bottom-6 right-6 bg-slate-900 border border-emerald-500/40 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 z-50 pointer-events-none text-xs font-mono text-emerald-400"
+                : "fixed bottom-6 right-6 bg-slate-900 border border-rose-500/40 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 z-50 pointer-events-none text-xs font-mono text-rose-400";
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 1500);
+        }
+
+        // --- Session Timer Calculation Implementations ---
+        function resetSessionTimer() {
+            clearInterval(state.timerIntervalRef);
+            state.elapsedSeconds = 0;
+            document.getElementById('hud-timer').innerText = "00:00";
+
+            state.timerIntervalRef = setInterval(() => {
+                if (!state.gameActive) return;
+                state.elapsedSeconds++;
+                
+                const mins = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, '0');
+                const secs = String(state.elapsedSeconds % 60).padStart(2, '0');
+                document.getElementById('hud-timer').innerText = `${mins}:${secs}`;
+            }, 1000);
+        }
+
+        function triggerVictoryScreen() {
+            state.gameActive = false;
+            clearInterval(state.timerIntervalRef);
+            
+            const mins = String(Math.floor(state.elapsedSeconds / 60)).padStart(2, '0');
+            const secs = String(state.elapsedSeconds % 60).padStart(2, '0');
+            
+            document.getElementById('modal-time').innerText = `${mins}:${secs}`;
+            document.getElementById('modal-cat').innerText = state.activeCategory;
+            document.getElementById('victory-modal').classList.remove('hidden');
+        }
+
+        // --- Geometric Matrix Selection & Drag Interactivity Calculators ---
+        function computeMatrixCellCoordinates(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Adapt spatial coordinate transforms matching responsive client canvas bounding maps resolutions
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            const canvasX = (clientX - rect.left) * (canvas.width / rect.width);
+            const canvasY = (clientY - rect.top) * (canvas.height / rect.height);
+
+            const c = Math.floor(canvasX / interactionState.cellWidth);
+            const r = Math.floor(canvasY / interactionState.cellHeight);
+
+            // Clamp output matrix row/column parameters within valid boundary index safe stretches arrays
+            return {
+                r: Math.max(0, Math.min(state.gridSize - 1, r)),
+                c: Math.max(0, Math.min(state.gridSize - 1, c))
+            };
+        }
+
+        // Constrain arbitrary dragging inputs into horizontal, vertical, or true 45-degree diagonal lines
+        function filterSelectionToStraightLineSegment(start, current) {
+            const dr = current.r - start.r;
+            const dc = current.c - start.c;
+
+            if (dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc)) {
+                return current; // Already aligned correctly
+            }
+
+            // Snap projection onto the dominant directional vector plane path segment coordinates metrics
+            if (Math.abs(dc) > Math.abs(dr)) {
+                return { r: start.r, c: current.c }; // Horizontal lock constraint projection mapping
+            } else {
+                return { r: current.r, c: start.c }; // Vertical lock constraint projection mapping
+            }
+        }
+
+        function handleDragStart(e) {
+            if (!state.gameActive) return;
+            interactionState.isDragging = true;
+            interactionState.startCell = computeMatrixCellCoordinates(e);
+            interactionState.currentCell = interactionState.startCell;
+            renderCanvasFramePipeline();
+        }
+
+        function handleDragMove(e) {
+            if (!interactionState.isDragging) return;
+            const rawCoords = computeMatrixCellCoordinates(e);
+            interactionState.currentCell = filterSelectionToStraightLineSegment(interactionState.startCell, rawCoords);
+            renderCanvasFramePipeline();
+        }
+
+        function handleDragEnd() {
+            if (!interactionState.isDragging) return;
+            interactionState.isDragging = false;
+
+            validateSelectionPathSequence();
+            renderCanvasFramePipeline();
+        }
+
+        function validateSelectionPathSequence() {
+            const start = interactionState.startCell;
+            const end = interactionState.currentCell;
+            if (!start || !end) return;
+
+            let dr = end.r - start.r;
+            let dc = end.c - start.c;
+            
+            const totalSteps = Math.max(Math.abs(dr), Math.abs(dc));
+            
+            // Normalize direction steps to basic single-unit matrix increments (-1, 0, 1)
+            const stepR = dr === 0 ? 0 : dr / Math.abs(dr);
+            const stepC = dc === 0 ? 0 : dc / Math.abs(dc);
+
+            let builtString = "";
+            for (let i = 0; i <= totalSteps; i++) {
+                const targetRow = start.r + stepR * i;
+                const targetCol = start.c + stepC * i;
+                builtString += state.gridMatrix[targetRow][targetCol];
+            }
+
+            // Support checking word trajectories from both launch ends matching either trace path direction values splits
+            const reversedString = builtString.split("").reverse().join("");
+            
+            let matchFoundWord = null;
+            if (state.targetWords.includes(builtString) && !state.foundWords.includes(builtString)) {
+                matchFoundWord = builtString;
+            } else if (state.targetWords.includes(reversedString) && !state.foundWords.includes(reversedString)) {
+                matchFoundWord = reversedString;
+            }
+
+            if (matchFoundWord) {
+                state.foundWords.push(matchFoundWord);
+                const randomColor = highlightColors[permanentHighlights.length % highlightColors.length];
+                
+                // Save discovered capsule path configurations permanent records lists
+                permanentHighlights.push({
+                    start: { r: start.r, c: start.c },
+                    end: { r: end.r, c: end.c },
+                    color: randomColor
+                });
+
+                triggerToastAlert(`Found: ${matchFoundWord}!`, true);
+                syncInteractiveUI();
+            } else {
+                if (builtString.length > 1) {
+                    triggerToastAlert("No match found", false);
+                }
+            }
+        }
+
+        // --- Canvas Rendering Graphic Interface Layer Pipelines ---
+        function renderCanvasFramePipeline() {
+            interactionState.cellWidth = canvas.width / state.gridSize;
+            interactionState.cellHeight = canvas.height / state.gridSize;
+
+            // 1. Clear background array profiles context bounds cleanly
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Render structural grid background aesthetic accent lines
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.3)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < state.gridSize; i++) {
+                // Vertical lines grid paths lines
+                ctx.beginPath();
+                ctx.moveTo(i * interactionState.cellWidth, 0);
+                ctx.lineTo(i * interactionState.cellWidth, canvas.height);
+                ctx.stroke();
+
+                // Horizontal lines grid paths lines
+                ctx.beginPath();
+                ctx.moveTo(0, i * interactionState.cellHeight);
+                ctx.lineTo(canvas.width, i * interactionState.cellHeight);
+                ctx.stroke();
+            }
+
+            // 2. Draw permanent highlight paths capsules around already validated entries arrays
+            permanentHighlights.forEach(hl => {
+                drawSelectionHighlightCapsule(hl.start, hl.end, hl.color);
+            });
+
+            // 3. Draw active real-time dragging selection indicator track lines capsules if engaged
+            if (interactionState.isDragging && interactionState.startCell && interactionState.currentCell) {
+                drawSelectionHighlightCapsule(interactionState.startCell, interactionState.currentCell, "rgba(6, 182, 212, 0.45)");
+            }
+
+            // 4. Render layout character letters alphanumeric typography maps arrays structures
+            ctx.fillStyle = "#f1f5f9";
+            ctx.font = "bold 20px 'Space Grotesk', sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+
+            for (let r = 0; r < state.gridSize; r++) {
+                for (let c = 0; c < state.gridSize; c++) {
+                    const textChar = state.gridMatrix[r][c] || "";
+                    const centerX = c * interactionState.cellWidth + interactionState.cellWidth / 2;
+                    const centerY = r * interactionState.cellHeight + interactionState.cellHeight / 2;
+                    
+                    ctx.fillText(textChar, centerX, centerY);
+                }
+            }
+        }
+
+        // Utility helper capsule line path artist trace framework component routines
+        function drawSelectionHighlightCapsule(start, end, fillStyleColor) {
+            const w = interactionState.cellWidth;
+            const h = interactionState.cellHeight;
+
+            const startX = start.c * w + w / 2;
+            const startY = start.r * h + h / 2;
+            const endX = end.c * w + w / 2;
+            const endY = end.r * h + h / 2;
+
+            ctx.save();
+            ctx.strokeStyle = fillStyleColor;
+            ctx.lineWidth = Math.min(w, h) * 0.76; // Fit bounding highlight widths inside grid scales cleanly
+            ctx.lineCap = "round";
+            
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // --- Application Bootstrap Wire-up Initialization Event Sequences ---
+        function bootstrapGameSession() {
+            document.getElementById('victory-modal').classList.add('hidden');
+            generateProceduralWordSearchMatrix();
+            renderCanvasFramePipeline();
+        }
+
+        // Global Event listeners setup tracking mouse/touch operations routing paths
+        canvas.addEventListener('mousedown', handleDragStart);
+        canvas.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('mouseup', handleDragEnd);
+
+        canvas.addEventListener('touchstart', (e) => { handleDragStart(e); e.preventDefault(); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { handleDragMove(e); e.preventDefault(); }, { passive: false });
+        window.addEventListener('touchend', handleDragEnd);
+
+        document.getElementById('btn-regenerate').addEventListener('click', bootstrapGameSession);
+        document.getElementById('btn-modal-next').addEventListener('click', bootstrapGameSession);
+
+        // Wiring Category Panel Selector Tabs Click Routing logic blocks loops
+        const tabButtons = document.querySelectorAll('.category-tab-btn');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                tabButtons.forEach(b => {
+                    b.className = "category-tab-btn bg-slate-950 hover:bg-slate-800 text-slate-400 p-3 rounded-xl border border-slate-800 text-left transition";
+                });
+                
+                btn.className = "category-tab-btn bg-cyan-600 text-white p-3 rounded-xl border border-cyan-500/30 text-left transition";
+                state.activeCategory = btn.getAttribute('data-category');
+                bootstrapGameSession();
+            });
+        });
+
+        // Initialize layout dimensions scaling configurations mappings updates loop checks
+        window.onload = () => {
+            bootstrapGameSession();
+        };
+    </script>
+</body>
+</html>

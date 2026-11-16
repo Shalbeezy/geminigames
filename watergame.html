@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HydroFlow: The Hydration Game</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS for robust layout and modern dashboard design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0f172a;
+            user-select: none;
+        }
+        /* Custom wave animation for the central hydration tracker */
+        .wave-container {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: #1e293b;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 0 15px rgba(59, 130, 246, 0.3);
+            overflow: hidden;
+        }
+        .water-wave {
+            position: absolute;
+            bottom: 0;
+            left: -50%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+            border-radius: 38%;
+            transition: top 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: spinWaves 8s linear infinite;
+        }
+        .water-wave-secondary {
+            position: absolute;
+            bottom: 0;
+            left: -60%;
+            width: 200%;
+            height: 100%;
+            background: linear-gradient(180deg, rgba(56, 189, 248, 0.4) 0%, rgba(2, 132, 199, 0.6) 100%);
+            border-radius: 35%;
+            transition: top 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            animation: spinWaves 6s linear infinite reverse;
+        }
+        @keyframes spinWaves {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Glass floating bubbles */
+        .bubble {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            bottom: -10px;
+            animation: floatUp 3s infinite ease-in;
+        }
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.8); opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-200px) scale(1.2); opacity: 0; }
+        }
+        /* Custom scrollbar for upgrade panels */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-wrap justify-between items-center shadow-lg gap-4">
+        <div class="flex items-center space-x-3">
+            <svg class="w-8 height-8 text-sky-400" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"></path>
+            </svg>
+            <h1 class="text-2xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-blue-500">HYDROFLOW</h1>
+        </div>
+        <div class="flex items-center space-x-6">
+            <div class="bg-slate-800 px-4 py-2 rounded-xl flex items-center space-x-2 border border-slate-700">
+                <span class="text-amber-400 font-bold">💧 HydroCoins:</span>
+                <span id="coin-display" class="font-mono text-xl text-white">0</span>
+            </div>
+            <div class="bg-slate-800 px-4 py-2 rounded-xl flex items-center space-x-2 border border-slate-700">
+                <span class="text-emerald-400 font-bold">📅 Day:</span>
+                <span id="day-display" class="font-mono text-xl text-white">1</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container Layout -->
+    <main class="flex-grow p-4 lg:p-8 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        
+        <!-- Left Column: The Interactive Hydration Tank / Dashboard -->
+        <section class="lg:col-span-5 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col items-center justify-between min-h-[580px] w-full">
+            <div class="w-full text-center">
+                <h2 class="text-xl font-semibold text-slate-300">Daily Hydration Level</h2>
+                <p class="text-xs text-slate-500 mt-1">Don't let your vitals drain down to 0%!</p>
+            </div>
+
+            <!-- Animated Water Vessel -->
+            <div class="my-6 relative flex justify-center items-center">
+                <div class="wave-container">
+                    <div id="wave-back" class="water-wave-secondary" style="top: 50%;"></div>
+                    <div id="wave-front" class="water-wave" style="top: 50%;"></div>
+                    <!-- Ambient bubbles wrapper -->
+                    <div id="bubble-container" class="absolute inset-0 pointer-events-none"></div>
+                </div>
+                <!-- Percentage overlay -->
+                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
+                    <span id="hydration-pct" class="text-4xl font-extrabold text-white drop-shadow-[0_4px_6px_rgba(0,0,0,0.7)]">50%</span>
+                    <span id="vessel-subtext" class="text-xs font-semibold text-sky-100 uppercase tracking-widest mt-1 opacity-90 drop-shadow">Hydrated</span>
+                </div>
+            </div>
+
+            <!-- Real-time Stats Sub-panel -->
+            <div class="w-full grid grid-cols-2 gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-sm">
+                <div>
+                    <span class="block text-slate-500">Drank Today:</span>
+                    <span id="stat-drank" class="text-lg text-sky-400 font-bold">0 ml</span>
+                </div>
+                <div>
+                    <span class="block text-slate-500">Daily Target:</span>
+                    <span id="stat-target" class="text-lg text-emerald-400 font-bold">2000 ml</span>
+                </div>
+                <div>
+                    <span class="block text-slate-500">Metabolism Rate:</span>
+                    <span id="stat-drain" class="text-lg text-rose-400 font-bold">-1.5%/s</span>
+                </div>
+                <div>
+                    <span class="block text-slate-500">Intake Bonus:</span>
+                    <span id="stat-bonus" class="text-lg text-amber-400 font-bold">1.0x</span>
+                </div>
+            </div>
+
+            <!-- Quick Action Main Button -->
+            <button id="drink-btn" class="w-full mt-6 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 active:scale-[0.98] text-white font-bold py-4 px-6 rounded-xl transition duration-150 shadow-lg shadow-blue-500/20 flex justify-center items-center space-x-3 text-lg">
+                <svg class="w-6 h-6 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                </svg>
+                <span>CHUG WATER (<span id="btn-amount-str">250ml</span>)</span>
+            </button>
+        </section>
+
+        <!-- Right Column: Navigation Tabs & Functional Modules -->
+        <section class="lg:col-span-7 flex flex-col space-y-6 w-full">
+            
+            <!-- Dashboard Tab Bar Selector -->
+            <div class="bg-slate-900 p-2 rounded-xl border border-slate-800 flex space-x-2">
+                <button id="tab-shop-btn" class="flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition bg-sky-600 text-white shadow">
+                    🛒 Upgrades & Infusions
+                </button>
+                <button id="tab-game-btn" class="flex-1 py-2 px-4 rounded-lg font-semibold text-sm transition text-slate-400 hover:bg-slate-800 hover:text-slate-200">
+                    🎮 HydroCatch Arcade
+                </button>
+            </div>
+
+            <!-- Tab Content 1: Upgrades Store Module -->
+            <div id="tab-shop" class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col space-y-4">
+                <div class="border-b border-slate-800 pb-3">
+                    <h3 class="text-lg font-semibold text-white">Hydration Upgrades Shop</h3>
+                    <p class="text-xs text-slate-400">Reinvest your coins to amplify drinking yields or unlock enhancements.</p>
+                </div>
+
+                <div class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                    <!-- Upgrade Card 1: Container Capacity Expansion -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center hover:border-slate-700 transition">
+                        <div>
+                            <h4 class="font-bold text-sky-400">Vessel Upgrade</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">Increases manual water intake capacity per click.</p>
+                            <span id="upgrade-capacity-desc" class="text-xs font-mono text-slate-500 block mt-1">Current: 250ml → Next: 350ml</span>
+                        </div>
+                        <button id="buy-capacity-btn" class="bg-slate-800 hover:bg-sky-600 font-bold px-4 py-2 rounded-lg text-sm transition text-white whitespace-nowrap min-w-[90px]">
+                            💰 50
+                        </button>
+                    </div>
+
+                    <!-- Upgrade Card 2: Automatic Filter System -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center hover:border-slate-700 transition">
+                        <div>
+                            <h4 class="font-bold text-sky-400">Carbon Water Filter</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">Automates intake over time by providing filtration flow.</p>
+                            <span id="upgrade-passive-desc" class="text-xs font-mono text-slate-500 block mt-1">Current: 0ml/s → Next: +10ml/s</span>
+                        </div>
+                        <button id="buy-passive-btn" class="bg-slate-800 hover:bg-sky-600 font-bold px-4 py-2 rounded-lg text-sm transition text-white whitespace-nowrap min-w-[90px]">
+                            💰 120
+                        </button>
+                    </div>
+
+                    <!-- Upgrade Card 3: Electrolyte/Fruit Infusers -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center hover:border-slate-700 transition">
+                        <div>
+                            <h4 class="font-bold text-amber-400">Lemon Slice Infusion</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">Adds vital flavor! Increases HydroCoins generated per glass.</p>
+                            <span id="upgrade-multiplier-desc" class="text-xs font-mono text-slate-500 block mt-1">Multiplier: 1.0x → Next: 1.5x</span>
+                        </div>
+                        <button id="buy-multiplier-btn" class="bg-slate-800 hover:bg-amber-600 font-bold px-4 py-2 rounded-lg text-sm transition text-white whitespace-nowrap min-w-[90px]">
+                            💰 80
+                        </button>
+                    </div>
+
+                    <!-- Upgrade Card 4: Metabolic Insulation -->
+                    <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex justify-between items-center hover:border-slate-700 transition">
+                        <div>
+                            <h4 class="font-bold text-rose-400">Thermal Straw Insulation</h4>
+                            <p class="text-xs text-slate-400 mt-0.5">Slows the overall natural loss/drain of the hydration level.</p>
+                            <span id="upgrade-insulation-desc" class="text-xs font-mono text-slate-500 block mt-1">Drain: -1.5%/s → Next: -1.2%/s</span>
+                        </div>
+                        <button id="buy-insulation-btn" class="bg-slate-800 hover:bg-rose-600 font-bold px-4 py-2 rounded-lg text-sm transition text-white whitespace-nowrap min-w-[90px]">
+                            💰 150
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content 2: HydroCatch Arcade Canvas Module -->
+            <div id="tab-game" class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col space-y-4 hidden">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">HydroCatch Mini-Game</h3>
+                        <p class="text-xs text-slate-400">Catch drops and fruit slices. Avoid dehydration hazards like soda cans!</p>
+                    </div>
+                    <button id="start-game-btn" class="bg-emerald-600 hover:bg-emerald-500 font-bold px-4 py-2 rounded-lg text-sm text-white transition">
+                        Play Arcade
+                    </button>
+                </div>
+
+                <!-- Interactive Game Viewport -->
+                <div class="relative bg-slate-950 rounded-xl overflow-hidden border border-slate-800 flex justify-center items-center aspect-video w-full">
+                    <canvas id="arcade-canvas" width="600" height="340" class="max-w-full block bg-slate-950"></canvas>
+                    
+                    <!-- Overlay Start screen state inside container canvas area -->
+                    <div id="arcade-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col justify-center items-center text-center p-4">
+                        <span class="text-4xl mb-2">💧</span>
+                        <h4 class="text-xl font-bold text-white">Ready to Hydrate?</h4>
+                        <p class="text-xs text-slate-400 max-w-sm mt-1 mb-4">Move your tracking cup using your mouse/touch, or arrow keys to catch water drops (+Coins) and avoid red soda cans (-Hydration)!</p>
+                        <span class="text-xs font-semibold px-3 py-1 bg-slate-800 text-slate-400 rounded-full border border-slate-700">Click 'Play Arcade' above to begin</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- UI Custom Toast Status Message Notifications -->
+    <div id="toast-notification" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 bg-slate-800 text-slate-100 border border-slate-700 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 z-50 pointer-events-none">
+        <div id="toast-icon-wrapper" class="p-1.5 rounded-lg bg-sky-500/20 text-sky-400">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+        <div>
+            <p id="toast-heading" class="font-bold text-sm text-white">Notification</p>
+            <p id="toast-body" class="text-xs text-slate-400">Message placeholder payload...</p>
+        </div>
+    </div>
+
+    <!-- Interactive Event Modal Window -->
+    <div id="event-modal" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex justify-center items-center p-4 z-50 hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-fade-in">
+            <span id="modal-icon" class="text-5xl block mb-3">☀️</span>
+            <h3 id="modal-title" class="text-2xl font-bold text-white">Heatwave Alert!</h3>
+            <p id="modal-body" class="text-sm text-slate-300 mt-2 mb-6">A sudden heatwave is driving temperature spikes. Your hydration metric will drain twice as fast for the next 15 seconds! Drink up immediately!</p>
+            <button id="modal-close-btn" class="w-full bg-sky-600 hover:bg-sky-500 font-bold py-3 rounded-xl text-white tracking-wide transition">
+                Understood!
+            </button>
+        </div>
+    </div>
+
+    <!-- Footer System Status Branding bar -->
+    <footer class="bg-slate-950 py-3 text-center text-xs text-slate-600 border-t border-slate-900">
+        HydroFlow Hydration Game Loop Engine v2.5.0 • Drink water in real life too!
+    </footer>
+
+    <!-- Game Core Logic Script Script Block -->
+    <script>
+        // --- Core Application State Variables ---
+        let state = {
+            hydration: 50.0,        // Primary survival percentage metric (0 to 100)
+            coins: 0,               // In-game purchase currency resource
+            totalDrank: 0,          // Aggregate absolute volume consumed today (ml)
+            targetVol: 2000,        // Target volume constraint boundary to cross day
+            day: 1,                 // Core progress timeline counter
+            drainRate: 1.5,         // Percentage of hydration lost per second baseline
+            drainModifier: 1.0,     // Conditional temporary dynamic hazard multipliers
+            
+            // Purchase/Upgrade tier indexing structures
+            intakeAmount: 250,      // Volume produced by a single manual button chug
+            passiveFlow: 0,         // Constant water volume generated automated each second
+            coinMultiplier: 1.0,    // Multiplier for resource rewards
+            upgradeCosts: {
+                capacity: 50,
+                passive: 120,
+                multiplier: 80,
+                insulation: 150
+            }
+        };
+
+        // --- Tab Management System Switch Layout Configuration ---
+        const tabShopBtn = document.getElementById('tab-shop-btn');
+        const tabGameBtn = document.getElementById('tab-game-btn');
+        const tabShop = document.getElementById('tab-shop');
+        const tabGame = document.getElementById('tab-game');
+
+        tabShopBtn.addEventListener('click', () => {
+            toggleTabs(tabShopBtn, tabGameBtn, tabShop, tabGame);
+        });
+
+        tabGameBtn.addEventListener('click', () => {
+            toggleTabs(tabGameBtn, tabShopBtn, tabGame, tabShop);
+            resizeArcadeCanvas();
+        });
+
+        function toggleTabs(activeBtn, inactiveBtn, activePanel, inactivePanel) {
+            activeBtn.classList.add('bg-sky-600', 'text-white', 'shadow');
+            activeBtn.classList.remove('text-slate-400', 'hover:bg-slate-800');
+            inactiveBtn.classList.remove('bg-sky-600', 'text-white', 'shadow');
+            inactiveBtn.classList.add('text-slate-400', 'hover:bg-slate-800');
+            activePanel.classList.remove('hidden');
+            inactivePanel.classList.add('hidden');
+        }
+
+        // --- Custom Toast Alert Interface Mechanism ---
+        const toast = document.getElementById('toast-notification');
+        const toastHeading = document.getElementById('toast-heading');
+        const toastBody = document.getElementById('toast-body');
+        let toastTimeout;
+
+        function showToast(title, msg, type = 'info') {
+            clearTimeout(toastTimeout);
+            toastHeading.innerText = title;
+            toastBody.innerText = msg;
+            
+            const iconWrapper = document.getElementById('toast-icon-wrapper');
+            if (type === 'success') {
+                iconWrapper.className = "p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400";
+            } else if (type === 'warning') {
+                iconWrapper.className = "p-1.5 rounded-lg bg-rose-500/20 text-rose-400";
+            } else {
+                iconWrapper.className = "p-1.5 rounded-lg bg-sky-500/20 text-sky-400";
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toastTimeout = setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3500);
+        }
+
+        // --- Ambient Wave & Particle Render Operations ---
+        function generateAmbientBubbles() {
+            const container = document.getElementById('bubble-container');
+            setInterval(() => {
+                if (state.hydration <= 2) return;
+                const bubble = document.createElement('div');
+                bubble.classList.add('bubble');
+                const size = Math.random() * 8 + 4;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${Math.random() * 100}%`;
+                bubble.style.animationDuration = `${Math.random() * 2 + 2}s`;
+                container.appendChild(bubble);
+                setTimeout(() => bubble.remove(), 4000);
+            }, 450);
+        }
+        generateAmbientBubbles();
+
+        // --- Real-time Main Metric Update Renderers ---
+        function updateDashboardUI() {
+            // Cap boundary checks
+            if (state.hydration > 100) state.hydration = 100;
+            if (state.hydration < 0) state.hydration = 0;
+
+            // Map standard text nodes
+            document.getElementById('coin-display').innerText = Math.floor(state.coins);
+            document.getElementById('day-display').innerText = state.day;
+            document.getElementById('hydration-pct').innerText = `${Math.floor(state.hydration)}%`;
+            document.getElementById('stat-drank').innerText = `${state.totalDrank} ml`;
+            document.getElementById('stat-target').innerText = `${state.targetVol} ml`;
+            document.getElementById('btn-amount-str').innerText = `${state.intakeAmount}ml`;
+            
+            const realTimeDrain = state.drainRate * state.drainModifier;
+            document.getElementById('stat-drain').innerText = `-${realTimeDrain.toFixed(1)}%/s`;
+            document.getElementById('stat-bonus').innerText = `${state.coinMultiplier.toFixed(1)}x`;
+
+            // Adjust physical SVG Wave high level coordinates relative to current inversion metrics
+            const frontWave = document.getElementById('wave-front');
+            const backWave = document.getElementById('wave-back');
+            const calculatedTopSpace = 100 - state.hydration; // Top offset tracking height
+            
+            frontWave.style.top = `${calculatedTopSpace}%`;
+            backWave.style.top = `${Math.max(0, calculatedTopSpace - 2)}%`;
+
+            // Evaluate Dynamic Context Warning Labels
+            const labelNode = document.getElementById('vessel-subtext');
+            if (state.hydration > 75) {
+                labelNode.innerText = "OPTIMAL";
+                labelNode.className = "text-xs font-semibold text-emerald-300 uppercase tracking-widest mt-1 opacity-90 drop-shadow";
+            } else if (state.hydration > 35) {
+                labelNode.innerText = "HYDRATED";
+                labelNode.className = "text-xs font-semibold text-sky-100 uppercase tracking-widest mt-1 opacity-90 drop-shadow";
+            } else if (state.hydration > 0) {
+                labelNode.innerText = "PARCHED";
+                labelNode.className = "text-xs font-semibold text-amber-400 uppercase tracking-widest mt-1 opacity-90 drop-shadow animate-pulse";
+            } else {
+                labelNode.innerText = "DEHYDRATED";
+                labelNode.className = "text-xs font-semibold text-rose-500 uppercase tracking-widest mt-1 opacity-100 drop-shadow font-bold";
+            }
+
+            // Shop cost elements sync
+            document.getElementById('buy-capacity-btn').innerText = `💰 ${state.upgradeCosts.capacity}`;
+            document.getElementById('buy-passive-btn').innerText = `💰 ${state.upgradeCosts.passive}`;
+            document.getElementById('buy-multiplier-btn').innerText = `💰 ${state.upgradeCosts.multiplier}`;
+            document.getElementById('buy-insulation-btn').innerText = `💰 ${state.upgradeCosts.insulation}`;
+        }
+
+        // --- Core Mechanical State Loop Triggers ---
+        document.getElementById('drink-btn').addEventListener('click', () => {
+            if (state.hydration >= 100) {
+                showToast("Fully Satiated", "Your body cannot safely absorb more water right now!", "info");
+                return;
+            }
+            
+            // Increment core metrics standard units
+            state.totalDrank += state.intakeAmount;
+            const hydrationBoost = (state.intakeAmount / state.targetVol) * 100;
+            state.hydration += hydrationBoost;
+            
+            // Grant transactional resource payload reward base bounds
+            const coinsEarned = Math.floor(10 * state.coinMultiplier);
+            state.coins += coinsEarned;
+
+            showToast("Gulp!", `Consumed +${state.intakeAmount}ml! Added +${coinsEarned} HydroCoins!`, "success");
+            evaluateMilestones();
+            updateDashboardUI();
+        });
+
+        // Loop Calculation Framework (Executed every 1000ms baseline interval check)
+        setInterval(() => {
+            // Apply passive loss parameters
+            state.hydration -= (state.drainRate * state.drainModifier);
+            
+            // Process infrastructure flow automation systems
+            if (state.passiveFlow > 0 && state.hydration < 100) {
+                state.totalDrank += state.passiveFlow;
+                const passiveBoost = (state.passiveFlow / state.targetVol) * 100;
+                state.hydration += passiveBoost;
+            }
+
+            if (state.hydration <= 0) {
+                handleDehydrationCrash();
+            }
+
+            evaluateMilestones();
+            updateDashboardUI();
+        }, 1000);
+
+        // Track milestone boundaries for transitioning active game progression days
+        function evaluateMilestones() {
+            if (state.totalDrank >= state.targetVol) {
+                state.day += 1;
+                state.totalDrank = 0;
+                state.targetVol = Math.floor(state.targetVol * 1.25); // Target shifts dynamically outward
+                state.coins += 100; // Large day clear reward payload boundary tier
+                showToast(`Day ${state.day - 1} Complete!`, "Excellent hydration! Daily goal expanded. Awarded +100 bonus coins!", "success");
+                triggerRandomEnvironmentalEvent();
+            }
+        }
+
+        function handleDehydrationCrash() {
+            state.coins = Math.max(0, state.coins - 25);
+            state.hydration = 40; // Revive structural base parameters slightly
+            showToast("Dehydration Alert!", "You fainted from lack of water! Medical recovery costs 25 HydroCoins.", "warning");
+        }
+
+        // --- Random Dynamic Dynamic Challenge Incidents ---
+        const modal = document.getElementById('event-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalBody = document.getElementById('modal-body');
+        const modalIcon = document.getElementById('modal-icon');
+
+        function triggerRandomEnvironmentalEvent() {
+            const chance = Math.random();
+            if (chance < 0.4) {
+                // Scenario A: Intense Heatwave Event
+                modalIcon.innerText = "☀️";
+                modalTitle.innerText = "Sudden Heatwave!";
+                modalBody.innerText = "The summer temperatures are soaring high! The metabolic consumption rate is elevated to 2.5x speed for the next brief span of time. Keep active pacing!";
+                state.drainModifier = 2.5;
+                modal.classList.remove('hidden');
+            } else if (chance < 0.7) {
+                // Scenario B: Perfect Cooler Weather Bonus Shift
+                modalIcon.innerText = "❄️";
+                modalTitle.innerText = "Cool Breeze Inbound";
+                modalBody.innerText = "Perfect crisp insulation weather conditions reduce modern physical expenditure demands! Metabolic leakage drops to half for your current operational cycle stretch.";
+                state.drainModifier = 0.5;
+                modal.classList.remove('hidden');
+            }
+        }
+
+        document.getElementById('modal-close-btn').addEventListener('click', () => {
+            modal.classList.add('hidden');
+            // Reset modifiers back on fixed delayed timers safely down the loop context clear
+            setTimeout(() => {
+                state.drainModifier = 1.0;
+                showToast("Weather Clear", "The environmental system event factors have normalized back to steady parameters.", "info");
+                updateDashboardUI();
+            }, 15000);
+        });
+
+        // --- Merchant Shop Click Processing Logic Blocks ---
+        document.getElementById('buy-capacity-btn').addEventListener('click', () => {
+            if (state.coins >= state.upgradeCosts.capacity) {
+                state.coins -= state.upgradeCosts.capacity;
+                state.intakeAmount += 100;
+                state.upgradeCosts.capacity = Math.floor(state.upgradeCosts.capacity * 1.5);
+                document.getElementById('upgrade-capacity-desc').innerText = `Current: ${state.intakeAmount}ml → Next: ${state.intakeAmount + 100}ml`;
+                showToast("Upgrade Purchased", "Your water vessel capacity has been upgraded!", "success");
+                updateDashboardUI();
+            } else {
+                showToast("Insufficient Coins", "Drink more water or play the arcade to acquire HydroCoins!", "warning");
+            }
+        });
+
+        document.getElementById('buy-passive-btn').addEventListener('click', () => {
+            if (state.coins >= state.upgradeCosts.passive) {
+                state.coins -= state.upgradeCosts.passive;
+                state.passiveFlow += 15;
+                state.upgradeCosts.passive = Math.floor(state.upgradeCosts.passive * 1.6);
+                document.getElementById('upgrade-passive-desc').innerText = `Current: ${state.passiveFlow}ml/s → Next: ${state.passiveFlow + 15}ml/s`;
+                showToast("System Online", "Continuous automated water flow processing active!", "success");
+                updateDashboardUI();
+            } else {
+                showToast("Insufficient Coins", "You require more HydroCoins for this operational deployment.", "warning");
+            }
+        });
+
+        document.getElementById('buy-multiplier-btn').addEventListener('click', () => {
+            if (state.coins >= state.upgradeCosts.multiplier) {
+                state.coins -= state.upgradeCosts.multiplier;
+                state.coinMultiplier += 0.5;
+                state.upgradeCosts.multiplier = Math.floor(state.upgradeCosts.multiplier * 1.4);
+                document.getElementById('upgrade-multiplier-desc').innerText = `Multiplier: ${state.coinMultiplier.toFixed(1)}x → Next: ${(state.coinMultiplier + 0.5).toFixed(1)}x`;
+                showToast("Flavor Enhanced", "Lemon infusion yields more tracking coins per unit drink volume!", "success");
+                updateDashboardUI();
+            } else {
+                showToast("Insufficient Coins", "Flavor additions require further wallet reserves.", "warning");
+            }
+        });
+
+        document.getElementById('buy-insulation-btn').addEventListener('click', () => {
+            if (state.coins >= state.upgradeCosts.insulation) {
+                if (state.drainRate <= 0.4) {
+                    showToast("Max Insulation", "Your thermal system is already operating at peak thermodynamic optimization!", "info");
+                    return;
+                }
+                state.coins -= state.upgradeCosts.insulation;
+                state.drainRate = parseFloat((state.drainRate - 0.2).toFixed(2));
+                state.upgradeCosts.insulation = Math.floor(state.upgradeCosts.insulation * 1.7);
+                document.getElementById('upgrade-insulation-desc').innerText = `Drain: -${state.drainRate}%/s → Next: -${(state.drainRate - 0.2).toFixed(2)}%/s`;
+                showToast("Insulation Applied", "Natural evaporation vectors suppressed successfully.", "success");
+                updateDashboardUI();
+            } else {
+                showToast("Insufficient Coins", "Further insulating layers require additional funding.", "warning");
+            }
+        });
+
+        // --- Tab 2 Arcade Sub-system Engine Implementation (HTML Canvas Mechanics) ---
+        const canvas = document.getElementById('arcade-canvas');
+        const ctx = canvas.getContext('2d');
+        const startArcadeBtn = document.getElementById('start-game-btn');
+        const arcadeOverlay = document.getElementById('arcade-overlay');
+
+        let arcadeActive = false;
+        let score = 0;
+        let cup = { x: 270, y: 300, width: 70, height: 25, speed: 24 };
+        let items = [];
+        let spawnTimer = 0;
+        let keys = {};
+
+        // Event Listeners for tracking interactive spatial movements across the structural area bounds
+        window.addEventListener('keydown', (e) => { keys[e.code] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+        
+        // Touch/Mouse Direct Interaction Tracking Vectors
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const rootX = e.clientX - rect.left;
+            // Adapt scaling if display bounding shifts resolution structures dynamically
+            cup.x = (rootX * (canvas.width / rect.width)) - (cup.width / 2);
+            clampCupPosition();
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            if(e.touches.length > 0) {
+                const rect = canvas.getBoundingClientRect();
+                const rootX = e.touches[0].clientX - rect.left;
+                cup.x = (rootX * (canvas.width / rect.width)) - (cup.width / 2);
+                clampCupPosition();
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        function clampCupPosition() {
+            if (cup.x < 0) cup.x = 0;
+            if (cup.x > canvas.width - cup.width) cup.x = canvas.width - cup.width;
+        }
+
+        function resizeArcadeCanvas() {
+            // Internal static aspect resolution constraint structure fallback processing safely
+            if (window.innerWidth < 640) {
+                canvas.style.width = "100%";
+            }
+        }
+
+        startArcadeBtn.addEventListener('click', () => {
+            if (!arcadeActive) {
+                startGame();
+            } else {
+                stopGame();
+            }
+        });
+
+        function startGame() {
+            arcadeActive = true;
+            score = 0;
+            items = [];
+            spawnTimer = 0;
+            startArcadeBtn.innerText = "End Simulation";
+            startArcadeBtn.classList.replace('bg-emerald-600', 'bg-rose-600');
+            startArcadeBtn.classList.replace('hover:bg-emerald-500', 'hover:bg-rose-500');
+            arcadeOverlay.classList.add('hidden');
+            showToast("Arcade Session Live", "Move your cup to track and catch objects cleanly!", "info");
+            executeArcadeLoop();
+        }
+
+        function stopGame() {
+            arcadeActive = false;
+            startArcadeBtn.innerText = "Play Arcade";
+            startArcadeBtn.classList.replace('bg-rose-600', 'bg-emerald-600');
+            startArcadeBtn.classList.replace('hover:bg-rose-500', 'hover:bg-emerald-500');
+            arcadeOverlay.classList.remove('hidden');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function spawnItem() {
+            const rand = Math.random();
+            let type = 'water';
+            let color = '#38bdf8';
+            let radius = 8;
+
+            if (rand < 0.20) {
+                type = 'soda';
+                color = '#f43f5e';
+                radius = 12;
+            } else if (rand < 0.40) {
+                type = 'lemon';
+                color = '#f59e0b';
+                radius = 10;
+            }
+
+            items.push({
+                x: Math.random() * (canvas.width - 40) + 20,
+                y: -10,
+                type: type,
+                color: color,
+                radius: radius,
+                speed: Math.random() * 2.5 + 2 + (state.day * 0.3) // Scale difficulty with current operational day layers
+            });
+        }
+
+        function executeArcadeLoop() {
+            if (!arcadeActive) return;
+
+            // 1. Process Logic States Updates
+            if (keys['ArrowLeft']) cup.x -= cup.speed;
+            if (keys['ArrowRight']) cup.x += cup.speed;
+            clampCupPosition();
+
+            spawnTimer++;
+            if (spawnTimer > Math.max(15, 45 - state.day * 3)) {
+                spawnItem();
+                spawnTimer = 0;
+            }
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.y += item.speed;
+
+                // Collision detection algorithm mapping
+                if (item.y + item.radius >= cup.y && 
+                    item.y - item.radius <= cup.y + cup.height && 
+                    item.x + item.radius >= cup.x && 
+                    item.x - item.radius <= cup.x + cup.width) {
+                    
+                    // Trigger structural functional processing payloads according to matched collision object variants
+                    if (item.type === 'water') {
+                        state.coins += Math.floor(3 * state.coinMultiplier);
+                        state.hydration = Math.min(100, state.hydration + 2);
+                        score += 10;
+                    } else if (item.type === 'lemon') {
+                        state.coins += Math.floor(12 * state.coinMultiplier);
+                        score += 30;
+                    } else if (item.type === 'soda') {
+                        state.hydration = Math.max(0, state.hydration - 12);
+                        score = Math.max(0, score - 20);
+                        showToast("Caught Dehydrator!", "Sodas drain hydration level heavily! -12% hydration penalty incurred.", "warning");
+                    }
+
+                    items.splice(i, 1);
+                    updateDashboardUI();
+                    continue;
+                }
+
+                // Bounds overflow fallback tracking safely
+                if (item.y > canvas.height + 20) {
+                    items.splice(i, 1);
+                }
+            }
+
+            // 2. Clear & Render View Frame Layers
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Render Background Grid aesthetic markers
+            ctx.strokeStyle = 'rgba(30, 41, 59, 0.5)';
+            ctx.lineWidth = 1;
+            for(let x=0; x<canvas.width; x+=40) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+
+            // Render Player Hydration tracking cup asset item UI boundary element
+            ctx.fillStyle = '#0ea5e9';
+            ctx.beginPath();
+            ctx.roundRect(cup.x, cup.y, cup.width, cup.height, 6);
+            ctx.fill();
+            // Rim element glow highlights decoration lines
+            ctx.fillStyle = '#7dd3fc';
+            ctx.fillRect(cup.x, cup.y, cup.width, 3);
+
+            // Render individual descending objects elements inside active view pool
+            items.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.beginPath();
+                if (item.type === 'water') {
+                    // Teardrop shape paths render logic
+                    ctx.moveTo(item.x, item.y - item.radius);
+                    ctx.lineTo(item.x + item.radius, item.y + item.radius);
+                    ctx.lineTo(item.x - item.radius, item.y + item.radius);
+                } else if (item.type === 'soda') {
+                    // Render industrial hazard block shape vectors
+                    ctx.roundRect(item.x - item.radius, item.y - item.radius, item.radius*2, item.radius*2, 4);
+                } else {
+                    // Circle rendering for fruits vectors tracking elements
+                    ctx.arc(item.x, item.y, item.radius, 0, Math.PI * 2);
+                }
+                ctx.fill();
+            });
+
+            // Score HUD tracking readout strings
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 13px Poppins, sans-serif';
+            ctx.fillText(`SESSION SCORE: ${score}`, 16, 26);
+
+            requestAnimationFrame(executeArcadeLoop);
+        }
+
+        // --- Application Bootstrap Run Initialization Sequence ---
+        updateDashboardUI();
+    </script>
+</body>
+</html>

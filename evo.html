@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creature Lab - Verlet Physics & Evolution Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            user-select: none;
+        }
+        .panel-bg {
+            background-color: #1e293b;
+            border: 1px solid #334155;
+        }
+        canvas {
+            background: radial-gradient(circle at center, #111827 0%, #030712 100%);
+        }
+        /* Custom scrollbar styling for slick look */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col font-sans overflow-hidden">
+
+    <!-- Top Navigation Header -->
+    <header class="panel-bg h-14 px-6 flex items-center justify-between shadow-md z-10">
+        <div class="flex items-center space-x-3">
+            <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+            <h1 class="text-lg font-bold tracking-wider text-slate-100 uppercase">CREATURE LAB <span class="text-xs text-cyan-400 font-normal lowercase ml-2">v2.0 verlet physics</span></h1>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-xs text-slate-400">Mode:</span>
+            <div id="modeGroup" class="flex rounded-md bg-slate-900 p-0.5 border border-slate-700">
+                <button onclick="setLabMode('edit')" id="btn-mode-edit" class="px-3 py-1 text-xs font-semibold rounded bg-cyan-600 text-white shadow-sm transition">Editor</button>
+                <button onclick="setLabMode('simulate')" id="btn-mode-simulate" class="px-3 py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition">Simulate</button>
+                <button onclick="setLabMode('evolve')" id="btn-mode-evolve" class="px-3 py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition">AI Evolve</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Layout -->
+    <div class="flex-1 flex overflow-hidden w-full">
+        
+        <!-- Left Sidebar: Construction Tools & Presets -->
+        <aside class="w-80 panel-bg h-full flex flex-col border-r border-slate-700 shadow-xl overflow-y-auto">
+            
+            <!-- Creature Presets Box -->
+            <div class="p-4 border-b border-slate-700 bg-slate-900/40">
+                <label class="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">-- Load Preset Template --</label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="loadPreset('biped')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-600 rounded transition text-left flex items-center justify-between">
+                        <span>🚶 Biped Runner</span>
+                    </button>
+                    <button onclick="loadPreset('quadruped')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-600 rounded transition text-left flex items-center justify-between">
+                        <span>🐎 Quadruped</span>
+                    </button>
+                    <button onclick="loadPreset('inchworm')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-600 rounded transition text-left flex items-center justify-between">
+                        <span>🐛 Inchworm</span>
+                    </button>
+                    <button onclick="loadPreset('frog')" class="px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-600 rounded transition text-left flex items-center justify-between">
+                        <span>🐸 Frog Jumper</span>
+                    </button>
+                </div>
+                <button onclick="loadPreset('wheel')" class="w-full mt-2 px-2 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 border border-slate-600 rounded transition text-center block">
+                    ⚙️ Muscle Wheel Test
+                </button>
+                
+                <div class="mt-4 flex space-x-2">
+                    <button onclick="resetCreaturePosition()" class="flex-1 py-1 px-3 bg-slate-700 hover:bg-slate-600 border border-slate-600 rounded text-xs text-slate-200 transition">
+                        Reset Position
+                    </button>
+                    <button onclick="clearCanvasLab()" class="flex-1 py-1 px-3 bg-red-950/40 hover:bg-red-950 border border-red-800 rounded text-xs text-red-300 transition">
+                        Clear Lab
+                    </button>
+                </div>
+            </div>
+
+            <!-- Manual Build System Manual Guide -->
+            <div class="p-4 border-b border-slate-700">
+                <label class="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Build Toolbox</label>
+                <div id="buildToolsGroup" class="flex flex-col space-y-1">
+                    <button id="tool-joint" onclick="setBuildTool('joint')" class="w-full py-1.5 px-3 rounded text-left text-xs font-medium transition bg-cyan-950 text-cyan-400 border border-cyan-800">
+                        🔵 1. Add Joints <span class="text-[10px] text-slate-400 block font-normal mt-0.5">Click empty canvas space to place node</span>
+                    </button>
+                    <button id="tool-bone" onclick="setBuildTool('bone')" class="w-full py-1.5 px-3 rounded text-left text-xs font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+                        🦴 2. Link Bones <span class="text-[10px] text-slate-400 block font-normal mt-0.5">Drag between joints for rigid structural lines</span>
+                    </button>
+                    <button id="tool-muscle" onclick="setBuildTool('muscle')" class="w-full py-1.5 px-3 rounded text-left text-xs font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+                        🔴 3. Attach Muscles <span class="text-[10px] text-slate-400 block font-normal mt-0.5">Drag between joints to form moving motors</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Global Lab Physics Configuration Environment -->
+            <div class="p-4 space-y-4 flex-1">
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Physics Environment</label>
+                    
+                    <div class="space-y-3 bg-slate-900/50 p-3 rounded-lg border border-slate-800 text-xs">
+                        <div>
+                            <div class="flex justify-between mb-1 text-slate-300">
+                                <span>Gravity</span>
+                                <span id="val-gravity">0.50</span>
+                            </div>
+                            <input id="slider-gravity" type="range" min="0" max="1.5" step="0.05" value="0.5" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1 text-slate-300">
+                                <span>Ground Friction</span>
+                                <span id="val-friction">0.85</span>
+                            </div>
+                            <input id="slider-friction" type="range" min="0" max="1" step="0.05" value="0.85" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between mb-1 text-slate-300">
+                                <span>Muscle Stiffness</span>
+                                <span id="val-stiffness">0.50</span>
+                            </div>
+                            <input id="slider-stiffness" type="range" min="0.1" max="1" step="0.05" value="0.50" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-widest text-slate-400 font-bold mb-2">Terrain Type</label>
+                    <select id="select-terrain" onchange="changeTerrainType(this.value)" class="w-full p-2 bg-slate-800 border border-slate-700 rounded text-xs text-slate-200 outline-none focus:border-cyan-500">
+                        <option value="flat">Flat Ground Testbed</option>
+                        <option value="hills">Rolling Hills</option>
+                        <option value="stairs">Obstacle Stairs</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Center Interactive Physics Stage Canvas Workspace -->
+        <main class="flex-1 relative flex flex-col">
+            <!-- Diagnostics Telemetry HUD Overlaid on top of stage canvas -->
+            <div class="absolute top-4 left-4 z-10 flex space-x-3 pointer-events-none text-xs">
+                <div class="bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-2 rounded shadow flex flex-col">
+                    <span class="text-slate-400 uppercase tracking-wider text-[10px]">Distance Traveled</span>
+                    <span id="hud-distance" class="text-lg font-bold font-mono text-emerald-400">0.00 m</span>
+                </div>
+                <div class="bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-2 rounded shadow flex flex-col">
+                    <span class="text-slate-400 uppercase tracking-wider text-[10px]">Top Speed</span>
+                    <span id="hud-speed" class="text-lg font-bold font-mono text-cyan-400">0.0 m/s</span>
+                </div>
+                <div class="bg-slate-950/80 backdrop-blur border border-slate-800 px-3 py-2 rounded shadow flex flex-col">
+                    <span class="text-slate-400 uppercase tracking-wider text-[10px]">Global Frequency</span>
+                    <span id="hud-freq" class="text-lg font-bold font-mono text-amber-400">1.0 Hz</span>
+                </div>
+            </div>
+
+            <!-- Evolutionary Strategy Auto Training Status Overlay -->
+            <div id="evolutionHud" class="absolute top-4 right-4 z-10 bg-purple-950/80 backdrop-blur border border-purple-800 px-4 py-3 rounded-lg shadow-lg text-xs w-64 hidden flex flex-col space-y-2">
+                <div class="flex items-center justify-between border-b border-purple-800 pb-1.5">
+                    <span class="font-bold tracking-wider text-purple-200 uppercase text-[10px]">AI Auto-Trainer Engine</span>
+                    <span id="evo-generation" class="font-mono text-purple-300 font-bold bg-purple-900 px-1.5 py-0.5 rounded">Gen: 1</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 text-slate-300">
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase">Best Fitness:</span>
+                        <span id="evo-best-fitness" class="font-mono font-bold text-yellow-400 text-sm">0.0 m</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[9px] uppercase">Organism Index:</span>
+                        <span id="evo-current-org" class="font-mono font-bold text-indigo-300 text-sm">1 / 12</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between text-[10px] text-slate-400 mb-0.5">
+                        <span>Trial countdown:</span>
+                        <span id="evo-timer" class="font-mono text-red-400">6.0s</span>
+                    </div>
+                    <div class="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                        <div id="evo-progress-bar" class="bg-purple-500 h-full w-0 transition-all duration-100 ease-linear"></div>
+                    </div>
+                </div>
+                <button id="btn-toggle-evolution" onclick="toggleEvolutionEngine()" class="w-full mt-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-1 px-2 rounded text-xs transition uppercase tracking-wide">
+                    Start Evolution
+                </button>
+            </div>
+
+            <!-- Interactive Stage Frame Canvas -->
+            <div class="flex-1 w-full relative">
+                <canvas id="stageCanvas" class="w-full h-full block"></canvas>
+            </div>
+
+            <!-- Bottom Instruction Bar Context Info -->
+            <div class="h-8 bg-slate-950 border-t border-slate-800 px-4 flex items-center justify-between text-[11px] text-slate-400">
+                <div id="lab-context-tip">💡 Tip: Choose "Editor" mode to manually place joints and wire muscle contractures.</div>
+                <div class="font-mono text-[10px] text-slate-500">Click a muscle constraint to fine-tune oscillation parameters manually.</div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Oscillators & Muscle Brain Settings -->
+        <aside class="w-80 panel-bg h-full flex flex-col border-l border-slate-700 shadow-xl overflow-y-auto">
+            <div class="p-4 border-b border-slate-700 bg-slate-900/60">
+                <h3 class="text-xs uppercase tracking-widest text-slate-400 font-bold mb-1">Muscle Parameters</h3>
+                <p class="text-[11px] text-slate-400">Select a red muscle string to edit its Brain Oscillations (Frequency, Strength, Phase offset).</p>
+            </div>
+
+            <!-- Parameter Configuration Panel Dynamic State Form -->
+            <div id="muscleConfigForm" class="p-4 space-y-5 opacity-40 pointer-events-none transition-opacity duration-200">
+                <div class="bg-slate-900/80 p-2 rounded border border-slate-800 text-xs text-slate-400 flex justify-between items-center">
+                    <span>Active Target Element:</span>
+                    <span id="targetMuscleLabel" class="font-mono text-cyan-400 font-bold">None Selected</span>
+                </div>
+
+                <!-- Parameter Sliders -->
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">Contraction Force (Amp)</span>
+                            <span id="lbl-force" class="font-mono text-red-400 font-bold">0.30</span>
+                        </div>
+                        <input id="slider-force" type="range" min="0.05" max="0.8" step="0.05" value="0.30" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-red-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">Speed (Freq Multiplier)</span>
+                            <span id="lbl-speed" class="font-mono text-amber-400 font-bold">1.0x</span>
+                        </div>
+                        <input id="slider-speed" type="range" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-300">Phase Shift (Offset)</span>
+                            <span id="lbl-phase" class="font-mono text-purple-400 font-bold">0.0π</span>
+                        </div>
+                        <input id="slider-phase" type="range" min="0" max="6.28" step="0.1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
+                    </div>
+                </div>
+
+                <div class="pt-2 border-t border-slate-800 text-[10px] text-slate-400 space-y-1">
+                    <p>🧪 <strong class="text-slate-200">Phase Offset</strong> defines when the muscle pulls relative to others.</p>
+                    <p>⚡ High frequencies can destabilize physical joints if force thresholds are overdriven.</p>
+                </div>
+            </div>
+            
+            <!-- Default Information Display Box when nothing is highlighted -->
+            <div id="noMusclePlaceholder" class="p-6 text-center text-xs text-slate-500 my-auto flex flex-col items-center justify-center space-y-2">
+                <span class="text-3xl">🧠</span>
+                <p>No active muscle selection highlighted.</p>
+                <p class="text-[11px] max-w-[180px]">Toggle into the simulation environment or click any red connection link line to update its oscillation properties.</p>
+            </div>
+        </aside>
+
+    </div>
+
+    <!-- Core Interactive Simulation and Engine Framework Source Script Code -->
+    <script>
+        // --- Core Engine Data Struct Objects ---
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.oldX = x;
+                this.oldY = y;
+                this.radius = 6;
+                this.isPinned = false;
+            }
+        }
+
+        class Constraint {
+            constructor(p1, p2, type = 'bone') {
+                this.p1 = p1; // Point 1 index references or objects
+                this.p2 = p2; // Point 2
+                this.type = type; // 'bone' or 'muscle'
+                this.targetLength = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                
+                // Muscle brain oscillator variables
+                this.force = 0.3; // Amplitude expansion/contraction ratio
+                this.speed = 1.0; // Frequency scale modifier
+                this.phaseShift = 0.0; // Radian offset state
+            }
+        }
+
+        // --- Application Management State Context Vars ---
+        const canvas = document.getElementById('stageCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let labMode = 'edit'; // 'edit' | 'simulate' | 'evolve'
+        let activeBuildTool = 'joint'; // 'joint' | 'bone' | 'muscle'
+        
+        let joints = [];
+        let constraints = [];
+        let selectedMuscleIndex = null;
+        
+        // Physics Environment Scalars
+        let envGravity = 0.5;
+        let envFriction = 0.85;
+        let envMuscleStiffness = 0.5;
+        let terrainType = 'flat';
+        
+        // Telemetry telemetry state variables
+        let clockTime = 0;
+        let originalStartingX = 0;
+        let maxDistanceTraveled = 0;
+        let maxRecordedVelocity = 0;
+
+        // Interaction state track variables
+        let dragStartJoint = null;
+        let mouseCoords = { x: 0, y: 0 };
+
+        // --- Genetic Evolutionary Optimization Engine variables ---
+        let isEvolutionRunning = false;
+        let currentGeneration = 1;
+        let currentOrganismIndex = 0;
+        const populationSize = 12;
+        const trialDurationFrames = 60 * 6; // 6 seconds at ~60fps
+        let currentTrialFrameCount = 0;
+        
+        // The active setup blueprint that is simulated during evolution steps
+        let organismBlueprintPoints = [];
+        let organismBlueprintConstraints = [];
+        
+        // Dynamic arrays holding individual parameter sets
+        let currentPopulationDNA = [];
+        let bestFitnessScoreEver = 0;
+        let bestDNARecordEver = null;
+
+        // --- Canvas Initialization Resize Logic Setup ---
+        function resizeLabViewport() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeLabViewport);
+        resizeLabViewport();
+
+        // --- Input Event Listener Setup Connections ---
+        canvas.addEventListener('mousedown', handleStageMouseDown);
+        canvas.addEventListener('mousemove', handleStageMouseMove);
+        window.addEventListener('mouseup', handleStageMouseUp);
+
+        // Physics UI input elements bindings tracking updates hookups
+        setupSliderHooks();
+
+        function setupSliderHooks() {
+            const sliders = [
+                { id: 'slider-gravity', valId: 'val-gravity', update: (v) => envGravity = parseFloat(v) },
+                { id: 'slider-friction', valId: 'val-friction', update: (v) => envFriction = parseFloat(v) },
+                { id: 'slider-stiffness', valId: 'val-stiffness', update: (v) => envMuscleStiffness = parseFloat(v) },
+                
+                // Active Muscle Form fields
+                { id: 'slider-force', valId: 'lbl-force', update: (v) => { if(selectedMuscleIndex !== null) constraints[selectedMuscleIndex].force = parseFloat(v); } },
+                { id: 'slider-speed', valId: 'lbl-speed', update: (v) => { if(selectedMuscleIndex !== null) constraints[selectedMuscleIndex].speed = parseFloat(v); }, suffix: 'x' },
+                { id: 'slider-phase', valId: 'lbl-phase', update: (v) => { if(selectedMuscleIndex !== null) constraints[selectedMuscleIndex].phaseShift = parseFloat(v); }, suffix: 'π' }
+            ];
+
+            sliders.forEach(s => {
+                const el = document.getElementById(s.id);
+                if (!el) return;
+                el.addEventListener('input', (e) => {
+                    let rawVal = e.target.value;
+                    s.update(rawVal);
+                    document.getElementById(s.valId).innerText = rawVal + (s.suffix || '');
+                });
+            });
+        }
+
+        // --- Main Controller Routing View Switching Configuration ---
+        function setLabMode(targetMode) {
+            labMode = targetMode;
+            
+            // Clean up state transitions
+            if (isEvolutionRunning && targetMode !== 'evolve') {
+                stopEvolutionEngine();
+            }
+
+            // Manage CSS highlight classes
+            ['edit', 'simulate', 'evolve'].forEach(m => {
+                const btn = document.getElementById(`btn-mode-${m}`);
+                if (m === targetMode) {
+                    btn.className = "px-3 py-1 text-xs font-semibold rounded bg-cyan-600 text-white shadow-sm transition";
+                } else {
+                    btn.className = "px-3 py-1 text-xs font-semibold rounded text-slate-400 hover:text-slate-200 transition";
+                }
+            });
+
+            // Adjust tip dialogs box text indicators
+            const tipEl = document.getElementById('lab-context-tip');
+            const evoOverlay = document.getElementById('evolutionHud');
+            
+            if (targetMode === 'edit') {
+                tipEl.innerText = '💡 Tip: Choose "Editor" mode to manually place joints and wire muscle contractures.';
+                evoOverlay.classList.add('hidden');
+            } else if (targetMode === 'simulate') {
+                tipEl.innerText = '⚡ Simulating! Watch oscillators expand & contract links. Left click any red string to tweak muscle attributes.';
+                evoOverlay.classList.add('hidden');
+            } else if (targetMode === 'evolve') {
+                tipEl.innerText = '🧬 AI Training Mode: Evolving neural oscillation rhythms to maximize creature walking distance performance.';
+                evoOverlay.classList.remove('hidden');
+                initEvolutionaryFramework();
+            }
+        }
+
+        function setBuildTool(tool) {
+            activeBuildTool = tool;
+            ['joint', 'bone', 'muscle'].forEach(t => {
+                const btn = document.getElementById(`tool-${t}`);
+                if (t === tool) {
+                    btn.className = "w-full py-1.5 px-3 rounded text-left text-xs font-medium transition bg-cyan-950 text-cyan-400 border border-cyan-800";
+                } else {
+                    btn.className = "w-full py-1.5 px-3 rounded text-left text-xs font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700";
+                }
+            });
+        }
+
+        function changeTerrainType(type) {
+            terrainType = type;
+        }
+
+        // --- Interaction Event Handlers System ---
+        function handleStageMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            // 1. If simulating or evolving, check selection click hits on muscle elements
+            if (labMode === 'simulate' || labMode === 'edit') {
+                let clickedMuscleIdx = checkMuscleClickCollision(clickX, clickY);
+                if (clickedMuscleIdx !== null) {
+                    highlightMuscleParameterPanel(clickedMuscleIdx);
+                    return;
+                }
+            }
+
+            if (labMode !== 'edit') return;
+
+            // Find if existing nodes are targeted directly
+            let targetNode = findJointAtCoords(clickX, clickY);
+
+            if (activeBuildTool === 'joint') {
+                if (!targetNode) {
+                    joints.push(new Point(clickX, clickY));
+                    calculateCreatureCenterAnchorX();
+                }
+            } else if (activeBuildTool === 'bone' || activeBuildTool === 'muscle') {
+                if (targetNode) {
+                    dragStartJoint = targetNode;
+                }
+            }
+        }
+
+        function handleStageMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouseCoords.x = e.clientX - rect.left;
+            mouseCoords.y = e.clientY - rect.top;
+        }
+
+        function handleStageMouseUp(e) {
+            if (labMode !== 'edit' || !dragStartJoint) {
+                dragStartJoint = null;
+                return;
+            }
+
+            let targetNode = findJointAtCoords(mouseCoords.x, mouseCoords.y);
+            if (targetNode && targetNode !== dragStartJoint) {
+                // Ensure link connection uniqueness check prevents mirror duplicates
+                let exists = constraints.some(c => 
+                    (c.p1 === dragStartJoint && c.p2 === targetNode) || 
+                    (c.p1 === targetNode && c.p2 === dragStartJoint)
+                );
+
+                if (!exists) {
+                    const newLink = new Constraint(dragStartJoint, targetNode, activeBuildTool);
+                    constraints.push(newLink);
+                }
+            }
+
+            dragStartJoint = null;
+        }
+
+        function findJointAtCoords(x, y, maxRadius = 15) {
+            for (let j of joints) {
+                if (Math.hypot(j.x - x, j.y - y) < maxRadius) return j;
+            }
+            return null;
+        }
+
+        function checkMuscleClickCollision(x, y) {
+            for (let i = 0; i < constraints.length; i++) {
+                let c = constraints[i];
+                if (c.type !== 'muscle') continue;
+                
+                // Line segment distance equation approximation calculation
+                let x1 = c.p1.x; let y1 = c.p1.y;
+                let x2 = c.p2.x; let y2 = c.p2.y;
+                let length = Math.hypot(x2 - x1, y2 - y1);
+                if (length === 0) continue;
+
+                let u = ((x - x1) * (x2 - x1) + (y - y1) * (y2 - y1)) / (length * length);
+                if (u >= 0 && u <= 1) {
+                    let ix = x1 + u * (x2 - x1);
+                    let iy = y1 + u * (y2 - y1);
+                    if (Math.hypot(x - ix, y - iy) < 8) return i;
+                }
+            }
+            return null;
+        }
+
+        function highlightMuscleParameterPanel(idx) {
+            selectedMuscleIndex = idx;
+            const c = constraints[idx];
+            
+            document.getElementById('noMusclePlaceholder').classList.add('hidden');
+            const form = document.getElementById('muscleConfigForm');
+            form.classList.remove('opacity-40', 'pointer-events-none');
+            
+            document.getElementById('targetMuscleLabel').innerText = `Muscle #${idx + 1}`;
+            
+            // Re-apply form standard element numerical indicator readouts
+            document.getElementById('slider-force').value = c.force;
+            document.getElementById('lbl-force').innerText = c.force.toFixed(2);
+            
+            document.getElementById('slider-speed').value = c.speed;
+            document.getElementById('lbl-speed').innerText = c.speed.toFixed(1) + 'x';
+            
+            document.getElementById('slider-phase').value = c.phaseShift;
+            document.getElementById('lbl-phase').innerText = (c.phaseShift / Math.PI).toFixed(1) + 'π';
+        }
+
+        // --- Core Simulation Physics Calculation Loop Blocks ---
+        function updatePhysicsSimulationFrame() {
+            if (joints.length === 0) return;
+
+            // Increment frequency oscillation clock frame reference index
+            clockTime += 0.05;
+
+            // A. Apply Kinematics Forces to Nodes (Verlet Integration Method step 1)
+            for (let j of joints) {
+                let vx = (j.x - j.oldX) * envFriction;
+                let vy = (j.y - j.oldY) * envFriction;
+                
+                j.oldX = j.x;
+                j.oldY = j.y;
+                
+                j.x += vx;
+                j.y += vy + envGravity; // Acceleration scalar applied downwards
+            }
+
+            // B. Solve Link Length Constraints Iteratively
+            const solveIterations = 6;
+            for (let step = 0; step < solveIterations; step++) {
+                for (let c of constraints) {
+                    let dx = c.p2.x - c.p1.x;
+                    let dy = c.p2.y - c.p1.y;
+                    let currentLength = Math.hypot(dx, dy);
+                    if (currentLength === 0) currentLength = 0.01;
+
+                    // Calculate current target length baseline driven by internal active neural oscillation values
+                    let activeTarget = c.targetLength;
+                    if (c.type === 'muscle') {
+                        // Wave oscillator equation: baseline +/- amplitude extension scaling
+                        let waveValue = Math.sin(clockTime * c.speed + c.phaseShift);
+                        activeTarget = c.targetLength * (1.0 + waveValue * c.force);
+                    }
+
+                    let difference = activeTarget - currentLength;
+                    let percent = (difference / currentLength) * (c.type === 'muscle' ? envMuscleStiffness : 0.85) * 0.5;
+                    
+                    let offsetX = dx * percent;
+                    let offsetY = dy * percent;
+
+                    c.p1.x -= offsetX;
+                    c.p1.y -= offsetY;
+                    c.p2.x += offsetX;
+                    c.p2.y += offsetY;
+                }
+
+                // Apply Terrain boundary collision locks inside iteration frame loop
+                applyTerrainCollisions();
+            }
+
+            // Calculate overall speed/performance metrics metrics mapping values
+            updatePerformanceHUDTelemetry();
+        }
+
+        function applyTerrainCollisions() {
+            const canvasHeight = canvas.height;
+            
+            for (let j of joints) {
+                let groundY = canvasHeight - 80; // Baseline flat terrain altitude reference height
+
+                if (terrainType === 'hills') {
+                    // Sine function driven rolling landscape grid lines geometry definition map
+                    groundY = (canvasHeight - 120) + Math.sin(j.x * 0.006) * 45 + Math.cos(j.x * 0.015) * 15;
+                } else if (terrainType === 'stairs') {
+                    // Step function terrace stairs simulator math definitions code blocks
+                    let stepWidth = 160;
+                    let stepHeight = 25;
+                    let currentStepIndex = Math.floor(j.x / stepWidth);
+                    groundY = (canvasHeight - 60) - (currentStepIndex * stepHeight);
+                }
+
+                // If point penetrates the localized ground line boundary envelope limit
+                if (j.y > groundY - j.radius) {
+                    j.y = groundY - j.radius;
+                    
+                    // Friction calculations to slow horizontal skid movement rate vectors
+                    let vx = (j.x - j.oldX) * envFriction;
+                    j.oldX = j.x - vx * 0.4; 
+                }
+            }
+        }
+
+        function calculateCreatureCenterAnchorX() {
+            if (joints.length === 0) return 0;
+            let sumX = 0;
+            joints.forEach(j => sumX += j.x);
+            return sumX / joints.length;
+        }
+
+        function updatePerformanceHUDTelemetry() {
+            if (joints.length === 0) return;
+            
+            let currentX = calculateCreatureCenterAnchorX();
+            let rawDistance = (currentX - originalStartingX) / 40.0; // Scale metrics down to simulated metric scale
+            if (rawDistance < 0) rawDistance = 0; // forward lock
+
+            if (rawDistance > maxDistanceTraveled) {
+                maxDistanceTraveled = rawDistance;
+            }
+
+            // Instant velocity checks mapping parameters calculations
+            let speedSum = 0;
+            joints.forEach(j => speedSum += Math.hypot(j.x - j.oldX, j.y - j.oldY));
+            let currentSpeedAvg = (speedSum / joints.length) * 0.5;
+            if (currentSpeedAvg > maxRecordedVelocity) maxRecordedVelocity = currentSpeedAvg;
+
+            document.getElementById('hud-distance').innerText = maxDistanceTraveled.toFixed(2) + ' m';
+            document.getElementById('hud-speed').innerText = currentSpeedAvg.toFixed(1) + ' m/s';
+        }
+
+        // --- Presets Template System Database ---
+        function clearCanvasLab() {
+            joints = [];
+            constraints = [];
+            selectedMuscleIndex = null;
+            originalStartingX = 0;
+            maxDistanceTraveled = 0;
+            maxRecordedVelocity = 0;
+            clockTime = 0;
+            
+            document.getElementById('noMusclePlaceholder').classList.remove('hidden');
+            document.getElementById('muscleConfigForm').classList.add('opacity-40', 'pointer-events-none');
+            
+            document.getElementById('hud-distance').innerText = '0.00 m';
+            document.getElementById('hud-speed').innerText = '0.0 m/s';
+        }
+
+        function resetCreaturePosition() {
+            if (joints.length === 0) return;
+            
+            let currentX = calculateCreatureCenterAnchorX();
+            let deltaX = 150 - currentX; // Shift back toward left spawn boundary point index
+            
+            // Reset vertical clearance offset spacing bounds
+            let lowestY = -Infinity;
+            joints.forEach(j => { if (j.y > lowestY) lowestY = j.y; });
+            let deltaY = (canvas.height - 180) - lowestY;
+
+            joints.forEach(j => {
+                j.x += deltaX;
+                j.y += deltaY;
+                j.oldX = j.x;
+                j.oldY = j.y;
+            });
+
+            clockTime = 0;
+            originalStartingX = 150;
+            maxDistanceTraveled = 0;
+            maxRecordedVelocity = 0;
+        }
+
+        function loadPreset(key) {
+            clearCanvasLab();
+            const h = canvas.height;
+            const midY = h - 180;
+            const startX = 150;
+
+            if (key === 'biped') {
+                // Generate simple human walker configuration setup framework
+                let hip = new Point(startX, midY - 60);
+                let kneeL = new Point(startX - 20, midY - 30);
+                let footL = new Point(startX - 15, midY);
+                let kneeR = new Point(startX + 20, midY - 30);
+                let footR = new Point(startX + 15, midY);
+                let head = new Point(startX, midY - 100);
+
+                joints = [hip, kneeL, footL, kneeR, footR, head];
+
+                // Core bones framework structural scaffolding layers setup elements
+                constraints.push(new Constraint(head, hip, 'bone'));
+                constraints.push(new Constraint(hip, kneeL, 'bone'));
+                constraints.push(new Constraint(kneeL, footL, 'bone'));
+                constraints.push(new Constraint(hip, kneeR, 'bone'));
+                constraints.push(new Constraint(kneeR, footR, 'bone'));
+
+                // Drive muscles setup oscillators links configuration maps
+                let m1 = new Constraint(head, kneeL, 'muscle'); m1.phaseShift = 0; m1.force = 0.35;
+                let m2 = new Constraint(head, kneeR, 'muscle'); m2.phaseShift = Math.PI; m2.force = 0.35;
+                let m3 = new Constraint(hip, footL, 'muscle'); m3.phaseShift = Math.PI * 0.5; m3.force = 0.25;
+                let m4 = new Constraint(hip, footR, 'muscle'); m4.phaseShift = Math.PI * 1.5; m4.force = 0.25;
+
+                constraints.push(m1, m2, m3, m4);
+
+            } else if (key === 'quadruped') {
+                // Galloping spine configuration blueprint properties setup map matrix elements
+                let spineF = new Point(startX + 50, midY - 50);
+                let spineB = new Point(startX - 30, midY - 50);
+                
+                let kneeFL = new Point(startX + 60, midY - 25);
+                let footFL = new Point(startX + 65, midY);
+                let kneeFR = new Point(startX + 40, midY - 25);
+                let footFR = new Point(startX + 35, midY);
+
+                let kneeBL = new Point(startX - 40, midY - 25);
+                let footBL = new Point(startX - 45, midY);
+                let kneeBR = new Point(startX - 20, midY - 25);
+                let footBR = new Point(startX - 15, midY);
+
+                joints = [spineF, spineB, kneeFL, footFL, kneeFR, footFR, kneeBL, footBL, kneeBR, footBR];
+
+                // Rigid structural linkages arrays definitions setup values lists 
+                constraints.push(new Constraint(spineB, spineF, 'bone'));
+                constraints.push(new Constraint(spineF, kneeFL, 'bone')); constraints.push(new Constraint(kneeFL, footFL, 'bone'));
+                constraints.push(new Constraint(spineF, kneeFR, 'bone')); constraints.push(new Constraint(kneeFR, footFR, 'bone'));
+                constraints.push(new Constraint(spineB, kneeBL, 'bone')); constraints.push(new Constraint(kneeBL, footBL, 'bone'));
+                constraints.push(new Constraint(spineB, kneeBR, 'bone')); constraints.push(new Constraint(kneeBR, footBR, 'bone'));
+
+                // Extruded interactive muscle parameters layout sets maps configurations
+                let muscleSpine = new Constraint(spineB, spineF, 'muscle'); muscleSpine.force = 0.2; muscleSpine.phaseShift = 0;
+                let mFL = new Constraint(spineB, footFL, 'muscle'); mFL.force = 0.3; mFL.phaseShift = Math.PI * 0.25;
+                let mFR = new Constraint(spineB, footFR, 'muscle'); mFR.force = 0.3; mFR.phaseShift = Math.PI * 1.25;
+                let mBL = new Constraint(spineF, footBL, 'muscle'); mBL.force = 0.3; mBL.phaseShift = Math.PI * 1.0;
+                let mBR = new Constraint(spineF, footBR, 'muscle'); mBR.force = 0.3; mBR.phaseShift = Math.PI * 0.0;
+
+                constraints.push(muscleSpine, mFL, mFR, mBL, mBR);
+
+            } else if (key === 'inchworm') {
+                // Continuous crawler wave setup system parameters code layout
+                let n1 = new Point(startX - 40, midY);
+                let n2 = new Point(startX, midY - 30);
+                let n3 = new Point(startX + 40, midY);
+
+                joints = [n1, n2, n3];
+                constraints.push(new Constraint(n1, n2, 'bone'));
+                constraints.push(new Constraint(n2, n3, 'bone'));
+                
+                let m = new Constraint(n1, n3, 'muscle');
+                m.force = 0.45;
+                m.speed = 1.4;
+                m.phaseShift = 0;
+                constraints.push(m);
+
+            } else if (key === 'frog') {
+                // Compression energy dynamic propulsion physics engine template code configuration elements
+                let body = new Point(startX, midY - 60);
+                let hipJoint = new Point(startX - 30, midY - 40);
+                let ankleJoint = new Point(startX - 45, midY - 15);
+                let footPad = new Point(startX - 25, midY);
+
+                joints = [body, hipJoint, ankleJoint, footPad];
+                constraints.push(new Constraint(body, hipJoint, 'bone'));
+                constraints.push(new Constraint(hipJoint, ankleJoint, 'bone'));
+                constraints.push(new Constraint(ankleJoint, footPad, 'bone'));
+                constraints.push(new Constraint(body, footPad, 'bone')); // Closure strut
+
+                let jumpMuscle1 = new Constraint(body, ankleJoint, 'muscle'); jumpMuscle1.force = 0.4; jumpMuscle1.phaseShift = 0;
+                let jumpMuscle2 = new Constraint(hipJoint, footPad, 'muscle'); jumpMuscle2.force = 0.35; jumpMuscle2.phaseShift = 0.2;
+                constraints.push(jumpMuscle1, jumpMuscle2);
+
+            } else if (key === 'wheel') {
+                // Dynamic multi-spoke circular structural cage physics configuration element matrices setup loop array maps
+                let center = new Point(startX, midY - 40);
+                joints.push(center);
+                
+                const spokesCount = 6;
+                const radiusDist = 45;
+                let outerPoints = [];
+
+                for(let i=0; i<spokesCount; i++) {
+                    let angle = (i / spokesCount) * Math.PI * 2;
+                    let px = startX + Math.sin(angle) * radiusDist;
+                    let py = (midY - 40) + Math.cos(angle) * radiusDist;
+                    let pt = new Point(px, py);
+                    joints.push(pt);
+                    outerPoints.push(pt);
+                    constraints.push(new Constraint(center, pt, 'bone'));
+                }
+
+                // Chain muscles across outer perimeter boundaries context layers
+                for(let i=0; i<spokesCount; i++) {
+                    let nextIdx = (i + 1) % spokesCount;
+                    let muscleSpoke = new Constraint(outerPoints[i], outerPoints[nextIdx], 'muscle');
+                    muscleSpoke.force = 0.3;
+                    muscleSpoke.phaseShift = (i / spokesCount) * Math.PI * 2;
+                    constraints.push(muscleSpoke);
+                }
+            }
+
+            originalStartingX = calculateCreatureCenterAnchorX();
+            if (labMode === 'edit') {
+                setLabMode('simulate'); // Auto jump into runtime context so users can instantly witness activity
+            }
+        }
+
+        // --- Core Graphical Render Engine Logic Framework Layout Functions ---
+        function renderLabStageFrame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 1. Draw Environment Terrain Background Profile lines grid layer
+            drawStageEnvironmentTerrain();
+
+            // 2. Draw active links editing drag preview indicators
+            if (labMode === 'edit' && dragStartJoint) {
+                ctx.beginPath();
+                ctx.moveTo(dragStartJoint.x, dragStartJoint.y);
+                ctx.lineTo(mouseCoords.x, mouseCoords.y);
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = activeBuildTool === 'muscle' ? '#f87171' : '#94a3b8';
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 3. Render Link Constraints Structures
+            for (let i = 0; i < constraints.length; i++) {
+                let c = constraints[i];
+                ctx.beginPath();
+                ctx.moveTo(c.p1.x, c.p1.y);
+                ctx.lineTo(c.p2.x, c.p2.y);
+                
+                if (c.type === 'muscle') {
+                    ctx.lineWidth = (selectedMuscleIndex === i) ? 5 : 3;
+                    ctx.strokeStyle = (selectedMuscleIndex === i) ? '#f43f5e' : '#ef4444';
+                    ctx.stroke();
+                    
+                    // Draw visual ripple energy pulse nodes along string vectors mapping properties positions indicators
+                    let midX = (c.p1.x + c.p2.x) / 2;
+                    let midY = (c.p1.y + c.p2.y) / 2;
+                    ctx.beginPath();
+                    ctx.arc(midX, midY, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#fca5a5';
+                    ctx.fill();
+                } else {
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#64748b';
+                    ctx.stroke();
+                }
+            }
+
+            // 4. Render Physical Node Joints
+            for (let j of joints) {
+                ctx.beginPath();
+                ctx.arc(j.x, j.y, j.radius, 0, Math.PI * 2);
+                ctx.fillStyle = j.isPinned ? '#e11d48' : '#38bdf8';
+                ctx.fill();
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = '#0f172a';
+                ctx.stroke();
+            }
+
+            // Highlight editing mouse hovered points indicators inside edit mode views layer boundaries elements sets
+            if (labMode === 'edit') {
+                let hovered = findJointAtCoords(mouseCoords.x, mouseCoords.y);
+                if (hovered) {
+                    ctx.beginPath();
+                    ctx.arc(hovered.x, hovered.y, hovered.radius + 4, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        function drawStageEnvironmentTerrain() {
+            const w = canvas.width;
+            const h = canvas.height;
+            const groundBaseY = h - 80;
+
+            ctx.beginPath();
+            
+            if (terrainType === 'flat') {
+                ctx.moveTo(0, groundBaseY);
+                ctx.lineTo(w, groundBaseY);
+            } else if (terrainType === 'hills') {
+                ctx.moveTo(0, h);
+                for (let x = 0; x <= w; x += 10) {
+                    let y = (h - 120) + Math.sin(x * 0.006) * 45 + Math.cos(x * 0.015) * 15;
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+            } else if (terrainType === 'stairs') {
+                let stepWidth = 160;
+                let stepHeight = 25;
+                ctx.moveTo(0, groundBaseY);
+                for (let x = 0; x <= w; x += stepWidth) {
+                    let stepIdx = Math.floor(x / stepWidth);
+                    let y = (h - 60) - (stepIdx * stepHeight);
+                    ctx.lineTo(x, y);
+                    ctx.lineTo(x + stepWidth, y);
+                }
+            }
+
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#475569';
+            ctx.stroke();
+
+            // Fill lower bedrock matrix background styling pattern layer
+            ctx.lineTo(w, h);
+            ctx.lineTo(0, h);
+            ctx.fillStyle = '#1e293b';
+            ctx.fill();
+            
+            // Draw grid vertical reference hash lines ticks across view background coordinates window grid bounds matrix mapping
+            ctx.beginPath();
+            ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
+            ctx.lineWidth = 1;
+            for(let x=0; x<w; x+=80) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+            }
+            ctx.stroke();
+        }
+
+        // --- Genetic Algorithm Autonomous AI Optimization Engine Framework Implementation ---
+        function initEvolutionaryFramework() {
+            if (joints.length === 0) {
+                // fallback safety template initialization call if workspace empty
+                loadPreset('biped');
+                setLabMode('evolve');
+                return;
+            }
+
+            // Capture structural topology blueprints vectors from active configuration state objects array mapping listings
+            saveCurrentCreatureBlueprints();
+            
+            currentGeneration = 1;
+            currentOrganismIndex = 0;
+            currentTrialFrameCount = 0;
+            bestFitnessScoreEver = 0;
+            bestDNARecordEver = null;
+
+            // Seed initial randomized generational chromosome matrices values setup lists sets
+            currentPopulationDNA = [];
+            const muscleCount = constraints.filter(c => c.type === 'muscle').length;
+
+            for(let i=0; i<populationSize; i++) {
+                let chromosome = [];
+                for(let m=0; m<muscleCount; m++) {
+                    chromosome.push({
+                        phaseShift: Math.random() * Math.PI * 2,
+                        force: 0.1 + Math.random() * 0.5,
+                        speed: 0.5 + Math.random() * 2.0
+                    });
+                }
+                currentPopulationDNA.push({
+                    genes: chromosome,
+                    fitness: 0
+                });
+            }
+
+            updateEvolutionEngineHUDDisplay();
+            applyDNAGenesToActiveCreature(currentPopulationDNA[0].genes);
+            resetCreaturePosition();
+        }
+
+        function saveCurrentCreatureBlueprints() {
+            organismBlueprintPoints = joints.map(j => ({ x: j.x, y: j.y }));
+            organismBlueprintConstraints = constraints.map(c => {
+                // store indexed reference addresses
+                let p1Idx = joints.indexOf(c.p1);
+                let p2Idx = joints.indexOf(c.p2);
+                return { p1Idx, p2Idx, type: c.type, targetLength: c.targetLength };
+            });
+        }
+
+        function regenerateCreatureFromBlueprints() {
+            joints = organismBlueprintPoints.map(bp => new Point(bp.x, bp.y));
+            constraints = organismBlueprintConstraints.map(bc => {
+                let c = new Constraint(joints[bc.p1Idx], joints[bc.p2Idx], bc.type);
+                c.targetLength = bc.targetLength;
+                return c;
+            });
+        }
+
+        function applyDNAGenesToActiveCreature(genesArray) {
+            let muscleIdx = 0;
+            for(let c of constraints) {
+                if (c.type !== 'muscle') continue;
+                if (genesArray[muscleIdx]) {
+                    c.phaseShift = genesArray[muscleIdx].phaseShift;
+                    c.force = genesArray[muscleIdx].force;
+                    c.speed = genesArray[muscleIdx].speed;
+                }
+                muscleIdx++;
+            }
+        }
+
+        function toggleEvolutionEngine() {
+            const btn = document.getElementById('btn-toggle-evolution');
+            if (!isEvolutionRunning) {
+                isEvolutionRunning = true;
+                btn.innerText = "Halt Training";
+                btn.className = "w-full mt-1 bg-red-600 hover:bg-red-500 text-white font-bold py-1 px-2 rounded text-xs transition uppercase tracking-wide";
+            } else {
+                stopEvolutionEngine();
+            }
+        }
+
+        function stopEvolutionEngine() {
+            isEvolutionRunning = false;
+            const btn = document.getElementById('btn-toggle-evolution');
+            if (btn) {
+                btn.innerText = "Start Evolution";
+                btn.className = "w-full mt-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-1 px-2 rounded text-xs transition uppercase tracking-wide";
+            }
+        }
+
+        function processEvolutionEngineTick() {
+            if (!isEvolutionRunning) return;
+
+            currentTrialFrameCount++;
+            
+            // Frame progression progress timeline metrics computation UI indicators calculations bar values hook
+            let progressRatio = (currentTrialFrameCount / trialDurationFrames) * 100;
+            document.getElementById('evo-progress-bar').style.width = `${progressRatio}%`;
+            document.getElementById('evo-timer').innerText = ((trialDurationFrames - currentTrialFrameCount) / 60).toFixed(1) + 's';
+
+            if (currentTrialFrameCount >= trialDurationFrames) {
+                // Trial expired. Assess fitness result criteria metric scores
+                currentPopulationDNA[currentOrganismIndex].fitness = maxDistanceTraveled;
+
+                if (maxDistanceTraveled > bestFitnessScoreEver) {
+                    bestFitnessScoreEver = maxDistanceTraveled;
+                    bestDNARecordEver = JSON.parse(JSON.stringify(currentPopulationDNA[currentOrganismIndex].genes));
+                }
+
+                // Advance iteration focus tracking sequence markers indices
+                currentOrganismIndex++;
+                if (currentOrganismIndex >= populationSize) {
+                    // All candidates cataloged. Perform Natural Selection cross breeding logic matrix routines steps
+                    executeGeneticSelectionCrossoverGenerationCycle();
+                } else {
+                    // Transition to next candidate sequence line indexes
+                    runNextOrganismTrial();
+                }
+            }
+        }
+
+        function runNextOrganismTrial() {
+            currentTrialFrameCount = 0;
+            regenerateCreatureFromBlueprints();
+            applyDNAGenesToActiveCreature(currentPopulationDNA[currentOrganismIndex].genes);
+            resetCreaturePosition();
+            updateEvolutionEngineHUDDisplay();
+        }
+
+        function executeGeneticSelectionCrossoverGenerationCycle() {
+            // Sort list by highest structural performance metric values records descending order
+            currentPopulationDNA.sort((a, b) => b.fitness - a.fitness);
+
+            let nextGenerationDNA = [];
+            
+            // Elitism strategy: Retain top 2 performers verbatim
+            nextGenerationDNA.push({ genes: JSON.parse(JSON.stringify(currentPopulationDNA[0].genes)), fitness: 0 });
+            nextGenerationDNA.push({ genes: JSON.parse(JSON.stringify(currentPopulationDNA[1].genes)), fitness: 0 });
+
+            const muscleCount = currentPopulationDNA[0].genes.length;
+
+            // Generate remaining slots via parent pairing crossover blending operations
+            while(nextGenerationDNA.length < populationSize) {
+                // Select parents preferentially heavily biased towards top tier profiles lists indices matching rows
+                let parentA = selectParentViaTournamentWheel();
+                let parentB = selectParentViaTournamentWheel();
+                
+                let childChromosomes = [];
+                for(let m=0; m<muscleCount; m++) {
+                    // 50/50 uniform cross breeding variable mapping property selection split operations metrics
+                    let geneSource = Math.random() > 0.5 ? parentA.genes[m] : parentB.genes[m];
+                    
+                    // Introduce random mutation fluctuations parameters variations scaling offsets metrics
+                    let mutatedGene = {
+                        phaseShift: geneSource.phaseShift + (Math.random() - 0.5) * 0.4,
+                        force: Math.max(0.05, Math.min(0.8, geneSource.force + (Math.random() - 0.5) * 0.1)),
+                        speed: Math.max(0.2, Math.min(3.0, geneSource.speed + (Math.random() - 0.5) * 0.2))
+                    };
+                    childChromosomes.push(mutatedGene);
+                }
+
+                nextGenerationDNA.push({ genes: childChromosomes, fitness: 0 });
+            }
+
+            currentPopulationDNA = nextGenerationDNA;
+            currentGeneration++;
+            currentOrganismIndex = 0;
+            
+            runNextOrganismTrial();
+        }
+
+        function selectParentViaTournamentWheel() {
+            // Select 3 random configurations from population pool, return best of group
+            let r1 = currentPopulationDNA[Math.floor(Math.random() * populationSize)];
+            let r2 = currentPopulationDNA[Math.floor(Math.random() * populationSize)];
+            let r3 = currentPopulationDNA[Math.floor(Math.random() * populationSize)];
+            
+            let supreme = r1;
+            if(r2.fitness > supreme.fitness) supreme = r2;
+            if(r3.fitness > supreme.fitness) supreme = r3;
+            return supreme;
+        }
+
+        function updateEvolutionEngineHUDDisplay() {
+            document.getElementById('evo-generation').innerText = `Gen: ${currentGeneration}`;
+            document.getElementById('evo-best-fitness').innerText = bestFitnessScoreEver.toFixed(2) + ' m';
+            document.getElementById('evo-current-org').innerText = `${currentOrganismIndex + 1} / ${populationSize}`;
+        }
+
+        // --- Main Animation Core Cycle Runtime Routine Scheduler Hooks ---
+        function runMasterLabTickLoop() {
+            // 1. Compute physics updates if not explicitly locked down in editor mode bounds profile
+            if (labMode === 'simulate' || labMode === 'evolve') {
+                updatePhysicsSimulationFrame();
+            }
+
+            // 2. Step automation algorithms tracking updates if engaged
+            if (labMode === 'evolve') {
+                processEvolutionEngineTick();
+            }
+
+            // 3. Render refreshed elements arrays layers positions mapping ticks to stage viewport canvas elements
+            renderLabStageFrame();
+
+            requestAnimationFrame(runMasterLabTickLoop);
+        }
+
+        // Initialize Workspace with default Biped configuration model on first load context loop parameters
+        window.onload = function() {
+            loadPreset('biped');
+            requestAnimationFrame(runMasterLabTickLoop);
+        };
+    </script>
+</body>
+</html>
