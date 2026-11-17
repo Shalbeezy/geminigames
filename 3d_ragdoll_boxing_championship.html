@@ -1,0 +1,2145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Ragdoll Boxing Championship</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js r128 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Teko:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Fallback Utility & Layout Rules (Ensures dark theme, glass panels, & HUD layout work even if Tailwind CDN fails) */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background: radial-gradient(circle at 50% 35%, #162038 0%, #090d16 65%, #04060b 100%) !important;
+            color: #f8fafc !important;
+        }
+        button {
+            cursor: pointer;
+            font-family: inherit;
+            color: inherit;
+        }
+        #canvas-container {
+            position: fixed;
+            inset: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .font-display {
+            font-family: 'Teko', Impact, sans-serif;
+            letter-spacing: 0.04em;
+        }
+        .glass-panel {
+            background: rgba(11, 16, 28, 0.92);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 20px 45px rgba(0, 0, 0, 0.72);
+            color: #f8fafc;
+        }
+        .hidden {
+            display: none !important;
+        }
+        /* Core HUD & Locker Layout Fallbacks */
+        #locker-ui {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+            gap: 12px;
+            pointer-events: none;
+        }
+        @media (min-width: 1024px) {
+            #locker-ui {
+                flex-direction: row;
+                padding: 24px;
+            }
+        }
+        #locker-drawer {
+            pointer-events: auto;
+            width: 100%;
+            max-width: 460px;
+            border-radius: 18px;
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            max-height: calc(100vh - 32px);
+            margin-left: auto;
+        }
+        #fight-ui {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 14px;
+            pointer-events: none;
+        }
+        #gameover-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(2, 6, 15, 0.82);
+            backdrop-filter: blur(10px);
+            padding: 16px;
+        }
+        /* Custom Range Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.16);
+            height: 6px;
+            border-radius: 999px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);
+            transition: transform 0.15s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        /* Punch & Control Buttons */
+        .punch-btn {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.96) 0%, rgba(15, 23, 42, 0.99) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 12px;
+            color: #f8fafc;
+            box-shadow: 0 5px 0 #020617, 0 8px 18px rgba(0, 0, 0, 0.55);
+            transition: transform 0.07s ease, box-shadow 0.07s ease, border-color 0.15s ease, background 0.15s ease;
+        }
+        .punch-btn:hover:not(:disabled) {
+            border-color: rgba(251, 191, 36, 0.65);
+            background: linear-gradient(180deg, rgba(45, 58, 82, 0.98) 0%, rgba(20, 30, 52, 0.99) 100%);
+        }
+        .punch-btn:active:not(:disabled), .punch-btn.active-key {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #020617, 0 3px 8px rgba(0, 0, 0, 0.5);
+            border-color: #fbbf24;
+        }
+        .punch-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+        .guard-btn {
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.95) 0%, rgba(29, 78, 216, 0.98) 100%);
+            border: 1px solid rgba(147, 197, 253, 0.5);
+            border-radius: 16px;
+            color: #ffffff;
+            box-shadow: 0 5px 0 #1e3a8a, 0 8px 18px rgba(0, 0, 0, 0.55);
+        }
+        .guard-btn:active, .guard-btn.active-guard {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #1e3a8a;
+            background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+        }
+        .cta-gold-btn {
+            background: linear-gradient(90deg, #fcd34d 0%, #facc15 50%, #f59e0b 100%);
+            color: #090d16 !important;
+            border: none;
+            border-radius: 14px;
+            font-weight: 700;
+            box-shadow: 0 6px 0 #92400e, 0 12px 25px rgba(245, 158, 11, 0.4);
+        }
+        @keyframes bannerPop {
+            0% { transform: scale(0.65); opacity: 0; }
+            65% { transform: scale(1.06); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .banner-animate {
+            animation: bannerPop 0.32s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.04);
+            border-radius: 999px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 999px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden">
+
+    <!-- 3D WebGL Canvas Container -->
+    <div id="canvas-container"></div>
+
+    <!-- ==================== LOCKER ROOM / CHARACTER BUILDER UI ==================== -->
+    <div id="locker-ui" class="fixed inset-0 z-20 pointer-events-none flex flex-col lg:flex-row justify-between p-3 sm:p-5 gap-3 overflow-y-auto lg:overflow-hidden">
+        
+        <!-- Top/Left Header + 3D Stage Hint -->
+        <div class="flex flex-col justify-between pointer-events-none lg:w-5/12 xl:w-1/2 shrink-0">
+            <div class="pointer-events-auto inline-block max-w-md">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-400/35 text-amber-300 text-[11px] font-bold uppercase tracking-widest mb-1.5 shadow-md" style="display:inline-flex;align-items:center;gap:8px;padding:4px 12px;border-radius:999px;background:rgba(245,158,11,0.18);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;font-size:11px;font-weight:700;margin-bottom:6px;">
+                    <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse" style="width:8px;height:8px;border-radius:50%;background:#fbbf24;"></span>
+                    Active Ragdoll Physics Engine
+                </div>
+                <h1 class="font-display text-4xl sm:text-6xl font-bold uppercase leading-none text-white drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]" style="margin:0;font-size:clamp(2.2rem,5vw,3.8rem);line-height:0.95;color:#ffffff;text-shadow:0 4px 16px rgba(0,0,0,0.9);">
+                    HEAVYWEIGHT <span class="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500" style="color:#fbbf24;">RAGDOLL</span>
+                </h1>
+                <p class="text-slate-300 text-xs sm:text-sm mt-1 drop-shadow" style="color:#cbd5e1;font-size:13px;margin-top:6px;">
+                    Customize your physique, stack iced-out 24K bling, and step into the ring.
+                </p>
+            </div>
+
+            <!-- Interactive 3D Preview Badge (Desktop) -->
+            <div class="hidden lg:flex items-center gap-2.5 self-start px-3.5 py-2 rounded-full glass-panel text-xs text-slate-300 pointer-events-auto" style="border-radius:999px;padding:8px 14px;font-size:12px;">
+                <svg class="w-4 h-4 text-amber-400 shrink-0" style="width:16px;height:16px;color:#fbbf24;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <span>Drag anywhere on the ring to rotate boxer 360°</span>
+            </div>
+        </div>
+
+        <!-- Right Customization Drawer -->
+        <div id="locker-drawer" class="glass-panel rounded-2xl p-4 sm:p-5 w-full lg:w-[440px] xl:w-[470px] pointer-events-auto flex flex-col justify-between lg:max-h-full mt-auto lg:mt-0 shadow-2xl">
+            <div class="overflow-y-auto custom-scroll pr-1 space-y-4" style="overflow-y:auto;display:flex;flex-direction:column;gap:14px;">
+                <!-- Panel Title & Preset Quick-Reset -->
+                <div class="flex items-center justify-between border-b border-white/10 pb-2.5" style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.12);padding-bottom:10px;">
+                    <div>
+                        <h2 class="font-display text-2xl font-bold uppercase tracking-wide text-white leading-none" style="margin:0;font-size:1.6rem;line-height:1;">Boxer Locker Room</h2>
+                        <span class="text-[11px] text-slate-400" style="font-size:11px;color:#94a3b8;">Live physical proportions & gear</span>
+                    </div>
+                    <span id="weight-class-badge" class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-300 text-xs font-extrabold uppercase tracking-wider" style="padding:4px 10px;border-radius:8px;background:rgba(245,158,11,0.2);border:1px solid rgba(251,191,36,0.4);color:#fcd34d;font-size:11px;font-weight:800;">
+                        Heavyweight
+                    </span>
+                </div>
+
+                <!-- 1. Physique & Build Sliders -->
+                <div class="bg-white/[0.03] border border-white/10 rounded-xl p-3 space-y-3" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-amber-400" style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;">1. Body Build & Reach</div>
+                    
+                    <!-- Height -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1" style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                            <span class="text-slate-300 font-medium">Height</span>
+                            <span id="val-height" class="font-bold text-white tabular-nums">6'2" (1.88m)</span>
+                        </div>
+                        <input id="slider-height" type="range" min="0.86" max="1.16" step="0.01" value="1.00" class="w-full">
+                    </div>
+
+                    <!-- Weight / Muscle Bulk -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1" style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                            <span class="text-slate-300 font-medium">Weight & Muscle Bulk</span>
+                            <span id="val-weight" class="font-bold text-white tabular-nums">225 lbs</span>
+                        </div>
+                        <input id="slider-weight" type="range" min="0.80" max="1.32" step="0.01" value="1.00" class="w-full">
+                    </div>
+
+                    <!-- Wingspan / Reach -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1" style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+                            <span class="text-slate-300 font-medium">Wingspan / Reach</span>
+                            <span id="val-reach" class="font-bold text-white tabular-nums">76" Reach</span>
+                        </div>
+                        <input id="slider-reach" type="range" min="0.85" max="1.22" step="0.01" value="1.00" class="w-full">
+                    </div>
+
+                    <!-- Live Stat Preview Pills -->
+                    <div class="grid grid-cols-3 gap-2 pt-1 text-center" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-top:4px;text-align:center;">
+                        <div class="rounded-lg bg-black/35 py-1.5 px-2 border border-white/5" style="border-radius:8px;background:rgba(0,0,0,0.4);padding:6px;border:1px solid rgba(255,255,255,0.08);">
+                            <div class="text-[10px] uppercase text-slate-400" style="font-size:10px;color:#94a3b8;">Power</div>
+                            <div id="stat-power" class="text-xs font-extrabold text-rose-400" style="font-size:12px;font-weight:800;color:#fb7185;">100%</div>
+                        </div>
+                        <div class="rounded-lg bg-black/35 py-1.5 px-2 border border-white/5" style="border-radius:8px;background:rgba(0,0,0,0.4);padding:6px;border:1px solid rgba(255,255,255,0.08);">
+                            <div class="text-[10px] uppercase text-slate-400" style="font-size:10px;color:#94a3b8;">Speed</div>
+                            <div id="stat-speed" class="text-xs font-extrabold text-sky-400" style="font-size:12px;font-weight:800;color:#38bdf8;">100%</div>
+                        </div>
+                        <div class="rounded-lg bg-black/35 py-1.5 px-2 border border-white/5" style="border-radius:8px;background:rgba(0,0,0,0.4);padding:6px;border:1px solid rgba(255,255,255,0.08);">
+                            <div class="text-[10px] uppercase text-slate-400" style="font-size:10px;color:#94a3b8;">Reach</div>
+                            <div id="stat-reach" class="text-xs font-extrabold text-amber-400" style="font-size:12px;font-weight:800;color:#fbbf24;">100%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Skin Tone & Ring Gear Colors -->
+                <div class="bg-white/[0.03] border border-white/10 rounded-xl p-3 space-y-2.5" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;">
+                    <div class="text-[11px] font-bold uppercase tracking-wider text-amber-400" style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;margin-bottom:8px;">2. Skin Tone & Fight Kit</div>
+                    <div class="grid grid-cols-2 gap-3" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div>
+                            <div class="text-[11px] text-slate-400 mb-1.5" style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Skin Tone</div>
+                            <div id="skin-swatches" class="flex flex-wrap gap-1.5" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-slate-400 mb-1.5" style="font-size:11px;color:#94a3b8;margin-bottom:6px;">Gloves & Trunks</div>
+                            <div id="gear-swatches" class="flex flex-wrap gap-1.5" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Championship Bling Toggles -->
+                <div class="bg-white/[0.03] border border-white/10 rounded-xl p-3 space-y-2" style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px;">
+                    <div class="flex items-center justify-between" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-amber-400" style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;">3. 24K Bling & Drip</span>
+                        <button id="btn-bling-all" class="text-[11px] font-semibold text-amber-300 hover:text-amber-200 underline" style="background:none;border:none;font-size:11px;color:#fcd34d;text-decoration:underline;">Equip All</button>
+                    </div>
+                    <div id="bling-toggles" class="grid grid-cols-2 sm:grid-cols-3 gap-1.5" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;"></div>
+                </div>
+            </div>
+
+            <!-- Enter Ring CTA -->
+            <div class="pt-3 mt-3 border-t border-white/10" style="padding-top:12px;margin-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+                <button id="btn-start-fight" class="cta-gold-btn w-full py-3.5 px-6 rounded-xl font-display text-2xl sm:text-3xl font-bold uppercase tracking-wider text-slate-950 bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 hover:from-amber-200 hover:to-yellow-400 shadow-[0_6px_0_#92400e,0_12px_25px_rgba(245,158,11,0.4)] active:translate-y-1 transition-all flex items-center justify-center gap-2" style="width:100%;padding:12px 20px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:1.75rem;">
+                    <span>ENTER THE RING</span>
+                    <svg class="w-6 h-6" style="width:22px;height:22px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== IN-FIGHT HUD & CONTROLS ==================== -->
+    <div id="fight-ui" class="fixed inset-0 z-20 pointer-events-none hidden flex-col justify-between p-3 sm:p-5">
+        
+        <!-- Top Scoreboard / Health & Stamina Bars (Compact so boxers are never blocked) -->
+        <div class="w-full max-w-2xl mx-auto flex flex-col gap-1" style="width:100%;max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:4px;">
+            <div class="glass-panel rounded-xl px-2.5 py-1.5 grid grid-cols-12 items-center gap-2" style="border-radius:12px;padding:6px 10px;display:grid;grid-template-columns:5fr 2fr 5fr;align-items:center;gap:8px;">
+                
+                <!-- Player Bars (Left) -->
+                <div class="col-span-5 flex flex-col gap-0.5" style="display:flex;flex-direction:column;gap:3px;">
+                    <div class="flex items-center justify-between text-[11px] font-extrabold uppercase leading-none" style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;line-height:1;">
+                        <span class="text-amber-300 truncate" style="color:#fcd34d;">YOU</span>
+                        <span id="player-hp-text" class="text-white tabular-nums">100</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-900/90 rounded-full overflow-hidden border border-white/15" style="width:100%;height:8px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.18);">
+                        <div id="player-hp-bar" class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-lime-400 transition-all duration-150" style="width: 100%;height:100%;border-radius:999px;background:linear-gradient(90deg,#10b981,#a3e635);"></div>
+                    </div>
+                    <div class="w-full h-1 bg-slate-900/90 rounded-full overflow-hidden" style="width:100%;height:4px;background:#0f172a;border-radius:999px;overflow:hidden;">
+                        <div id="player-stam-bar" class="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-300 transition-all duration-75" style="width: 100%;height:100%;border-radius:999px;background:linear-gradient(90deg,#0ea5e9,#67e8f9);"></div>
+                    </div>
+                </div>
+
+                <!-- Center Round & Clock -->
+                <div class="col-span-2 flex flex-col items-center justify-center text-center border-x border-white/10 px-1" style="display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-left:1px solid rgba(255,255,255,0.12);border-right:1px solid rgba(255,255,255,0.12);padding:0 4px;">
+                    <span id="round-label" class="text-[9px] font-extrabold uppercase tracking-wider text-amber-400 leading-none" style="font-size:9px;font-weight:800;color:#fbbf24;line-height:1;">RND 1/3</span>
+                    <span id="round-timer" class="font-display text-xl sm:text-2xl font-bold leading-none text-white tabular-nums mt-0.5" style="font-size:1.35rem;line-height:0.95;margin-top:2px;">1:30</span>
+                    <button id="btn-back-locker" class="pointer-events-auto text-[9px] text-slate-400 hover:text-white underline leading-none mt-0.5" style="pointer-events:auto;background:none;border:none;font-size:9px;color:#94a3b8;text-decoration:underline;line-height:1;margin-top:2px;">
+                        Menu [ESC]
+                    </button>
+                </div>
+
+                <!-- Opponent Bars (Right) -->
+                <div class="col-span-5 flex flex-col gap-0.5" style="display:flex;flex-direction:column;gap:3px;">
+                    <div class="flex items-center justify-between text-[11px] font-extrabold uppercase leading-none" style="display:flex;justify-content:space-between;font-size:11px;font-weight:800;line-height:1;">
+                        <span id="cpu-hp-text" class="text-white tabular-nums">100</span>
+                        <span class="text-rose-400 truncate" style="color:#fb7185;">IRON JAW</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-900/90 rounded-full overflow-hidden border border-white/15 flex justify-end" style="width:100%;height:8px;background:#0f172a;border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.18);display:flex;justify-content:flex-end;">
+                        <div id="cpu-hp-bar" class="h-full rounded-full bg-gradient-to-l from-rose-500 to-orange-400 transition-all duration-150" style="width: 100%;height:100%;border-radius:999px;background:linear-gradient(270deg,#f43f5e,#fb923c);"></div>
+                    </div>
+                    <div class="w-full h-1 bg-slate-900/90 rounded-full overflow-hidden flex justify-end" style="width:100%;height:4px;background:#0f172a;border-radius:999px;overflow:hidden;display:flex;justify-content:flex-end;">
+                        <div id="cpu-stam-bar" class="h-full rounded-full bg-gradient-to-l from-amber-500 to-yellow-300 transition-all duration-75" style="width: 100%;height:100%;border-radius:999px;background:linear-gradient(270deg,#f59e0b,#fde047);"></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Subtle Alternating Hand & Combo Telemetry Pill -->
+            <div class="flex items-center justify-between px-1" style="display:flex;align-items:center;justify-content:space-between;padding:0 4px;">
+                <div class="glass-panel rounded-full px-2.5 py-0.5 text-[10px] text-slate-300 flex items-center gap-1.5" style="border-radius:999px;padding:2px 10px;font-size:10px;display:flex;align-items:center;gap:5px;">
+                    <span class="text-slate-400" style="color:#94a3b8;">Next Alt Hand:</span>
+                    <span id="next-hand-pill" class="font-extrabold text-amber-300 uppercase" style="font-weight:800;color:#fcd34d;">LEFT</span>
+                </div>
+                <div id="combo-pill" class="hidden glass-panel rounded-full px-2.5 py-0.5 text-[10px] font-extrabold text-amber-300 border-amber-400/40" style="border-radius:999px;padding:2px 10px;font-size:10px;font-weight:800;color:#fcd34d;">
+                    2 HIT COMBO!
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Dynamic Ring Announcements (KO / Knockdown Count / Round Start) -->
+        <div id="ring-banner" class="hidden self-center text-center pointer-events-none px-6 py-3 rounded-2xl glass-panel border-amber-400/50" style="align-self:center;text-align:center;padding:14px 28px;border-radius:18px;border-color:rgba(251,191,36,0.5);">
+            <div id="banner-sub" class="text-xs sm:text-sm font-extrabold uppercase tracking-widest text-amber-300" style="font-size:13px;font-weight:800;color:#fcd34d;">ROUND 1</div>
+            <div id="banner-main" class="font-display text-5xl sm:text-7xl font-bold uppercase text-white leading-none drop-shadow-[0_4px_20px_rgba(0,0,0,0.9)]" style="font-size:4rem;line-height:0.95;color:#ffffff;">FIGHT!</div>
+        </div>
+
+        <!-- Bottom Action Dock: Footwork Pad + Guard + 5 Signature Punches -->
+        <div class="w-full max-w-5xl mx-auto flex flex-col md:flex-row items-center md:items-end justify-between gap-2.5 pointer-events-auto" style="width:100%;max-width:1024px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px;pointer-events:auto;">
+            
+            <!-- Left: Virtual Footwork D-Pad (Touch/Mouse) + Guard -->
+            <div class="flex items-center gap-2.5 w-full md:w-auto justify-between md:justify-start" style="display:flex;align-items:center;gap:10px;">
+                <div class="glass-panel rounded-2xl p-1.5 grid grid-cols-3 gap-1 w-32 h-24 shrink-0" style="border-radius:16px;padding:6px;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:128px;height:94px;">
+                    <div></div>
+                    <button data-move="up" class="move-btn punch-btn rounded-lg flex items-center justify-center text-xs font-bold text-slate-200" style="border-radius:8px;font-size:12px;" title="Move Away from Screen (W)">▲</button>
+                    <div></div>
+                    <button data-move="left" class="move-btn punch-btn rounded-lg flex items-center justify-center text-xs font-bold text-slate-200" style="border-radius:8px;font-size:12px;" title="Move Left (A)">◀</button>
+                    <button data-move="down" class="move-btn punch-btn rounded-lg flex items-center justify-center text-xs font-bold text-slate-200" style="border-radius:8px;font-size:12px;" title="Move Toward Screen (S)">▼</button>
+                    <button data-move="right" class="move-btn punch-btn rounded-lg flex items-center justify-center text-xs font-bold text-slate-200" style="border-radius:8px;font-size:12px;" title="Move Right (D)">▶</button>
+                </div>
+
+                <!-- Guard / High Block Button -->
+                <button id="btn-guard" class="guard-btn rounded-2xl px-4 py-3 h-24 flex-1 md:flex-initial md:w-28 flex flex-col items-center justify-center text-white" style="padding:10px 16px;height:94px;min-width:108px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                    <span class="font-display text-2xl font-bold uppercase leading-none" style="font-size:1.5rem;line-height:1;">GUARD</span>
+                    <span class="text-[10px] font-semibold text-blue-100 mt-1" style="font-size:10px;color:#dbeafe;margin-top:4px;">HOLD [SPACE]</span>
+                </button>
+            </div>
+
+            <!-- Right: All 5 Attacks (Alternating Jab, Left Hook, Right Hook, Alternating Uppercut, Alternating Overhand) -->
+            <div class="glass-panel rounded-2xl p-2 w-full md:w-auto flex-1 max-w-2xl" style="border-radius:16px;padding:8px;flex:1 1 520px;max-width:660px;">
+                <div class="grid grid-cols-5 gap-1.5 sm:gap-2" style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;">
+                    <!-- 1. JAB (Alternating) -->
+                    <button id="atk-jab" data-attack="jab" class="punch-btn rounded-xl py-2.5 px-1.5 flex flex-col items-center justify-between text-center" style="padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:rgba(14,165,233,0.22);color:#7dd3fc;">ALT L/R</span>
+                        <span class="font-display text-lg sm:text-2xl font-bold uppercase text-white leading-tight mt-1" style="font-size:1.35rem;line-height:1.1;margin-top:4px;">JAB</span>
+                        <span class="text-[10px] text-slate-400 font-semibold" style="font-size:10px;color:#94a3b8;">[J / 1]</span>
+                    </button>
+
+                    <!-- 2. LEFT HOOK -->
+                    <button id="atk-leftHook" data-attack="leftHook" class="punch-btn rounded-xl py-2.5 px-1.5 flex flex-col items-center justify-between text-center" style="padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.22);color:#6ee7b7;">LEFT</span>
+                        <span class="font-display text-lg sm:text-2xl font-bold uppercase text-white leading-tight mt-1" style="font-size:1.35rem;line-height:1.1;margin-top:4px;">L. HOOK</span>
+                        <span class="text-[10px] text-slate-400 font-semibold" style="font-size:10px;color:#94a3b8;">[R / 2]</span>
+                    </button>
+
+                    <!-- 3. RIGHT HOOK -->
+                    <button id="atk-rightHook" data-attack="rightHook" class="punch-btn rounded-xl py-2.5 px-1.5 flex flex-col items-center justify-between text-center" style="padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:rgba(16,185,129,0.22);color:#6ee7b7;">RIGHT</span>
+                        <span class="font-display text-lg sm:text-2xl font-bold uppercase text-white leading-tight mt-1" style="font-size:1.35rem;line-height:1.1;margin-top:4px;">R. HOOK</span>
+                        <span class="text-[10px] text-slate-400 font-semibold" style="font-size:10px;color:#94a3b8;">[T / 3]</span>
+                    </button>
+
+                    <!-- 4. UPPERCUT (Alternating) -->
+                    <button id="atk-uppercut" data-attack="uppercut" class="punch-btn rounded-xl py-2.5 px-1.5 flex flex-col items-center justify-between text-center" style="padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:rgba(245,158,11,0.22);color:#fcd34d;">ALT L/R</span>
+                        <span class="font-display text-lg sm:text-2xl font-bold uppercase text-white leading-tight mt-1" style="font-size:1.35rem;line-height:1.1;margin-top:4px;">UPPERCUT</span>
+                        <span class="text-[10px] text-slate-400 font-semibold" style="font-size:10px;color:#94a3b8;">[F / 4]</span>
+                    </button>
+
+                    <!-- 5. OVERHAND (Alternating) -->
+                    <button id="atk-overhand" data-attack="overhand" class="punch-btn rounded-xl py-2.5 px-1.5 flex flex-col items-center justify-between text-center" style="padding:10px 6px;display:flex;flex-direction:column;align-items:center;justify-content:space-between;">
+                        <span class="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300" style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:rgba(244,63,94,0.22);color:#fda4af;">ALT L/R</span>
+                        <span class="font-display text-lg sm:text-2xl font-bold uppercase text-white leading-tight mt-1" style="font-size:1.35rem;line-height:1.1;margin-top:4px;">OVERHAND</span>
+                        <span class="text-[10px] text-slate-400 font-semibold" style="font-size:10px;color:#94a3b8;">[G / 5]</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== MATCH OVER / VICTORY MODAL ==================== -->
+    <div id="gameover-modal" class="fixed inset-0 z-30 hidden items-center justify-center bg-black/75 backdrop-blur-md p-4">
+        <div class="glass-panel rounded-3xl p-6 sm:p-8 max-w-md w-full text-center border-amber-400/40 banner-animate" style="border-radius:24px;padding:28px;max-width:420px;width:100%;text-align:center;">
+            <div id="go-subtitle" class="text-xs font-extrabold uppercase tracking-widest text-amber-400 mb-1" style="font-size:12px;font-weight:800;color:#fbbf24;margin-bottom:4px;">KNOCKOUT VICTORY</div>
+            <h2 id="go-title" class="font-display text-5xl sm:text-6xl font-bold uppercase text-white leading-none mb-3" style="font-size:3.5rem;line-height:1;margin:0 0 12px 0;">YOU WIN!</h2>
+            <p id="go-stats" class="text-slate-300 text-sm mb-6" style="color:#cbd5e1;font-size:14px;margin-bottom:22px;">Landed 18 punches • 2 Knockdowns</p>
+            <div class="grid grid-cols-2 gap-3" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <button id="btn-rematch" class="cta-gold-btn py-3 px-4 rounded-xl font-display text-2xl font-bold uppercase text-slate-950 bg-gradient-to-r from-amber-300 to-amber-500 hover:from-amber-200 hover:to-amber-400 shadow-lg" style="padding:12px 16px;font-size:1.5rem;">
+                    REMATCH
+                </button>
+                <button id="btn-modal-locker" class="punch-btn py-3 px-4 rounded-xl font-display text-2xl font-bold uppercase text-white bg-slate-800 hover:bg-slate-700 border border-white/15" style="padding:12px 16px;font-size:1.5rem;">
+                    LOCKER ROOM
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 3D RAGDOLL BOXING CHAMPIONSHIP
+         * Complete self-contained 16-node Verlet + Active Balance Ragdoll Engine,
+         * Locker Room Customizer, Synthesized Web Audio SFX, and 5 Signature Attacks.
+         */
+
+        // ==========================================
+        // 1. SYNTHESIZED WEB AUDIO SOUND EFFECTS
+        // ==========================================
+        const SoundFX = (() => {
+            let ctx = null;
+            function ensureCtx() {
+                if (!ctx && (window.AudioContext || window.webkitAudioContext)) {
+                    ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (ctx && ctx.state === 'suspended') ctx.resume();
+                return ctx;
+            }
+            function playPunch(power = 1.0, isBlocked = false) {
+                const c = ensureCtx();
+                if (!c) return;
+                const now = c.currentTime;
+                const osc = c.createOscillator();
+                const gain = c.createGain();
+                osc.type = isBlocked ? 'triangle' : 'sine';
+                osc.frequency.setValueAtTime(isBlocked ? 190 : 145 * power, now);
+                osc.frequency.exponentialRampToValueAtTime(34, now + 0.16);
+                gain.gain.setValueAtTime(Math.min(0.45, 0.28 * power), now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                osc.connect(gain);
+                gain.connect(c.destination);
+                osc.start(now);
+                osc.stop(now + 0.19);
+            }
+            function playWhoosh() {
+                const c = ensureCtx();
+                if (!c) return;
+                const now = c.currentTime;
+                const osc = c.createOscillator();
+                const gain = c.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(260, now);
+                osc.frequency.exponentialRampToValueAtTime(90, now + 0.11);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                osc.connect(gain);
+                gain.connect(c.destination);
+                osc.start(now);
+                osc.stop(now + 0.13);
+            }
+            function playBell(count = 1) {
+                const c = ensureCtx();
+                if (!c) return;
+                for (let i = 0; i < count; i++) {
+                    const start = c.currentTime + i * 0.28;
+                    [587.33, 880, 1174.66].forEach((freq, idx) => {
+                        const osc = c.createOscillator();
+                        const gain = c.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, start);
+                        gain.gain.setValueAtTime(0.16 / (idx + 1), start);
+                        gain.gain.exponentialRampToValueAtTime(0.0008, start + 1.1);
+                        osc.connect(gain);
+                        gain.connect(c.destination);
+                        osc.start(start);
+                        osc.stop(start + 1.15);
+                    });
+                }
+            }
+            return { playPunch, playWhoosh, playBell };
+        })();
+
+        // ==========================================
+        // 2. CONFIGURATION & CUSTOMIZATION STATE
+        // ==========================================
+        const SKIN_TONES = [
+            { name: 'Porcelain', hex: '#f5cbb7' },
+            { name: 'Tan', hex: '#d89b74' },
+            { name: 'Bronze', hex: '#b67549' },
+            { name: 'Chestnut', hex: '#834b2b' },
+            { name: 'Espresso', hex: '#4e2b18' }
+        ];
+
+        const GEAR_COLORS = [
+            { name: 'Championship Gold', primary: '#eab308', accent: '#111827' },
+            { name: 'Crimson Fury', primary: '#dc2626', accent: '#fef2f2' },
+            { name: 'Royal Cobalt', primary: '#2563eb', accent: '#facc15' },
+            { name: 'Emerald Viper', primary: '#059669', accent: '#ecfdf5' },
+            { name: 'Obsidian Nights', primary: '#1e293b', accent: '#f59e0b' }
+        ];
+
+        const BLING_CATALOG = [
+            { id: 'chain', label: '24K Cuban Chain' },
+            { id: 'belt', label: 'Champ Title Belt' },
+            { id: 'cuffs', label: 'Iced Wrist Cuffs' },
+            { id: 'crown', label: "King's Crown" },
+            { id: 'grillz', label: 'Diamond Grillz' }
+        ];
+
+        const playerConfig = {
+            height: 1.00,
+            weight: 1.00,
+            reach: 1.00,
+            skinColor: SKIN_TONES[2].hex,
+            gearColor: GEAR_COLORS[0].primary,
+            gearAccent: GEAR_COLORS[0].accent,
+            bling: {
+                chain: true,
+                belt: true,
+                cuffs: false,
+                crown: true,
+                grillz: false
+            }
+        };
+
+        const GAME = {
+            mode: 'LOCKER', // 'LOCKER' | 'FIGHT' | 'REPLAY' | 'COUNTDOWN' | 'GAMEOVER'
+            round: 1,
+            maxRounds: 3,
+            roundTime: 90,
+            hitStop: 0,
+            cameraShake: 0,
+            lockerYaw: 0.45,
+            isDraggingLocker: false,
+            lastPointerX: 0,
+            kdTarget: null,
+            kdCount: 0,
+            kdTimer: 0,
+            replayBuffer: [],
+            replayFrames: [],
+            replayIndex: 0,
+            replayOrbitAngle: 0
+        };
+
+        // ==========================================
+        // 3. THREE.JS ARENA & RING SCENE SETUP
+        // ==========================================
+        let scene, camera, renderer;
+        let ringRopes = [];
+        let impactParticles = [];
+
+        function initThreeScene() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x070b14);
+            scene.fog = new THREE.FogExp2(0x070b14, 0.042);
+
+            camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 1.85, 5.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Arena Lighting
+            const hemiLight = new THREE.HemisphereLight(0xdbeafe, 0x1e293b, 0.65);
+            scene.add(hemiLight);
+
+            const mainSpot = new THREE.SpotLight(0xfffbeb, 1.45, 28, Math.PI * 0.36, 0.45, 1.1);
+            mainSpot.position.set(0, 8.5, 2.2);
+            mainSpot.castShadow = true;
+            mainSpot.shadow.mapSize.width = 1024;
+            mainSpot.shadow.mapSize.height = 1024;
+            scene.add(mainSpot);
+
+            const rimBlue = new THREE.PointLight(0x38bdf8, 0.75, 14);
+            rimBlue.position.set(-4.5, 3.2, -3.5);
+            scene.add(rimBlue);
+
+            const rimGold = new THREE.PointLight(0xfbbf24, 0.75, 14);
+            rimGold.position.set(4.5, 3.2, -3.5);
+            scene.add(rimGold);
+
+            buildBoxingRing();
+        }
+
+        function buildBoxingRing() {
+            const ringGroup = new THREE.Group();
+
+            // Canvas Mat
+            const matGeo = new THREE.BoxGeometry(6.4, 0.36, 6.4);
+            const matMat = new THREE.MeshStandardMaterial({
+                color: 0x1e293b,
+                roughness: 0.85,
+                metalness: 0.05
+            });
+            const matMesh = new THREE.Mesh(matGeo, matMat);
+            matMesh.position.y = -0.18;
+            matMesh.receiveShadow = true;
+            ringGroup.add(matMesh);
+
+            // Inner Ring Logo Circle
+            const ringTrim = new THREE.Mesh(
+                new THREE.RingGeometry(1.35, 1.46, 48),
+                new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide })
+            );
+            ringTrim.rotation.x = -Math.PI / 2;
+            ringTrim.position.y = 0.005;
+            ringGroup.add(ringTrim);
+
+            // Ring Apron Skirt
+            const apronGeo = new THREE.BoxGeometry(6.6, 0.7, 6.6);
+            const apronMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7 });
+            const apron = new THREE.Mesh(apronGeo, apronMat);
+            apron.position.y = -0.68;
+            ringGroup.add(apron);
+
+            // 4 Corner Posts & Turnbuckles
+            const postCoords = [
+                { x: -3.05, z: -3.05, color: 0x2563eb },
+                { x: 3.05, z: -3.05, color: 0xdc2626 },
+                { x: -3.05, z: 3.05, color: 0xf8fafc },
+                { x: 3.05, z: 3.05, color: 0xf8fafc }
+            ];
+
+            postCoords.forEach(p => {
+                const post = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.08, 0.08, 1.55, 12),
+                    new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.7, roughness: 0.3 })
+                );
+                post.position.set(p.x, 0.72, p.z);
+                post.castShadow = true;
+                ringGroup.add(post);
+
+                const pad = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.11, 0.11, 1.15, 12),
+                    new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.5 })
+                );
+                pad.position.set(p.x, 0.68, p.z);
+                ringGroup.add(pad);
+            });
+
+            // 4-Tier Ring Ropes
+            const ropeHeights = [0.36, 0.64, 0.92, 1.20];
+            const ropeColors = [0xdc2626, 0xf8fafc, 0x2563eb, 0xdc2626];
+            const sides = [
+                { a: [-3.05, -3.05], b: [3.05, -3.05] },
+                { a: [3.05, -3.05], b: [3.05, 3.05] },
+                { a: [3.05, 3.05], b: [-3.05, 3.05] },
+                { a: [-3.05, 3.05], b: [-3.05, -3.05] }
+            ];
+
+            ropeHeights.forEach((h, rIdx) => {
+                sides.forEach(side => {
+                    const start = new THREE.Vector3(side.a[0], h, side.a[1]);
+                    const end = new THREE.Vector3(side.b[0], h, side.b[1]);
+                    const mid = start.clone().lerp(end, 0.5);
+                    const len = start.distanceTo(end);
+                    const ropeMesh = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.022, 0.022, len, 8),
+                        new THREE.MeshStandardMaterial({ color: ropeColors[rIdx], roughness: 0.4 })
+                    );
+                    ropeMesh.position.copy(mid);
+                    ropeMesh.lookAt(end);
+                    ropeMesh.rotateX(Math.PI / 2);
+                    ringGroup.add(ropeMesh);
+                    ringRopes.push({ mesh: ropeMesh, baseMid: mid.clone() });
+                });
+            });
+
+            scene.add(ringGroup);
+        }
+
+        // ==========================================
+        // 4. IMPACT PARTICLE SYSTEM
+        // ==========================================
+        function spawnImpactParticles(pos, colorHex = 0xfbbf24, count = 14) {
+            const geo = new THREE.SphereGeometry(0.026, 6, 6);
+            for (let i = 0; i < count; i++) {
+                const mat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 1 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.copy(pos);
+                scene.add(mesh);
+                impactParticles.push({
+                    mesh,
+                    vel: new THREE.Vector3(
+                        (Math.random() - 0.5) * 3.8,
+                        Math.random() * 2.6 + 0.6,
+                        (Math.random() - 0.5) * 3.8
+                    ),
+                    life: 0.45 + Math.random() * 0.25
+                });
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = impactParticles.length - 1; i >= 0; i--) {
+                const p = impactParticles[i];
+                p.life -= dt;
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    p.mesh.geometry.dispose();
+                    p.mesh.material.dispose();
+                    impactParticles.splice(i, 1);
+                    continue;
+                }
+                p.vel.y -= 9.8 * dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                p.mesh.material.opacity = Math.max(0, p.life * 2);
+            }
+        }
+
+        // ==========================================
+        // 5. 16-NODE ARTICULATED ACTIVE RAGDOLL BOXER
+        // ==========================================
+        class RagdollBoxer {
+            constructor(name, isPlayer, config) {
+                this.name = name;
+                this.isPlayer = isPlayer;
+                this.config = JSON.parse(JSON.stringify(config));
+                this.facing = isPlayer ? 1 : -1;
+
+                // Combat State
+                this.hp = 100;
+                this.maxHp = 100;
+                this.stamina = 100;
+                this.maxStamina = 100;
+                this.isGuarding = false;
+                this.knockedDown = false;
+                this.knockdowns = 0;
+                this.punchesLanded = 0;
+                this.combo = 0;
+                this.comboTimer = 0;
+
+                // Alternating Hand State (true = next alternating punch uses Left hand, false = Right hand)
+                this.altUseLeft = true;
+
+                // Active Attack State
+                this.attack = null;
+                this.stepPhase = 0;
+                this.crownKnockedOff = false;
+                this.crownVel = new THREE.Vector3();
+
+                this.rootGroup = new THREE.Group();
+                scene.add(this.rootGroup);
+
+                this.nodes = {};
+                this.constraints = [];
+                this.limbMeshes = [];
+                this.blingMeshes = {};
+
+                this.buildSkeletonAndMeshes();
+            }
+
+            getStats() {
+                const h = this.config.height;
+                const w = this.config.weight;
+                const r = this.config.reach;
+                return {
+                    power: (0.78 + (w - 0.8) * 0.72 + (h - 0.86) * 0.25),
+                    speed: Math.max(0.74, 1.24 - (w - 0.8) * 0.55 - (h - 0.86) * 0.18),
+                    reach: r
+                };
+            }
+
+            addNode(id, x, y, z, mass = 1.0) {
+                this.nodes[id] = {
+                    id,
+                    pos: new THREE.Vector3(x, y, z),
+                    oldPos: new THREE.Vector3(x, y, z),
+                    mass
+                };
+            }
+
+            addConstraint(idA, idB, stiffness = 0.92) {
+                const restLen = this.nodes[idA].pos.distanceTo(this.nodes[idB].pos);
+                this.constraints.push({ idA, idB, restLen, stiffness });
+            }
+
+            buildSkeletonAndMeshes() {
+                // Clear existing meshes if rebuilding
+                while (this.rootGroup.children.length > 0) {
+                    const child = this.rootGroup.children[0];
+                    this.rootGroup.remove(child);
+                }
+                this.nodes = {};
+                this.constraints = [];
+                this.limbMeshes = [];
+                this.blingMeshes = {};
+
+                const h = this.config.height;
+                const w = this.config.weight;
+                const r = this.config.reach;
+                const f = this.facing;
+                const baseX = this.isPlayer ? -1.15 : 1.15;
+
+                // Anatomical joint positions scaled by height, weight, and reach
+                const footY = 0.08;
+                const kneeY = 0.52 * h;
+                const hipY = 0.96 * h;
+                const pelvisY = 1.00 * h;
+                const abdomenY = 1.22 * h;
+                const chestY = 1.46 * h;
+                const headY = 1.76 * h;
+
+                const hipSpread = 0.15 * Math.sqrt(w);
+                const shoulderSpread = 0.23 * Math.sqrt(w);
+                const upperArmLen = 0.30 * r;
+                const foreArmLen = 0.30 * r;
+
+                // 16 Ragdoll Nodes
+                this.addNode('pelvis', baseX, pelvisY, 0, 2.2 * w);
+                this.addNode('abdomen', baseX, abdomenY, 0, 1.8 * w);
+                this.addNode('chest', baseX, chestY, 0, 2.4 * w);
+                this.addNode('head', baseX, headY, 0, 1.2);
+
+                this.addNode('lHip', baseX - f * 0.04, hipY, -hipSpread, 1.4 * w);
+                this.addNode('rHip', baseX + f * 0.04, hipY, hipSpread, 1.4 * w);
+                this.addNode('lKnee', baseX - f * 0.06, kneeY, -hipSpread * 1.05, 1.1 * w);
+                this.addNode('rKnee', baseX + f * 0.08, kneeY, hipSpread * 1.05, 1.1 * w);
+                this.addNode('lFoot', baseX - f * 0.16, footY, -hipSpread * 1.1, 1.6);
+                this.addNode('rFoot', baseX + f * 0.18, footY, hipSpread * 1.1, 1.6);
+
+                this.addNode('lShoulder', baseX, chestY + 0.02, -shoulderSpread, 1.3 * w);
+                this.addNode('rShoulder', baseX, chestY + 0.02, shoulderSpread, 1.3 * w);
+                this.addNode('lElbow', baseX + f * 0.14, chestY - upperArmLen * 0.72, -shoulderSpread * 1.12, 0.9);
+                this.addNode('rElbow', baseX + f * 0.10, chestY - upperArmLen * 0.72, shoulderSpread * 1.12, 0.9);
+                this.addNode('lHand', baseX + f * (0.28 + foreArmLen * 0.45), chestY + 0.04, -shoulderSpread * 0.75, 0.85);
+                this.addNode('rHand', baseX + f * (0.22 + foreArmLen * 0.40), chestY + 0.06, shoulderSpread * 0.75, 0.85);
+
+                // Structural Constraints
+                this.addConstraint('pelvis', 'abdomen', 0.98);
+                this.addConstraint('abdomen', 'chest', 0.98);
+                this.addConstraint('pelvis', 'chest', 0.94);
+                this.addConstraint('chest', 'head', 0.95);
+
+                this.addConstraint('pelvis', 'lHip', 0.98);
+                this.addConstraint('pelvis', 'rHip', 0.98);
+                this.addConstraint('lHip', 'rHip', 0.95);
+                this.addConstraint('lHip', 'lKnee', 0.98);
+                this.addConstraint('rHip', 'rKnee', 0.98);
+                this.addConstraint('lKnee', 'lFoot', 0.98);
+                this.addConstraint('rKnee', 'rFoot', 0.98);
+                // Anti-collapse leg struts
+                this.addConstraint('lHip', 'lFoot', 0.55);
+                this.addConstraint('rHip', 'rFoot', 0.55);
+
+                this.addConstraint('chest', 'lShoulder', 0.98);
+                this.addConstraint('chest', 'rShoulder', 0.98);
+                this.addConstraint('lShoulder', 'rShoulder', 0.95);
+                this.addConstraint('lShoulder', 'lElbow', 0.96);
+                this.addConstraint('rShoulder', 'rElbow', 0.96);
+                this.addConstraint('lElbow', 'lHand', 0.96);
+                this.addConstraint('rElbow', 'rHand', 0.96);
+
+                // Materials
+                const skinMat = new THREE.MeshStandardMaterial({ color: this.config.skinColor, roughness: 0.55, metalness: 0.05 });
+                const gearMat = new THREE.MeshStandardMaterial({ color: this.config.gearColor, roughness: 0.35, metalness: 0.25 });
+                const accentMat = new THREE.MeshStandardMaterial({ color: this.config.gearAccent, roughness: 0.4 });
+                const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.92, roughness: 0.14 });
+                const diamondMat = new THREE.MeshStandardMaterial({ color: 0xe0f2fe, emissive: 0x38bdf8, emissiveIntensity: 0.35, metalness: 0.95, roughness: 0.05 });
+
+                // Helper to create capsule/cylinder limb between 2 nodes
+                const addLimb = (nodeA, nodeB, radiusTop, radiusBot, mat) => {
+                    const geo = new THREE.CylinderGeometry(radiusTop, radiusBot, 1, 12);
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.castShadow = true;
+                    this.rootGroup.add(mesh);
+                    this.limbMeshes.push({ mesh, nodeA, nodeB });
+                    return mesh;
+                };
+
+                const bulk = Math.sqrt(w);
+                // Torso & Trunks
+                addLimb('pelvis', 'abdomen', 0.17 * bulk, 0.19 * bulk, gearMat);
+                addLimb('abdomen', 'chest', 0.21 * bulk, 0.17 * bulk, skinMat);
+
+                // Legs & Boots
+                addLimb('lHip', 'lKnee', 0.095 * bulk, 0.075 * bulk, skinMat);
+                addLimb('rHip', 'rKnee', 0.095 * bulk, 0.075 * bulk, skinMat);
+                addLimb('lKnee', 'lFoot', 0.072 * bulk, 0.058 * bulk, skinMat);
+                addLimb('rKnee', 'rFoot', 0.072 * bulk, 0.058 * bulk, skinMat);
+
+                // Arms
+                addLimb('lShoulder', 'lElbow', 0.072 * bulk, 0.060 * bulk, skinMat);
+                addLimb('rShoulder', 'rElbow', 0.072 * bulk, 0.060 * bulk, skinMat);
+                addLimb('lElbow', 'lHand', 0.060 * bulk, 0.052 * bulk, skinMat);
+                addLimb('rElbow', 'rHand', 0.060 * bulk, 0.052 * bulk, skinMat);
+
+                // Head Mesh
+                this.headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.135, 16, 16), skinMat);
+                this.headMesh.castShadow = true;
+                this.rootGroup.add(this.headMesh);
+
+                // Eyes & Mouth/Grillz
+                const eyeGeo = new THREE.SphereGeometry(0.018, 8, 8);
+                const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+                const lEye = new THREE.Mesh(eyeGeo, eyeMat);
+                lEye.position.set(0.115, 0.03, -0.045);
+                const rEye = new THREE.Mesh(eyeGeo, eyeMat);
+                rEye.position.set(0.115, 0.03, 0.045);
+                this.headMesh.add(lEye, rEye);
+
+                // Diamond Grillz
+                const grillz = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.022, 0.068), diamondMat);
+                grillz.position.set(0.122, -0.042, 0);
+                this.headMesh.add(grillz);
+                this.blingMeshes.grillz = grillz;
+
+                // King's Crown
+                const crownGroup = new THREE.Group();
+                const crownBase = new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.105, 0.065, 12), goldMat);
+                crownGroup.add(crownBase);
+                for (let i = 0; i < 5; i++) {
+                    const ang = (i / 5) * Math.PI * 2;
+                    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.024, 0.055, 6), goldMat);
+                    spike.position.set(Math.cos(ang) * 0.095, 0.055, Math.sin(ang) * 0.095);
+                    crownGroup.add(spike);
+                }
+                crownGroup.position.set(0, 0.145, 0);
+                this.headMesh.add(crownGroup);
+                this.blingMeshes.crown = crownGroup;
+
+                // Boxing Gloves
+                const gloveGeo = new THREE.SphereGeometry(0.105, 14, 14);
+                this.lGloveMesh = new THREE.Mesh(gloveGeo, gearMat);
+                this.rGloveMesh = new THREE.Mesh(gloveGeo, gearMat);
+                this.lGloveMesh.castShadow = true;
+                this.rGloveMesh.castShadow = true;
+                this.rootGroup.add(this.lGloveMesh, this.rGloveMesh);
+
+                // Iced Wrist Cuffs
+                const cuffGeo = new THREE.CylinderGeometry(0.068, 0.068, 0.045, 12);
+                const lCuff = new THREE.Mesh(cuffGeo, diamondMat);
+                const rCuff = new THREE.Mesh(cuffGeo, diamondMat);
+                this.lGloveMesh.add(lCuff);
+                this.rGloveMesh.add(rCuff);
+                this.blingMeshes.cuffs = [lCuff, rCuff];
+
+                // Boots
+                const bootGeo = new THREE.BoxGeometry(0.22, 0.11, 0.11);
+                this.lBootMesh = new THREE.Mesh(bootGeo, accentMat);
+                this.rBootMesh = new THREE.Mesh(bootGeo, accentMat);
+                this.rootGroup.add(this.lBootMesh, this.rBootMesh);
+
+                // 24K Cuban Link Chain + Diamond Pendant
+                const chainGroup = new THREE.Group();
+                const torus = new THREE.Mesh(new THREE.TorusGeometry(0.155 * bulk, 0.018, 8, 20), goldMat);
+                torus.rotation.x = Math.PI / 2.3;
+                chainGroup.add(torus);
+                const pendant = new THREE.Mesh(new THREE.OctahedronGeometry(0.048, 0), diamondMat);
+                pendant.position.set(0.145 * bulk, -0.07, 0);
+                chainGroup.add(pendant);
+                this.rootGroup.add(chainGroup);
+                this.blingMeshes.chain = chainGroup;
+
+                // Championship Title Belt
+                const beltGroup = new THREE.Group();
+                const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.195 * bulk, 0.195 * bulk, 0.08, 18, 1, true), accentMat);
+                const plate = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.11, 0.16), goldMat);
+                plate.position.set(0.195 * bulk, 0, 0);
+                const gem = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), diamondMat);
+                gem.position.set(0.215 * bulk, 0, 0);
+                beltGroup.add(strap, plate, gem);
+                this.rootGroup.add(beltGroup);
+                this.blingMeshes.belt = beltGroup;
+
+                this.updateBlingVisibility();
+                this.syncMeshes();
+            }
+
+            updateBlingVisibility() {
+                const b = this.config.bling;
+                if (this.blingMeshes.chain) this.blingMeshes.chain.visible = !!b.chain;
+                if (this.blingMeshes.belt) this.blingMeshes.belt.visible = !!b.belt;
+                if (this.blingMeshes.crown) this.blingMeshes.crown.visible = !!b.crown && !this.crownKnockedOff;
+                if (this.blingMeshes.grillz) this.blingMeshes.grillz.visible = !!b.grillz;
+                if (this.blingMeshes.cuffs) {
+                    this.blingMeshes.cuffs.forEach(c => { c.visible = !!b.cuffs; });
+                }
+            }
+
+            applyImpulse(nodeId, ix, iy, iz) {
+                const n = this.nodes[nodeId];
+                if (!n) return;
+                n.pos.x += ix;
+                n.pos.y += iy;
+                n.pos.z += iz;
+            }
+
+            triggerAttack(type) {
+                if (this.knockedDown || this.attack) return false;
+
+                const specs = {
+                    jab:       { dur: 0.26, stam: 7,  dmg: 7,  reachMult: 1.05, alternating: true },
+                    leftHook:  { dur: 0.36, stam: 12, dmg: 12, reachMult: 0.92, hand: 'left' },
+                    rightHook: { dur: 0.36, stam: 12, dmg: 12, reachMult: 0.92, hand: 'right' },
+                    uppercut:  { dur: 0.40, stam: 15, dmg: 15, reachMult: 0.88, alternating: true },
+                    overhand:  { dur: 0.44, stam: 17, dmg: 17, reachMult: 0.98, alternating: true }
+                };
+
+                const spec = specs[type];
+                if (!spec || this.stamina < spec.stam) return false;
+
+                this.stamina = Math.max(0, this.stamina - spec.stam);
+                this.isGuarding = false;
+
+                let hand = spec.hand;
+                if (spec.alternating) {
+                    hand = this.altUseLeft ? 'left' : 'right';
+                    this.altUseLeft = !this.altUseLeft;
+                }
+
+                this.attack = {
+                    type,
+                    hand,
+                    elapsed: 0,
+                    duration: spec.dur / this.getStats().speed,
+                    dmg: spec.dmg * this.getStats().power,
+                    reachMult: spec.reachMult,
+                    hasHit: false
+                };
+
+                SoundFX.playWhoosh();
+                return true;
+            }
+
+            stepPhysics(dt, moveInput, opponent) {
+                if (this.comboTimer > 0) {
+                    this.comboTimer -= dt;
+                    if (this.comboTimer <= 0) this.combo = 0;
+                }
+
+                // Stamina regeneration
+                const regenRate = this.isGuarding ? 9 : 16;
+                this.stamina = Math.min(this.maxStamina, this.stamina + regenRate * dt);
+
+                // Face opponent automatically during active fight
+                if (opponent && !this.knockedDown) {
+                    const dx = opponent.nodes.pelvis.pos.x - this.nodes.pelvis.pos.x;
+                    if (Math.abs(dx) > 0.05) {
+                        this.facing = dx >= 0 ? 1 : -1;
+                    }
+                }
+
+                const h = this.config.height;
+                const w = this.config.weight;
+                const r = this.config.reach;
+                const f = this.facing;
+                const bulk = Math.sqrt(w);
+
+                // 1. Verlet Integration + Gravity + Damping
+                const damping = this.knockedDown ? 0.965 : 0.86;
+                const gravity = this.knockedDown ? -14.5 : -6.5;
+
+                for (const id in this.nodes) {
+                    const n = this.nodes[id];
+                    const vx = (n.pos.x - n.oldPos.x) * damping;
+                    const vy = (n.pos.y - n.oldPos.y) * damping;
+                    const vz = (n.pos.z - n.oldPos.z) * damping;
+
+                    n.oldPos.copy(n.pos);
+                    n.pos.x += vx;
+                    n.pos.y += vy + gravity * dt * dt;
+                    n.pos.z += vz;
+                }
+
+                // 2. Active Upright Balance & Stance Forces (when standing)
+                if (!this.knockedDown) {
+                    const pPelvis = this.nodes.pelvis.pos;
+                    const pChest = this.nodes.chest.pos;
+                    const pHead = this.nodes.head.pos;
+
+                    // Footwork translation (deliberate, realistic boxing pace)
+                    const moveSpeed = (1.42 * this.getStats().speed) * dt;
+                    let mx = (moveInput.x || 0) * moveSpeed;
+                    let mz = (moveInput.z || 0) * moveSpeed;
+
+                    if (Math.abs(mx) > 0.0001 || Math.abs(mz) > 0.0001) {
+                        this.stepPhase += dt * 8.5;
+                        pPelvis.x += mx;
+                        pPelvis.z += mz;
+                        this.nodes.lFoot.pos.x += mx;
+                        this.nodes.lFoot.pos.z += mz;
+                        this.nodes.rFoot.pos.x += mx;
+                        this.nodes.rFoot.pos.z += mz;
+
+                        // Procedural stepping lift
+                        const lLift = Math.max(0, Math.sin(this.stepPhase)) * 0.06;
+                        const rLift = Math.max(0, Math.sin(this.stepPhase + Math.PI)) * 0.06;
+                        this.nodes.lFoot.pos.y = 0.08 + lLift;
+                        this.nodes.rFoot.pos.y = 0.08 + rLift;
+                    } else {
+                        // Dampen horizontal momentum when no directional input is held so the boxer stays planted
+                        for (const id in this.nodes) {
+                            const n = this.nodes[id];
+                            n.oldPos.x = n.pos.x - (n.pos.x - n.oldPos.x) * 0.35;
+                            n.oldPos.z = n.pos.z - (n.pos.z - n.oldPos.z) * 0.35;
+                        }
+                        this.nodes.lFoot.pos.y = 0.08;
+                        this.nodes.rFoot.pos.y = 0.08;
+
+                        // Subtle idle fighter bounce
+                        this.stepPhase += dt * 3.4;
+                        const bounce = Math.sin(this.stepPhase) * 0.006;
+                        pPelvis.y += bounce;
+                    }
+
+                    // Keep feet planted in stance around pelvis
+                    const hipSpread = 0.15 * bulk;
+                    const targetLFootX = pPelvis.x - f * 0.16;
+                    const targetRFootX = pPelvis.x + f * 0.18;
+                    const targetLFootZ = pPelvis.z - hipSpread * 1.1;
+                    const targetRFootZ = pPelvis.z + hipSpread * 1.1;
+
+                    this.nodes.lFoot.pos.x += (targetLFootX - this.nodes.lFoot.pos.x) * 0.25;
+                    this.nodes.rFoot.pos.x += (targetRFootX - this.nodes.rFoot.pos.x) * 0.25;
+                    this.nodes.lFoot.pos.z += (targetLFootZ - this.nodes.lFoot.pos.z) * 0.25;
+                    this.nodes.rFoot.pos.z += (targetRFootZ - this.nodes.rFoot.pos.z) * 0.25;
+
+                    // Sync oldPos on feet so foot alignment spring doesn't inject sideways drift velocity
+                    this.nodes.lFoot.oldPos.x = this.nodes.lFoot.pos.x;
+                    this.nodes.lFoot.oldPos.z = this.nodes.lFoot.pos.z;
+                    this.nodes.rFoot.oldPos.x = this.nodes.rFoot.pos.x;
+                    this.nodes.rFoot.oldPos.z = this.nodes.rFoot.pos.z;
+
+                    // Wobble factor when low HP or low stamina
+                    const hpRatio = this.hp / this.maxHp;
+                    const stamRatio = this.stamina / this.maxStamina;
+                    const wobble = (1 - Math.min(hpRatio, stamRatio)) * 0.045;
+                    const wobbleX = Math.sin(this.stepPhase * 1.7) * wobble;
+                    const wobbleZ = Math.cos(this.stepPhase * 1.3) * wobble;
+
+                    // Upright Posture Springs
+                    const targetPelvisY = 1.00 * h;
+                    const targetChestY = 1.46 * h;
+                    const targetHeadY = 1.76 * h;
+
+                    pPelvis.y += (targetPelvisY - pPelvis.y) * 0.28;
+                    pChest.x += ((pPelvis.x + f * 0.05 + wobbleX) - pChest.x) * 0.25;
+                    pChest.y += (targetChestY - pChest.y) * 0.30;
+                    pChest.z += ((pPelvis.z + wobbleZ) - pChest.z) * 0.25;
+
+                    pHead.x += ((pChest.x + f * 0.06 + wobbleX * 1.4) - pHead.x) * 0.26;
+                    pHead.y += (targetHeadY - pHead.y) * 0.32;
+                    pHead.z += ((pChest.z + wobbleZ * 1.4) - pHead.z) * 0.26;
+
+                    // Knee Alignment (prevent inward buckling or crawling)
+                    const kneeForward = f * 0.07;
+                    this.nodes.lKnee.pos.x += ((pPelvis.x - f * 0.05 + kneeForward) - this.nodes.lKnee.pos.x) * 0.22;
+                    this.nodes.rKnee.pos.x += ((pPelvis.x + f * 0.09 + kneeForward) - this.nodes.rKnee.pos.x) * 0.22;
+                    this.nodes.lKnee.pos.z += ((pPelvis.z - hipSpread * 1.05) - this.nodes.lKnee.pos.z) * 0.22;
+                    this.nodes.rKnee.pos.z += ((pPelvis.z + hipSpread * 1.05) - this.nodes.rKnee.pos.z) * 0.22;
+
+                    // Arm Stance / Guard / Punch Trajectory Targets
+                    const shoulderSpread = 0.23 * bulk;
+                    let lHandTarget = new THREE.Vector3(
+                        pChest.x + f * (0.28 * r),
+                        pChest.y + 0.06,
+                        pChest.z - shoulderSpread * 0.72
+                    );
+                    let rHandTarget = new THREE.Vector3(
+                        pChest.x + f * (0.22 * r),
+                        pChest.y + 0.08,
+                        pChest.z + shoulderSpread * 0.72
+                    );
+                    let lElbowTarget = new THREE.Vector3(
+                        pChest.x + f * 0.12,
+                        pChest.y - 0.20 * r,
+                        pChest.z - shoulderSpread * 1.15
+                    );
+                    let rElbowTarget = new THREE.Vector3(
+                        pChest.x + f * 0.08,
+                        pChest.y - 0.20 * r,
+                        pChest.z + shoulderSpread * 1.15
+                    );
+
+                    if (this.isGuarding) {
+                        lHandTarget.set(pHead.x + f * 0.17, pHead.y - 0.02, pHead.z - 0.085);
+                        rHandTarget.set(pHead.x + f * 0.17, pHead.y - 0.02, pHead.z + 0.085);
+                        lElbowTarget.set(pChest.x + f * 0.14, pChest.y - 0.04, pChest.z - shoulderSpread * 0.85);
+                        rElbowTarget.set(pChest.x + f * 0.14, pChest.y - 0.04, pChest.z + shoulderSpread * 0.85);
+                    }
+
+                    // Active Punch Animation & Hit Detection
+                    if (this.attack) {
+                        this.attack.elapsed += dt;
+                        const t = Math.min(1, this.attack.elapsed / this.attack.duration);
+                        const ext = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 extension curve
+                        const isLeft = this.attack.hand === 'left';
+                        const sideSign = isLeft ? -1 : 1;
+                        const reachDist = (0.64 * r) * this.attack.reachMult;
+
+                        const activeHandTarget = isLeft ? lHandTarget : rHandTarget;
+                        const activeElbowTarget = isLeft ? lElbowTarget : rElbowTarget;
+
+                        if (this.attack.type === 'jab') {
+                            activeHandTarget.set(
+                                pChest.x + f * (0.25 + reachDist * ext),
+                                pHead.y - 0.02,
+                                pChest.z + sideSign * (shoulderSpread * (1 - ext * 0.65))
+                            );
+                            activeElbowTarget.set(
+                                pChest.x + f * (0.14 + reachDist * 0.45 * ext),
+                                pChest.y - 0.08 * (1 - ext),
+                                pChest.z + sideSign * shoulderSpread * 0.9
+                            );
+                            pChest.x += f * 0.03 * ext;
+                        } else if (this.attack.type === 'leftHook' || this.attack.type === 'rightHook') {
+                            const arcAngle = (1 - ext) * 1.25;
+                            activeHandTarget.set(
+                                pChest.x + f * (Math.cos(arcAngle) * reachDist * 0.92),
+                                pHead.y - 0.01,
+                                pChest.z + sideSign * (Math.sin(arcAngle) * 0.46 * r)
+                            );
+                            activeElbowTarget.set(
+                                pChest.x + f * (Math.cos(arcAngle + 0.35) * reachDist * 0.55),
+                                pHead.y - 0.03,
+                                pChest.z + sideSign * (0.34 * r)
+                            );
+                            pChest.z -= sideSign * 0.04 * ext;
+                        } else if (this.attack.type === 'uppercut') {
+                            const dip = Math.sin(Math.min(1, t * 2) * Math.PI) * 0.10;
+                            pPelvis.y -= dip * (1 - ext);
+                            activeHandTarget.set(
+                                pChest.x + f * (0.22 + reachDist * 0.72 * ext),
+                                pChest.y - 0.16 * (1 - ext) + 0.34 * ext,
+                                pChest.z + sideSign * 0.06
+                            );
+                            activeElbowTarget.set(
+                                pChest.x + f * (0.16 + 0.22 * ext),
+                                pChest.y - 0.24 + 0.24 * ext,
+                                pChest.z + sideSign * 0.18
+                            );
+                        } else if (this.attack.type === 'overhand') {
+                            const loopY = Math.sin(t * Math.PI) * 0.26;
+                            activeHandTarget.set(
+                                pChest.x + f * (0.20 + reachDist * 0.96 * ext),
+                                pHead.y + loopY - (t > 0.45 ? (t - 0.45) * 0.32 : 0),
+                                pChest.z + sideSign * (shoulderSpread * (1 - ext * 0.8))
+                            );
+                            activeElbowTarget.set(
+                                pChest.x + f * (0.16 + 0.32 * ext),
+                                pHead.y + 0.14 * ext,
+                                pChest.z + sideSign * (shoulderSpread * 1.15)
+                            );
+                            pChest.x += f * 0.05 * ext;
+                        }
+
+                        // Check Punch Impact during peak strike window (0.32 <= t <= 0.72)
+                        if (!this.attack.hasHit && t >= 0.32 && t <= 0.72 && opponent && !opponent.knockedDown) {
+                            const glovePos = this.nodes[isLeft ? 'lHand' : 'rHand'].pos;
+                            const oppHead = opponent.nodes.head.pos;
+                            const oppChest = opponent.nodes.chest.pos;
+                            const distToHead = glovePos.distanceTo(oppHead);
+                            const distToChest = glovePos.distanceTo(oppChest);
+                            const hitRadius = 0.34 + 0.05 * bulk;
+
+                            if (distToHead < hitRadius || distToChest < hitRadius + 0.05) {
+                                this.attack.hasHit = true;
+                                this.resolvePunchHit(opponent, glovePos);
+                            }
+                        }
+
+                        if (this.attack.elapsed >= this.attack.duration) {
+                            this.attack = null;
+                        }
+                    }
+
+                    // Pull arms toward stance/punch targets
+                    const armSpring = this.attack ? 0.55 : 0.32;
+                    this.nodes.lHand.pos.lerp(lHandTarget, armSpring);
+                    this.nodes.rHand.pos.lerp(rHandTarget, armSpring);
+                    this.nodes.lElbow.pos.lerp(lElbowTarget, armSpring * 0.85);
+                    this.nodes.rElbow.pos.lerp(rElbowTarget, armSpring * 0.85);
+                }
+
+                // 3. Constraint Solver (3 iterations for crisp joint rigidity)
+                for (let iter = 0; iter < 3; iter++) {
+                    for (let i = 0; i < this.constraints.length; i++) {
+                        const c = this.constraints[i];
+                        const nA = this.nodes[c.idA];
+                        const nB = this.nodes[c.idB];
+                        const delta = new THREE.Vector3().subVectors(nB.pos, nA.pos);
+                        const dist = delta.length();
+                        if (dist < 0.0001) continue;
+                        const diff = ((dist - c.restLen) / dist) * c.stiffness;
+                        const totalMass = nA.mass + nB.mass;
+                        const wA = nB.mass / totalMass;
+                        const wB = nA.mass / totalMass;
+                        nA.pos.addScaledVector(delta, diff * wA);
+                        nB.pos.addScaledVector(delta, -diff * wB);
+                    }
+
+                    // Floor & Ring Rope Boundary Clamping
+                    for (const id in this.nodes) {
+                        const n = this.nodes[id];
+                        const minY = (id === 'head') ? 0.14 : 0.07;
+                        if (n.pos.y < minY) {
+                            n.pos.y = minY;
+                        }
+                        if (!this.knockedDown) {
+                            if (id === 'lKnee' || id === 'rKnee') {
+                                n.pos.y = Math.max(n.pos.y, 0.36 * h);
+                            }
+                            if (id === 'pelvis') {
+                                n.pos.y = Math.max(n.pos.y, 0.78 * h);
+                            }
+                        }
+
+                        // Keep inside 4-sided boxing ring ropes (-2.75 to 2.75)
+                        const bound = 2.72;
+                        if (n.pos.x < -bound) { n.pos.x = -bound; flexRingRopes(n.pos); }
+                        if (n.pos.x > bound)  { n.pos.x = bound;  flexRingRopes(n.pos); }
+                        if (n.pos.z < -bound) { n.pos.z = -bound; flexRingRopes(n.pos); }
+                        if (n.pos.z > bound)  { n.pos.z = bound;  flexRingRopes(n.pos); }
+                    }
+                }
+
+                // 4. Fighter-to-Fighter Body Separation
+                if (opponent && !this.knockedDown && !opponent.knockedDown) {
+                    const pA = this.nodes.pelvis.pos;
+                    const pB = opponent.nodes.pelvis.pos;
+                    const sep = new THREE.Vector3().subVectors(pA, pB);
+                    sep.y = 0;
+                    const dist = sep.length();
+                    const minSep = 0.56;
+                    if (dist > 0.001 && dist < minSep) {
+                        sep.normalize().multiplyScalar((minSep - dist) * 0.5);
+                        pA.add(sep);
+                        pB.sub(sep);
+                        this.nodes.pelvis.oldPos.x = pA.x;
+                        this.nodes.pelvis.oldPos.z = pA.z;
+                        opponent.nodes.pelvis.oldPos.x = pB.x;
+                        opponent.nodes.pelvis.oldPos.z = pB.z;
+                    }
+                }
+
+                this.syncMeshes();
+            }
+
+            resolvePunchHit(opponent, impactPos) {
+                const atkType = this.attack.type;
+                const f = this.facing;
+                const isOverhand = atkType === 'overhand';
+                const blocked = opponent.isGuarding && !isOverhand;
+
+                const dmg = blocked ? this.attack.dmg * 0.22 : this.attack.dmg;
+                opponent.hp = Math.max(0, opponent.hp - dmg);
+                opponent.stamina = Math.max(0, opponent.stamina - (blocked ? 9 : 5));
+
+                this.punchesLanded++;
+                this.combo++;
+                this.comboTimer = 2.1;
+
+                // Directional Ragdoll Impact Impulses
+                const powerScale = blocked ? 0.35 : 1.0;
+                if (atkType === 'jab') {
+                    opponent.applyImpulse('head', f * 0.14 * powerScale, 0.03 * powerScale, 0);
+                    opponent.applyImpulse('chest', f * 0.08 * powerScale, 0, 0);
+                } else if (atkType === 'leftHook' || atkType === 'rightHook') {
+                    const sideZ = atkType === 'leftHook' ? 0.16 : -0.16;
+                    opponent.applyImpulse('head', f * 0.16 * powerScale, 0.04 * powerScale, sideZ * powerScale);
+                    opponent.applyImpulse('chest', f * 0.11 * powerScale, 0, sideZ * 0.6 * powerScale);
+                } else if (atkType === 'uppercut') {
+                    opponent.applyImpulse('head', f * 0.12 * powerScale, 0.24 * powerScale, 0);
+                    opponent.applyImpulse('chest', f * 0.09 * powerScale, 0.14 * powerScale, 0);
+                } else if (atkType === 'overhand') {
+                    opponent.applyImpulse('head', f * 0.24 * powerScale, -0.14 * powerScale, 0);
+                    opponent.applyImpulse('chest', f * 0.16 * powerScale, -0.06 * powerScale, 0);
+                }
+
+                // Visual & Audio Juice
+                spawnImpactParticles(impactPos, blocked ? 0x38bdf8 : 0xfbbf24, blocked ? 8 : 16);
+                SoundFX.playPunch(blocked ? 0.7 : 1.25, blocked);
+
+                if (!blocked) {
+                    GAME.hitStop = 0.032;
+                    GAME.cameraShake = Math.min(0.22, 0.08 + dmg * 0.008);
+                    // Knock crown loose on heavy clean shots
+                    if (opponent.config.bling.crown && !opponent.crownKnockedOff && dmg >= 13 && Math.random() < 0.45) {
+                        opponent.crownKnockedOff = true;
+                        opponent.updateBlingVisibility();
+                    }
+                }
+
+                // Trigger Knockdown if HP hits 0
+                if (opponent.hp <= 0 && !opponent.knockedDown) {
+                    triggerKnockdown(opponent, this, f);
+                }
+            }
+
+            resetForRound(spawnX) {
+                this.knockedDown = false;
+                this.attack = null;
+                this.isGuarding = false;
+                this.crownKnockedOff = false;
+                this.facing = spawnX < 0 ? 1 : -1;
+                this.buildSkeletonAndMeshes();
+
+                const shiftX = spawnX - this.nodes.pelvis.pos.x;
+                for (const id in this.nodes) {
+                    this.nodes[id].pos.x += shiftX;
+                    this.nodes[id].oldPos.copy(this.nodes[id].pos);
+                }
+                this.syncMeshes();
+            }
+
+            syncMeshes() {
+                const up = new THREE.Vector3(0, 1, 0);
+                for (let i = 0; i < this.limbMeshes.length; i++) {
+                    const { mesh, nodeA, nodeB } = this.limbMeshes[i];
+                    const pA = this.nodes[nodeA].pos;
+                    const pB = this.nodes[nodeB].pos;
+                    mesh.position.copy(pA).lerp(pB, 0.5);
+                    const dir = new THREE.Vector3().subVectors(pB, pA);
+                    const len = dir.length();
+                    mesh.scale.set(1, Math.max(0.01, len), 1);
+                    if (len > 0.001) {
+                        mesh.quaternion.setFromUnitVectors(up, dir.normalize());
+                    }
+                }
+
+                const yaw = this.facing === 1 ? 0 : Math.PI;
+                if (this.headMesh) {
+                    this.headMesh.position.copy(this.nodes.head.pos);
+                    this.headMesh.rotation.y = yaw;
+                }
+                if (this.lGloveMesh) this.lGloveMesh.position.copy(this.nodes.lHand.pos);
+                if (this.rGloveMesh) this.rGloveMesh.position.copy(this.nodes.rHand.pos);
+
+                if (this.lBootMesh) {
+                    this.lBootMesh.position.copy(this.nodes.lFoot.pos);
+                    this.lBootMesh.rotation.y = yaw;
+                }
+                if (this.rBootMesh) {
+                    this.rBootMesh.position.copy(this.nodes.rFoot.pos);
+                    this.rBootMesh.rotation.y = yaw;
+                }
+
+                if (this.blingMeshes.chain) {
+                    this.blingMeshes.chain.position.copy(this.nodes.chest.pos);
+                    this.blingMeshes.chain.position.y += 0.04;
+                    this.blingMeshes.chain.rotation.y = yaw;
+                }
+                if (this.blingMeshes.belt) {
+                    this.blingMeshes.belt.position.copy(this.nodes.pelvis.pos);
+                    this.blingMeshes.belt.position.y += 0.04;
+                    this.blingMeshes.belt.rotation.y = yaw;
+                }
+            }
+        }
+
+        function flexRingRopes(contactPos) {
+            for (let i = 0; i < ringRopes.length; i++) {
+                const r = ringRopes[i];
+                if (r.baseMid.distanceTo(contactPos) < 2.2) {
+                    r.mesh.position.x = r.baseMid.x + (Math.random() - 0.5) * 0.025;
+                    r.mesh.position.z = r.baseMid.z + (Math.random() - 0.5) * 0.025;
+                } else {
+                    r.mesh.position.lerp(r.baseMid, 0.15);
+                }
+            }
+        }
+
+        // ==========================================
+        // 6. MATCH FLOW, AI, REPLAY & UI CONTROLLERS
+        // ==========================================
+        let playerBoxer = null;
+        let cpuBoxer = null;
+        let bannerTimeout = null;
+        let aiDecisionTimer = 0;
+        let aiMoveVec = { x: 0, z: 0 };
+
+        const keysHeld = {};
+        const touchMove = { up: false, down: false, left: false, right: false };
+
+        function showBanner(subText, mainText, autoHideMs = 1500) {
+            const banner = document.getElementById('ring-banner');
+            document.getElementById('banner-sub').textContent = subText;
+            document.getElementById('banner-main').textContent = mainText;
+            banner.classList.remove('hidden');
+            banner.classList.remove('banner-animate');
+            void banner.offsetWidth;
+            banner.classList.add('banner-animate');
+
+            if (bannerTimeout) clearTimeout(bannerTimeout);
+            if (autoHideMs > 0) {
+                bannerTimeout = setTimeout(() => {
+                    banner.classList.add('hidden');
+                }, autoHideMs);
+            }
+        }
+
+        function hideBanner() {
+            if (bannerTimeout) clearTimeout(bannerTimeout);
+            document.getElementById('ring-banner').classList.add('hidden');
+        }
+
+        function recordReplayFrame() {
+            if (!playerBoxer || !cpuBoxer) return;
+            const snapBoxer = (b) => {
+                const pts = {};
+                for (const id in b.nodes) {
+                    pts[id] = b.nodes[id].pos.clone();
+                }
+                return { pts, facing: b.facing };
+            };
+            GAME.replayBuffer.push({
+                p: snapBoxer(playerBoxer),
+                c: snapBoxer(cpuBoxer)
+            });
+            if (GAME.replayBuffer.length > 75) {
+                GAME.replayBuffer.shift();
+            }
+        }
+
+        function applyReplayFrame(frame) {
+            if (!frame) return;
+            const restore = (b, snap) => {
+                b.facing = snap.facing;
+                for (const id in snap.pts) {
+                    if (b.nodes[id]) b.nodes[id].pos.copy(snap.pts[id]);
+                }
+                b.syncMeshes();
+            };
+            restore(playerBoxer, frame.p);
+            restore(cpuBoxer, frame.c);
+        }
+
+        function triggerKnockdown(victim, attacker, dirX) {
+            victim.knockedDown = true;
+            victim.knockdowns++;
+            victim.attack = null;
+            victim.isGuarding = false;
+
+            victim.applyImpulse('head', dirX * 0.42, 0.25, (Math.random() - 0.5) * 0.18);
+            victim.applyImpulse('chest', dirX * 0.34, 0.16, 0);
+            victim.applyImpulse('pelvis', dirX * 0.22, 0.08, 0);
+
+            SoundFX.playBell(1);
+
+            // Capture several frames of the collapse before entering slow-motion replay
+            GAME.kdTarget = victim;
+            GAME.kdCount = 0;
+            GAME.kdTimer = 0.85;
+            GAME.replayFrames = GAME.replayBuffer.slice(-55);
+            GAME.replayIndex = 0;
+            GAME.replayOrbitAngle = 0.35;
+            GAME.mode = 'REPLAY';
+
+            showBanner('INSTANT REPLAY • SLOW MOTION', `${victim.name} GOES DOWN!`, 0);
+        }
+
+        function updateCpuAI(dt) {
+            if (!cpuBoxer || !playerBoxer || cpuBoxer.knockedDown) return;
+
+            aiDecisionTimer -= dt;
+            const pPos = playerBoxer.nodes.pelvis.pos;
+            const cPos = cpuBoxer.nodes.pelvis.pos;
+            const dx = pPos.x - cPos.x;
+            const dz = pPos.z - cPos.z;
+            const dist = Math.hypot(dx, dz);
+            const idealRange = 0.82 * cpuBoxer.config.reach;
+
+            if (aiDecisionTimer <= 0) {
+                aiDecisionTimer = 0.28 + Math.random() * 0.28;
+                aiMoveVec = { x: 0, z: 0 };
+
+                if (dist > idealRange + 0.15) {
+                    aiMoveVec.x = Math.sign(dx) * 0.85;
+                    aiMoveVec.z = Math.sign(dz) * 0.45;
+                } else if (dist < idealRange - 0.22) {
+                    aiMoveVec.x = -Math.sign(dx) * 0.7;
+                } else {
+                    aiMoveVec.z = (Math.random() - 0.5) * 0.9;
+                }
+
+                // Guard if player is mid-punch
+                if (playerBoxer.attack && Math.random() < 0.58) {
+                    cpuBoxer.isGuarding = true;
+                } else {
+                    cpuBoxer.isGuarding = false;
+                    if (dist <= idealRange + 0.24 && !cpuBoxer.attack && cpuBoxer.stamina > 18) {
+                        const pool = ['jab', 'jab', 'leftHook', 'rightHook', 'uppercut', 'overhand'];
+                        const pick = pool[Math.floor(Math.random() * pool.length)];
+                        cpuBoxer.triggerAttack(pick);
+                    }
+                }
+            }
+
+            cpuBoxer.stepPhysics(dt, aiMoveVec, playerBoxer);
+        }
+
+        function getPlayerMoveInput() {
+            // Screen-relative movement:
+            // A / Left  -> -X (left on screen)
+            // D / Right -> +X (right on screen)
+            // W / Up    -> -Z (away from camera/screen)
+            // S / Down  -> +Z (toward camera/screen)
+            let x = 0;
+            let z = 0;
+            if (keysHeld['KeyA'] || keysHeld['ArrowLeft'] || touchMove.left) x -= 1;
+            if (keysHeld['KeyD'] || keysHeld['ArrowRight'] || touchMove.right) x += 1;
+            if (keysHeld['KeyW'] || keysHeld['ArrowUp'] || touchMove.up) z -= 1;
+            if (keysHeld['KeyS'] || keysHeld['ArrowDown'] || touchMove.down) z += 1;
+
+            if (x !== 0 && z !== 0) {
+                const inv = 1 / Math.SQRT2;
+                x *= inv;
+                z *= inv;
+            }
+            return { x, z };
+        }
+
+        function setGuard(active) {
+            if (!playerBoxer || GAME.mode !== 'FIGHT' || playerBoxer.knockedDown) return;
+            playerBoxer.isGuarding = active;
+            const btn = document.getElementById('btn-guard');
+            if (btn) btn.classList.toggle('active-guard', active);
+        }
+
+        function updateFightHUD() {
+            if (!playerBoxer || !cpuBoxer) return;
+            document.getElementById('player-hp-text').textContent = Math.ceil(playerBoxer.hp);
+            document.getElementById('player-hp-bar').style.width = `${(playerBoxer.hp / playerBoxer.maxHp) * 100}%`;
+            document.getElementById('player-stam-bar').style.width = `${(playerBoxer.stamina / playerBoxer.maxStamina) * 100}%`;
+
+            document.getElementById('cpu-hp-text').textContent = Math.ceil(cpuBoxer.hp);
+            document.getElementById('cpu-hp-bar').style.width = `${(cpuBoxer.hp / cpuBoxer.maxHp) * 100}%`;
+            document.getElementById('cpu-stam-bar').style.width = `${(cpuBoxer.stamina / cpuBoxer.maxStamina) * 100}%`;
+
+            document.getElementById('round-label').textContent = `RND ${GAME.round}/${GAME.maxRounds}`;
+            const secs = Math.max(0, Math.ceil(GAME.roundTime));
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            document.getElementById('round-timer').textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+
+            document.getElementById('next-hand-pill').textContent = playerBoxer.altUseLeft ? 'LEFT' : 'RIGHT';
+
+            const comboPill = document.getElementById('combo-pill');
+            if (playerBoxer.combo >= 2) {
+                comboPill.textContent = `${playerBoxer.combo} HIT COMBO!`;
+                comboPill.classList.remove('hidden');
+            } else {
+                comboPill.classList.add('hidden');
+            }
+        }
+
+        function enterLockerRoom() {
+            GAME.mode = 'LOCKER';
+            hideBanner();
+            document.getElementById('locker-ui').classList.remove('hidden');
+            document.getElementById('fight-ui').classList.add('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+
+            if (cpuBoxer) {
+                scene.remove(cpuBoxer.rootGroup);
+                cpuBoxer = null;
+            }
+            if (playerBoxer) {
+                scene.remove(playerBoxer.rootGroup);
+            }
+            playerBoxer = new RagdollBoxer('YOU', true, playerConfig);
+            playerBoxer.resetForRound(0);
+        }
+
+        function startMatch() {
+            GAME.mode = 'FIGHT';
+            GAME.round = 1;
+            GAME.roundTime = 90;
+            GAME.replayBuffer = [];
+            hideBanner();
+
+            document.getElementById('locker-ui').classList.add('hidden');
+            document.getElementById('fight-ui').classList.remove('hidden');
+            document.getElementById('gameover-modal').classList.add('hidden');
+
+            if (playerBoxer) scene.remove(playerBoxer.rootGroup);
+            if (cpuBoxer) scene.remove(cpuBoxer.rootGroup);
+
+            playerBoxer = new RagdollBoxer('YOU', true, playerConfig);
+            playerBoxer.resetForRound(-1.05);
+
+            const cpuConfig = {
+                height: 1.04,
+                weight: 1.08,
+                reach: 1.03,
+                skinColor: SKIN_TONES[3].hex,
+                gearColor: '#dc2626',
+                gearAccent: '#0f172a',
+                bling: { chain: true, belt: false, cuffs: true, crown: false, grillz: true }
+            };
+            cpuBoxer = new RagdollBoxer('IRON JAW', false, cpuConfig);
+            cpuBoxer.resetForRound(1.05);
+
+            SoundFX.playBell(1);
+            showBanner('ROUND 1 OF 3', 'FIGHT!', 1400);
+            updateFightHUD();
+        }
+
+        function endMatch(playerWon, subtitle) {
+            GAME.mode = 'GAMEOVER';
+            hideBanner();
+            SoundFX.playBell(3);
+
+            document.getElementById('go-subtitle').textContent = subtitle;
+            document.getElementById('go-title').textContent = playerWon ? 'YOU WIN!' : 'DEFEAT';
+            document.getElementById('go-stats').textContent =
+                `Landed ${playerBoxer.punchesLanded} punches • Scored ${cpuBoxer.knockdowns} knockdowns`;
+
+            const modal = document.getElementById('gameover-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // ==========================================
+        // 7. LOCKER ROOM UI & INPUT BINDINGS
+        // ==========================================
+        function updateLockerReadouts() {
+            const h = playerConfig.height;
+            const w = playerConfig.weight;
+            const r = playerConfig.reach;
+
+            const totalInches = Math.round(74 * h);
+            const feet = Math.floor(totalInches / 12);
+            const inches = totalInches % 12;
+            const meters = (totalInches * 0.0254).toFixed(2);
+            document.getElementById('val-height').textContent = `${feet}'${inches}" (${meters}m)`;
+
+            const lbs = Math.round(225 * w);
+            document.getElementById('val-weight').textContent = `${lbs} lbs`;
+
+            let weightClass = 'Heavyweight';
+            if (lbs < 195) weightClass = 'Middleweight';
+            else if (lbs < 215) weightClass = 'Cruiserweight';
+            else if (lbs > 255) weightClass = 'Super Heavy';
+            document.getElementById('weight-class-badge').textContent = weightClass;
+
+            const reachInches = Math.round(76 * r);
+            document.getElementById('val-reach').textContent = `${reachInches}" Reach`;
+
+            if (playerBoxer) {
+                playerBoxer.config = JSON.parse(JSON.stringify(playerConfig));
+                playerBoxer.buildSkeletonAndMeshes();
+                playerBoxer.resetForRound(0);
+                const stats = playerBoxer.getStats();
+                document.getElementById('stat-power').textContent = `${Math.round(stats.power * 100)}%`;
+                document.getElementById('stat-speed').textContent = `${Math.round(stats.speed * 100)}%`;
+                document.getElementById('stat-reach').textContent = `${Math.round(stats.reach * 100)}%`;
+            }
+        }
+
+        function initLockerUI() {
+            const sHeight = document.getElementById('slider-height');
+            const sWeight = document.getElementById('slider-weight');
+            const sReach = document.getElementById('slider-reach');
+
+            sHeight.addEventListener('input', (e) => {
+                playerConfig.height = parseFloat(e.target.value);
+                updateLockerReadouts();
+            });
+            sWeight.addEventListener('input', (e) => {
+                playerConfig.weight = parseFloat(e.target.value);
+                updateLockerReadouts();
+            });
+            sReach.addEventListener('input', (e) => {
+                playerConfig.reach = parseFloat(e.target.value);
+                updateLockerReadouts();
+            });
+
+            // Skin Swatches
+            const skinWrap = document.getElementById('skin-swatches');
+            SKIN_TONES.forEach((tone) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.title = tone.name;
+                btn.style.cssText = `width:28px;height:28px;border-radius:999px;background:${tone.hex};border:2px solid rgba(255,255,255,0.45);`;
+                btn.addEventListener('click', () => {
+                    playerConfig.skinColor = tone.hex;
+                    updateLockerReadouts();
+                });
+                skinWrap.appendChild(btn);
+            });
+
+            // Gear Swatches
+            const gearWrap = document.getElementById('gear-swatches');
+            GEAR_COLORS.forEach((gear) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.title = gear.name;
+                btn.style.cssText = `width:28px;height:28px;border-radius:999px;background:linear-gradient(135deg,${gear.primary} 55%,${gear.accent} 55%);border:2px solid rgba(255,255,255,0.45);`;
+                btn.addEventListener('click', () => {
+                    playerConfig.gearColor = gear.primary;
+                    playerConfig.gearAccent = gear.accent;
+                    updateLockerReadouts();
+                });
+                gearWrap.appendChild(btn);
+            });
+
+            // Bling Toggles
+            const blingWrap = document.getElementById('bling-toggles');
+            const renderBlingButtons = () => {
+                blingWrap.innerHTML = '';
+                BLING_CATALOG.forEach((item) => {
+                    const active = !!playerConfig.bling[item.id];
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.textContent = item.label;
+                    btn.style.cssText = active
+                        ? 'padding:7px 8px;border-radius:8px;font-size:11px;font-weight:700;background:rgba(251,191,36,0.25);border:1px solid #fbbf24;color:#fef08a;'
+                        : 'padding:7px 8px;border-radius:8px;font-size:11px;font-weight:600;background:rgba(15,23,42,0.7);border:1px solid rgba(255,255,255,0.12);color:#94a3b8;';
+                    btn.addEventListener('click', () => {
+                        playerConfig.bling[item.id] = !playerConfig.bling[item.id];
+                        renderBlingButtons();
+                        updateLockerReadouts();
+                    });
+                    blingWrap.appendChild(btn);
+                });
+            };
+            renderBlingButtons();
+
+            document.getElementById('btn-bling-all').addEventListener('click', () => {
+                BLING_CATALOG.forEach((item) => { playerConfig.bling[item.id] = true; });
+                renderBlingButtons();
+                updateLockerReadouts();
+            });
+
+            // Main Action Buttons
+            document.getElementById('btn-start-fight').addEventListener('click', startMatch);
+            document.getElementById('btn-rematch').addEventListener('click', startMatch);
+            document.getElementById('btn-back-locker').addEventListener('click', enterLockerRoom);
+            document.getElementById('btn-modal-locker').addEventListener('click', enterLockerRoom);
+
+            // 360 Locker Room Drag-to-Rotate on Canvas
+            const canvasEl = document.getElementById('canvas-container');
+            canvasEl.addEventListener('pointerdown', (e) => {
+                if (GAME.mode !== 'LOCKER') return;
+                GAME.isDraggingLocker = true;
+                GAME.lastPointerX = e.clientX;
+            });
+            window.addEventListener('pointermove', (e) => {
+                if (!GAME.isDraggingLocker || GAME.mode !== 'LOCKER') return;
+                const dx = e.clientX - GAME.lastPointerX;
+                GAME.lastPointerX = e.clientX;
+                GAME.lockerYaw += dx * 0.012;
+            });
+            window.addEventListener('pointerup', () => {
+                GAME.isDraggingLocker = false;
+            });
+
+            // Punch Buttons
+            document.querySelectorAll('[data-attack]').forEach((btn) => {
+                const atk = btn.getAttribute('data-attack');
+                btn.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    if (GAME.mode === 'FIGHT' && playerBoxer) {
+                        playerBoxer.triggerAttack(atk);
+                        updateFightHUD();
+                    }
+                });
+            });
+
+            // Guard Button
+            const guardBtn = document.getElementById('btn-guard');
+            guardBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); setGuard(true); });
+            guardBtn.addEventListener('pointerup', () => setGuard(false));
+            guardBtn.addEventListener('pointerleave', () => setGuard(false));
+
+            // Keyboard Controls (ESC = Menu/Exit, F = Uppercut, G = Overhand)
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Escape') {
+                    if (GAME.mode !== 'LOCKER') {
+                        e.preventDefault();
+                        enterLockerRoom();
+                    }
+                    return;
+                }
+
+                keysHeld[e.code] = true;
+                if (GAME.mode !== 'FIGHT' || !playerBoxer) return;
+
+                if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                    e.preventDefault();
+                    setGuard(true);
+                } else if (e.code === 'KeyJ' || e.code === 'Digit1') {
+                    playerBoxer.triggerAttack('jab');
+                } else if (e.code === 'KeyR' || e.code === 'Digit2') {
+                    playerBoxer.triggerAttack('leftHook');
+                } else if (e.code === 'KeyT' || e.code === 'Digit3') {
+                    playerBoxer.triggerAttack('rightHook');
+                } else if (e.code === 'KeyF' || e.code === 'Digit4') {
+                    playerBoxer.triggerAttack('uppercut');
+                } else if (e.code === 'KeyG' || e.code === 'Digit5') {
+                    playerBoxer.triggerAttack('overhand');
+                }
+                updateFightHUD();
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keysHeld[e.code] = false;
+                if (e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+                    setGuard(false);
+                }
+            });
+
+            // Clear any held movement/guard inputs if the window loses focus
+            window.addEventListener('blur', () => {
+                for (const code in keysHeld) keysHeld[code] = false;
+                touchMove.up = false;
+                touchMove.down = false;
+                touchMove.left = false;
+                touchMove.right = false;
+                setGuard(false);
+            });
+        }
+
+        // ==========================================
+        // 8. MAIN ANIMATION & SIMULATION LOOP
+        // ==========================================
+        let lastFrameTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+
+            const rawDt = Math.min(0.05, (now - lastFrameTime) / 1000);
+            lastFrameTime = now;
+
+            if (GAME.hitStop > 0) {
+                GAME.hitStop -= rawDt;
+                renderer.render(scene, camera);
+                return;
+            }
+
+            const dt = rawDt;
+
+            if (GAME.mode === 'LOCKER') {
+                if (playerBoxer) {
+                    if (!GAME.isDraggingLocker) {
+                        GAME.lockerYaw += dt * 0.45;
+                    }
+                    playerBoxer.stepPhysics(dt, { x: 0, z: 0 }, null);
+
+                    // Spin cleanly in place around the boxer's center on the left side of the Locker UI
+                    const isDesktop = window.innerWidth >= 1024;
+                    const displayX = isDesktop ? -0.68 : 0;
+                    const c = Math.cos(GAME.lockerYaw);
+                    const s = Math.sin(GAME.lockerYaw);
+
+                    playerBoxer.rootGroup.position.set(displayX, 0, 0);
+                    playerBoxer.rootGroup.rotation.y = GAME.lockerYaw;
+
+                    // Keep camera steady so the boxer spins in one spot without orbiting
+                    camera.position.lerp(new THREE.Vector3(0, 1.32, 3.05), 0.15);
+                    camera.lookAt(0, 1.05, 0);
+                }
+            } else if (GAME.mode === 'FIGHT') {
+                if (playerBoxer) {
+                    playerBoxer.rootGroup.position.set(0, 0, 0);
+                    playerBoxer.rootGroup.rotation.y = 0;
+                }
+                // Round Timer
+                GAME.roundTime -= dt;
+                if (GAME.roundTime <= 0) {
+                    if (GAME.round < GAME.maxRounds) {
+                        GAME.round++;
+                        GAME.roundTime = 90;
+                        playerBoxer.hp = Math.min(100, playerBoxer.hp + 25);
+                        cpuBoxer.hp = Math.min(100, cpuBoxer.hp + 25);
+                        playerBoxer.resetForRound(-1.05);
+                        cpuBoxer.resetForRound(1.05);
+                        SoundFX.playBell(1);
+                        showBanner(`ROUND ${GAME.round} OF ${GAME.maxRounds}`, 'FIGHT!', 1400);
+                    } else {
+                        endMatch(playerBoxer.hp >= cpuBoxer.hp, 'DECISION VICTORY');
+                    }
+                }
+
+                playerBoxer.stepPhysics(dt, getPlayerMoveInput(), cpuBoxer);
+                updateCpuAI(dt);
+                recordReplayFrame();
+
+                // Dynamic Broadcast Ring Camera
+                const midX = (playerBoxer.nodes.pelvis.pos.x + cpuBoxer.nodes.pelvis.pos.x) * 0.5;
+                const midZ = (playerBoxer.nodes.pelvis.pos.z + cpuBoxer.nodes.pelvis.pos.z) * 0.5;
+                const dist = Math.abs(playerBoxer.nodes.pelvis.pos.x - cpuBoxer.nodes.pelvis.pos.x);
+                const desiredZ = Math.max(3.6, Math.min(5.2, 2.7 + dist * 0.85));
+
+                let shakeX = 0;
+                let shakeY = 0;
+                if (GAME.cameraShake > 0) {
+                    shakeX = (Math.random() - 0.5) * GAME.cameraShake;
+                    shakeY = (Math.random() - 0.5) * GAME.cameraShake;
+                    GAME.cameraShake = Math.max(0, GAME.cameraShake - dt * 1.4);
+                }
+
+                camera.position.lerp(new THREE.Vector3(midX + shakeX, 1.95 + shakeY, midZ + desiredZ), 0.12);
+                camera.lookAt(midX, 1.12, midZ);
+
+                updateFightHUD();
+            } else if (GAME.mode === 'REPLAY') {
+                // 0.35x Slow-Motion Instant Replay playback
+                GAME.replayIndex += 0.35;
+                GAME.replayOrbitAngle += dt * 0.65;
+
+                const frameIdx = Math.min(GAME.replayFrames.length - 1, Math.floor(GAME.replayIndex));
+                const frame = GAME.replayFrames[frameIdx];
+                applyReplayFrame(frame);
+
+                // Dramatic slow-mo broadcast orbit camera focused on the downed boxer
+                const focusPos = GAME.kdTarget.nodes.chest.pos;
+                const orbitRadius = 3.1;
+                const camX = focusPos.x + Math.sin(GAME.replayOrbitAngle) * orbitRadius;
+                const camZ = focusPos.z + Math.cos(GAME.replayOrbitAngle) * orbitRadius;
+                camera.position.lerp(new THREE.Vector3(camX, 1.55, camZ), 0.15);
+                camera.lookAt(focusPos.x, Math.max(0.45, focusPos.y * 0.8), focusPos.z);
+
+                if (frameIdx >= GAME.replayFrames.length - 1) {
+                    // Transition smoothly to the 10-count at the end of the knockdown fall
+                    GAME.mode = 'COUNTDOWN';
+                    GAME.replayBuffer = [];
+                    showBanner(`${GAME.kdTarget.name} IS DOWN!`, 'KNOCKDOWN!', 0);
+                }
+            } else if (GAME.mode === 'COUNTDOWN') {
+                playerBoxer.stepPhysics(dt, { x: 0, z: 0 }, null);
+                cpuBoxer.stepPhysics(dt, { x: 0, z: 0 }, null);
+
+                // Reset camera back toward ring side view during referee count
+                camera.position.lerp(new THREE.Vector3(0, 1.95, 4.3), 0.1);
+                camera.lookAt(0, 1.05, 0);
+
+                GAME.kdTimer -= dt;
+                if (GAME.kdTimer <= 0) {
+                    GAME.kdCount++;
+                    GAME.kdTimer = 0.82;
+                    showBanner('REFEREE COUNT', `${GAME.kdCount}`, 0);
+
+                    // Boxer gets back up at count 7 if under 3 knockdowns
+                    if (GAME.kdCount >= 7 && GAME.kdTarget.knockdowns < 3) {
+                        GAME.kdTarget.hp = 45;
+                        GAME.kdTarget.stamina = 65;
+                        playerBoxer.resetForRound(-1.05);
+                        cpuBoxer.resetForRound(1.05);
+                        GAME.mode = 'FIGHT';
+                        showBanner(`${GAME.kdTarget.name} BEATS THE COUNT!`, 'BOX!', 1300);
+                    } else if (GAME.kdCount >= 10) {
+                        const playerWon = GAME.kdTarget !== playerBoxer;
+                        endMatch(playerWon, 'KNOCKOUT (10 COUNT)');
+                    }
+                }
+            }
+
+            updateParticles(dt);
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            if (!camera || !renderer) return;
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function () {
+            initThreeScene();
+            initLockerUI();
+            enterLockerRoom();
+            lastFrameTime = performance.now();
+            requestAnimationFrame(animate);
+        };
+    </script>
+</body>
+</html>
