@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PERSPECTIVE // Dream Therapy</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #111317;
+            font-family: 'Inter', sans-serif;
+            color: #f4f3ef;
+        }
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Crosshair */
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            border: 2px solid rgba(255, 255, 255, 0.85);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            transition: width 0.15s ease, height 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+            z-index: 10;
+            box-shadow: 0 0 6px rgba(0,0,0,0.4);
+        }
+        #crosshair.hovering {
+            width: 22px;
+            height: 22px;
+            border-color: #38bdf8;
+            background-color: rgba(56, 189, 248, 0.2);
+        }
+        #crosshair.holding {
+            width: 14px;
+            height: 14px;
+            border-color: #fbbf24;
+            background-color: rgba(251, 191, 36, 0.35);
+        }
+
+        /* HUD Overlay */
+        #hud {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 5;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 24px 32px;
+        }
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        .room-badge {
+            background: rgba(17, 19, 23, 0.72);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 12px 20px;
+            border-radius: 10px;
+        }
+        .room-badge .subtitle {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+        .room-badge .title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-top: 2px;
+        }
+        .hud-controls-top {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            pointer-events: auto;
+        }
+        .level-pills {
+            display: flex;
+            gap: 4px;
+            background: rgba(17, 19, 23, 0.72);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 4px;
+            border-radius: 8px;
+        }
+        .lvl-pill {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            padding: 5px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .lvl-pill:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+        .lvl-pill.active {
+            background: #38bdf8;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .hud-btn {
+            background: rgba(17, 19, 23, 0.72);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #f8fafc;
+            padding: 9px 13px;
+            border-radius: 8px;
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .hud-btn:hover {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        .hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .controls-hint {
+            background: rgba(17, 19, 23, 0.65);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #cbd5e1;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .key-cap {
+            font-family: 'Space Mono', monospace;
+            background: rgba(255, 255, 255, 0.14);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 11px;
+            margin-right: 4px;
+        }
+
+        #scale-readout {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            background: rgba(17, 19, 23, 0.72);
+            border: 1px solid rgba(251, 191, 36, 0.35);
+            color: #fbbf24;
+            padding: 8px 14px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        #scale-readout.visible {
+            opacity: 1;
+        }
+        #mantle-indicator {
+            position: fixed;
+            top: calc(50% + 22px);
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            color: #38bdf8;
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            padding: 3px 8px;
+            border-radius: 4px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease;
+            z-index: 11;
+        }
+        #mantle-indicator.visible {
+            opacity: 1;
+        }
+
+        /* Toast notification */
+        #toast {
+            position: fixed;
+            top: 90px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-10px);
+            background: rgba(15, 23, 42, 0.88);
+            border: 1px solid rgba(56, 189, 248, 0.4);
+            color: #e0f2fe;
+            padding: 10px 22px;
+            border-radius: 999px;
+            font-size: 14px;
+            font-weight: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s, transform 0.3s;
+            z-index: 15;
+        }
+        #toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Title / Pause Overlay */
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(24, 27, 34, 0.86) 0%, rgba(11, 13, 17, 0.96) 100%);
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            transition: opacity 0.35s ease;
+        }
+        #overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .modal-card {
+            max-width: 540px;
+            width: 90%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 18px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+        .institute-tag {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: #38bdf8;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .modal-title {
+            font-size: 32px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: #ffffff;
+            margin-bottom: 12px;
+        }
+        .modal-desc {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #cbd5e1;
+            margin-bottom: 28px;
+        }
+        .instruction-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            text-align: left;
+            margin-bottom: 30px;
+            background: rgba(0, 0, 0, 0.25);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .inst-item {
+            font-size: 13px;
+            color: #e2e8f0;
+        }
+        .inst-item span {
+            display: block;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            color: #94a3b8;
+        }
+        .primary-btn {
+            background: #f8fafc;
+            color: #0f172a;
+            border: none;
+            padding: 14px 36px;
+            font-size: 15px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: transform 0.15s, background 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.15);
+        }
+        .primary-btn:hover {
+            background: #38bdf8;
+            color: #0f172a;
+            transform: translateY(-2px);
+        }
+
+        /* Fade transition between rooms */
+        #fade-curtain {
+            position: fixed;
+            inset: 0;
+            background: #f4f3ef;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.45s ease;
+            z-index: 25;
+        }
+        #fade-curtain.active {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="game-canvas"></canvas>
+    <div id="crosshair"></div>
+    <div id="mantle-indicator">MANTLE</div>
+    <div id="fade-curtain"></div>
+    <div id="toast">Room Reset</div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div class="hud-top">
+            <div class="room-badge">
+                <div class="subtitle" id="room-number">ORIENTATION // 01 OF 06</div>
+                <div class="title" id="room-title">The Threshold</div>
+            </div>
+            <div class="hud-controls-top">
+                <div class="level-pills" id="level-pills" title="Jump to Chamber">
+                    <button class="lvl-pill active" data-lvl="0">01</button>
+                    <button class="lvl-pill" data-lvl="1">02</button>
+                    <button class="lvl-pill" data-lvl="2">03</button>
+                    <button class="lvl-pill" data-lvl="3">04</button>
+                    <button class="lvl-pill" data-lvl="4">05</button>
+                    <button class="lvl-pill" data-lvl="5">06</button>
+                </div>
+                <button class="hud-btn" id="btn-reset" title="Reset Current Room (R)">Reset [R]</button>
+                <button class="hud-btn" id="btn-mute" title="Toggle Audio">Audio: ON</button>
+            </div>
+        </div>
+
+        <div class="hud-bottom">
+            <div class="controls-hint">
+                <div><span class="key-cap">WASD</span>Move</div>
+                <div><span class="key-cap">SPACE</span>Jump / Mantle</div>
+                <div><span class="key-cap">CLICK</span>Grab / Release</div>
+                <div><span class="key-cap">R</span>Reset Room</div>
+            </div>
+            <div id="scale-readout">SCALE: 1.00x</div>
+        </div>
+    </div>
+
+    <!-- Start / Pause Modal -->
+    <div id="overlay">
+        <div class="modal-card">
+            <div class="institute-tag">Pierce Somnasculpt Institute</div>
+            <h1 class="modal-title" id="modal-heading">PERSPECTIVE // DREAM THERAPY</h1>
+            <p class="modal-desc" id="modal-text">
+                Welcome to Dream Therapy. Here, perception is reality: objects you hold maintain their visual size on screen, dynamically growing or shrinking in physical space as you move your gaze.
+            </p>
+            <div class="instruction-grid">
+                <div class="inst-item"><span>MOVEMENT</span>WASD + Spacebar</div>
+                <div class="inst-item"><span>LOOK AROUND</span>Mouse (Pointer Lock)</div>
+                <div class="inst-item"><span>FORCED PERSPECTIVE</span>Click to Grab &amp; Drop</div>
+                <div class="inst-item"><span>SAFETY PROTOCOL</span>Press R to Reset Room</div>
+            </div>
+            <button class="primary-btn" id="start-btn">Enter Dreamscape</button>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * PERSPECTIVE // DREAM THERAPY
+     * A 3D Forced-Perspective Puzzle Game inspired by Superliminal.
+     * Single-file Three.js r128 implementation with custom AABB physics,
+     * angular-size perspective scaling, subtle ledge mantling, raycast surface placement,
+     * and Web Audio procedural synth.
+     */
+
+    (function() {
+        'use strict';
+
+        // ==========================================
+        // 1. PROCEDURAL SOUND SYNTHESIZER (WEB AUDIO)
+        // ==========================================
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.holdOsc = null;
+                this.holdGain = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) {
+                        this.ctx = new AudioContext();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                if (this.muted && this.holdGain) {
+                    this.holdGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.05);
+                }
+                return this.muted;
+            }
+
+            playGrab() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.exponentialRampToValueAtTime(480, now + 0.14);
+
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.16);
+
+                this.startHoldHum();
+            }
+
+            startHoldHum() {
+                if (this.muted || !this.ctx) return;
+                this.stopHoldHum();
+                const now = this.ctx.currentTime;
+                this.holdOsc = this.ctx.createOscillator();
+                this.holdGain = this.ctx.createGain();
+                this.holdOsc.type = 'triangle';
+                this.holdOsc.frequency.setValueAtTime(140, now);
+                this.holdGain.gain.setValueAtTime(0.001, now);
+                this.holdGain.gain.linearRampToValueAtTime(0.035, now + 0.15);
+
+                this.holdOsc.connect(this.holdGain);
+                this.holdGain.connect(this.ctx.destination);
+                this.holdOsc.start(now);
+            }
+
+            updateHoldPitch(scaleRatio) {
+                if (this.muted || !this.holdOsc || !this.ctx) return;
+                const clamped = Math.max(0.25, Math.min(4.0, scaleRatio));
+                const targetFreq = 160 / Math.pow(clamped, 0.45);
+                this.holdOsc.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.06);
+            }
+
+            stopHoldHum() {
+                if (this.holdOsc && this.ctx) {
+                    const now = this.ctx.currentTime;
+                    try {
+                        this.holdGain.gain.setTargetAtTime(0.0001, now, 0.04);
+                        this.holdOsc.stop(now + 0.08);
+                    } catch (e) {}
+                }
+                this.holdOsc = null;
+                this.holdGain = null;
+            }
+
+            playDrop(scale = 1) {
+                this.stopHoldHum();
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                const baseFreq = Math.max(65, Math.min(260, 150 / Math.sqrt(scale)));
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(36, now + 0.22);
+
+                const vol = Math.min(0.25, 0.1 + scale * 0.04);
+                gain.gain.setValueAtTime(vol, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playPlate(activated) {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(activated ? 320 : 210, now);
+                osc.frequency.setValueAtTime(activated ? 440 : 160, now + 0.06);
+
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+            }
+
+            playChime() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const freqs = [523.25, 659.25, 783.99, 1046.50];
+                freqs.forEach((f, idx) => {
+                    const now = this.ctx.currentTime + idx * 0.09;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, now);
+                    gain.gain.setValueAtTime(0.09, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                });
+            }
+
+            playMantle() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(115, now);
+                osc.frequency.exponentialRampToValueAtTime(52, now + 0.16);
+
+                gain.gain.setValueAtTime(0.11, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.19);
+            }
+        }
+
+        const sound = new SoundSystem();
+
+        // ==========================================
+        // 2. THREE.JS SCENE & LIGHTING SETUP
+        // ==========================================
+        const canvas = document.getElementById('game-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xe6e3dc);
+        scene.fog = new THREE.Fog(0xe6e3dc, 18, 52);
+
+        const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.08, 100);
+        camera.rotation.order = 'YXZ';
+
+        // Studio Gallery Lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xc7c2b8, 0.72);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffcf5, 0.68);
+        dirLight.position.set(12, 22, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 55;
+        const d = 18;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.25);
+        fillLight.position.set(-14, 10, -12);
+        scene.add(fillLight);
+
+        // ==========================================
+        // 3. PROCEDURAL TEXTURES & MATERIALS
+        // ==========================================
+        function createGridTexture(bgColor, lineColor, subLineColor, divisions = 4) {
+            const c = document.createElement('canvas');
+            c.width = 512;
+            c.height = 512;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, 512, 512);
+
+            ctx.strokeStyle = subLineColor;
+            ctx.lineWidth = 1;
+            const step = 512 / divisions;
+            for (let i = 1; i < divisions; i++) {
+                ctx.beginPath();
+                ctx.moveTo(i * step, 0);
+                ctx.lineTo(i * step, 512);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i * step);
+                ctx.lineTo(512, i * step);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = lineColor;
+            ctx.lineWidth = 3;
+            ctx.strokeRect(0, 0, 512, 512);
+
+            const tex = new THREE.CanvasTexture(c);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.anisotropy = 4;
+            return tex;
+        }
+
+        function createPosterTexture(title, line1, line2, accentColor = '#38bdf8') {
+            const c = document.createElement('canvas');
+            c.width = 512;
+            c.height = 640;
+            const ctx = c.getContext('2d');
+
+            ctx.fillStyle = '#181b20';
+            ctx.fillRect(0, 0, 512, 640);
+
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = 10;
+            ctx.strokeRect(24, 24, 464, 592);
+
+            ctx.fillStyle = accentColor;
+            ctx.beginPath();
+            ctx.arc(256, 210, 75, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#181b20';
+            ctx.beginPath();
+            ctx.arc(256, 210, 34, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = 'bold 34px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, 256, 360);
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '22px monospace';
+            ctx.fillText(line1, 256, 420);
+            ctx.fillText(line2, 256, 455);
+
+            ctx.fillStyle = accentColor;
+            ctx.font = 'bold 16px monospace';
+            ctx.fillText('SOMNASCULPT THERAPY', 256, 560);
+
+            return new THREE.CanvasTexture(c);
+        }
+
+        const floorTex = createGridTexture('#dfdcd4', '#c5c0b5', '#d3cfc6', 2);
+        const wallTex = createGridTexture('#f5f3ee', '#e2dfd7', '#ece9e2', 2);
+        const platformTex = createGridTexture('#cbd5e1', '#94a3b8', '#b6c2d1', 2);
+
+        const materials = {
+            wall: new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.85, metalness: 0.02 }),
+            floor: new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.8, metalness: 0.05 }),
+            ceiling: new THREE.MeshStandardMaterial({ color: 0xfaf9f6, roughness: 0.9 }),
+            platform: new THREE.MeshStandardMaterial({ map: platformTex, roughness: 0.7, metalness: 0.08 }),
+            pedestal: new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.45, metalness: 0.2 }),
+            trim: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 }),
+            cubeToy: new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.35, metalness: 0.1 }),
+            wedgeToy: new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.35, metalness: 0.1 }),
+            plankToy: new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.38, metalness: 0.12 }),
+            emeraldToy: new THREE.MeshStandardMaterial({ color: 0x10b981, roughness: 0.35, metalness: 0.12 }),
+            monolith: new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.25, metalness: 0.35 }),
+            chasmFloor: new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.9 }),
+            plateBase: new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 }),
+            plateTopInactive: new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0x7f1d1d, roughness: 0.4 }),
+            plateTopActive: new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x14532d, roughness: 0.4 }),
+            doorClosed: new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.3 }),
+            doorOpen: new THREE.MeshStandardMaterial({ color: 0x10b981, emissive: 0x059669, emissiveIntensity: 0.6, roughness: 0.2 })
+        };
+
+        // ==========================================
+        // 4. GAME STATE & WORLD CONTAINERS
+        // ==========================================
+        const roomGroup = new THREE.Group();
+        scene.add(roomGroup);
+
+        let staticColliders = [];   // Array of { min: Vector3, max: Vector3, mesh: Mesh }
+        let grabbables = [];        // Array of interactive objects
+        let pressurePlates = [];    // Array of pressure plates
+        let exitDoor = null;        // Current room exit trigger & mesh
+        let raycastTargets = [];    // Static meshes for surface placement raycasts
+
+        let currentRoomIndex = 0;
+        let isLocked = false;
+        let transitioningRoom = false;
+        let gameCompleted = false;
+
+        // Player state (AABB cylinder/box approximation + subtle mantle state)
+        const player = {
+            pos: new THREE.Vector3(0, 0, 8),
+            vel: new THREE.Vector3(0, 0, 0),
+            radius: 0.42,
+            height: 1.75,
+            eyeHeight: 1.6,
+            yaw: 0,
+            pitch: 0,
+            onGround: false,
+            speed: 6.2,
+            jumpForce: 7.4,
+            mantleCooldown: 0,
+            mantleCamDip: 0
+        };
+
+        // Perspective Grab State
+        let hoveredObj = null;
+        let heldObj = null;
+        let grabInitialDist = 1.0;
+        let grabInitialScale = 1.0;
+        let grabYawOffset = 0;
+
+        const keys = {};
+        const raycaster = new THREE.Raycaster();
+        const centerNDC = new THREE.Vector2(0, 0);
+
+        // ==========================================
+        // 5. WORLD BUILDER HELPERS
+        // ==========================================
+        function addStaticBox(x, y, z, w, h, d, material, castShadow = true, receiveShadow = true) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            if (material.map) {
+                const matClone = material.clone();
+                matClone.map = material.map.clone();
+                matClone.map.needsUpdate = true;
+                matClone.map.repeat.set(Math.max(1, Math.round(w / 3)), Math.max(1, Math.round(Math.max(h, d) / 3)));
+                material = matClone;
+            }
+            const mesh = new THREE.Mesh(geo, material);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = castShadow;
+            mesh.receiveShadow = receiveShadow;
+            roomGroup.add(mesh);
+
+            const halfW = w / 2, halfH = h / 2, halfD = d / 2;
+            staticColliders.push({
+                min: new THREE.Vector3(x - halfW, y - halfH, z - halfD),
+                max: new THREE.Vector3(x + halfW, y + halfH, z + halfD),
+                mesh
+            });
+            raycastTargets.push(mesh);
+            return mesh;
+        }
+
+        function addPoster(x, y, z, rotY, title, l1, l2, color) {
+            const tex = createPosterTexture(title, l1, l2, color);
+            const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.75), mat);
+            mesh.position.set(x, y, z);
+            mesh.rotation.y = rotY;
+            roomGroup.add(mesh);
+        }
+
+        function createGrabbable(opts) {
+            const {
+                type = 'box',
+                x = 0, y = 1, z = 0,
+                baseSize = new THREE.Vector3(1, 1, 1),
+                initialScale = 1.0,
+                minScale = 0.25,
+                maxScale = 4.5,
+                material = materials.cubeToy
+            } = opts;
+
+            const container = new THREE.Group();
+            container.position.set(x, y, z);
+
+            let visualMesh;
+            if (type === 'pawn') {
+                // Stylized surrealist chess monolith
+                const pawnGroup = new THREE.Group();
+                const base = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.5, 0.25, 24), material);
+                base.position.y = -0.675;
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 0.95, 24), material);
+                body.position.y = -0.075;
+                const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.1, 24), material);
+                collar.position.y = 0.42;
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.28, 24, 18), material);
+                head.position.y = 0.66;
+
+                [base, body, collar, head].forEach(m => {
+                    m.castShadow = true;
+                    m.receiveShadow = true;
+                    pawnGroup.add(m);
+                });
+                visualMesh = pawnGroup;
+            } else {
+                const geo = new THREE.BoxGeometry(baseSize.x, baseSize.y, baseSize.z);
+                visualMesh = new THREE.Mesh(geo, material.clone());
+                visualMesh.castShadow = true;
+                visualMesh.receiveShadow = true;
+
+                // Subtle architectural edge highlight
+                const edges = new THREE.EdgesGeometry(geo);
+                const line = new THREE.LineSegments(
+                    edges,
+                    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.28 })
+                );
+                visualMesh.add(line);
+            }
+
+            // Invisible hit-box mesh for crisp raycasting even on composite shapes
+            const hitMesh = new THREE.Mesh(
+                new THREE.BoxGeometry(baseSize.x, baseSize.y, baseSize.z),
+                new THREE.MeshBasicMaterial({ visible: false })
+            );
+            container.add(visualMesh);
+            container.add(hitMesh);
+            container.scale.setScalar(initialScale);
+            roomGroup.add(container);
+
+            const obj = {
+                container,
+                visualMesh,
+                hitMesh,
+                baseSize: baseSize.clone(),
+                scale: initialScale,
+                minScale,
+                maxScale,
+                velY: 0,
+                isHeld: false,
+                getHalfExtents() {
+                    return new THREE.Vector3(
+                        (this.baseSize.x * this.scale) * 0.5,
+                        (this.baseSize.y * this.scale) * 0.5,
+                        (this.baseSize.z * this.scale) * 0.5
+                    );
+                },
+                getAABB() {
+                    const he = this.getHalfExtents();
+                    return {
+                        min: new THREE.Vector3(
+                            this.container.position.x - he.x,
+                            this.container.position.y - he.y,
+                            this.container.position.z - he.z
+                        ),
+                        max: new THREE.Vector3(
+                            this.container.position.x + he.x,
+                            this.container.position.y + he.y,
+                            this.container.position.z + he.z
+                        )
+                    };
+                }
+            };
+
+            hitMesh.userData.grabbable = obj;
+            grabbables.push(obj);
+            return obj;
+        }
+
+        function createPressurePlate(x, y, z, requiredMinScale = 1.6) {
+            const base = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.12, 2.6), materials.plateBase);
+            base.position.set(x, y + 0.06, z);
+            base.receiveShadow = true;
+            roomGroup.add(base);
+
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.14, 2.2), materials.plateTopInactive.clone());
+            pad.position.set(x, y + 0.14, z);
+            pad.receiveShadow = true;
+            roomGroup.add(pad);
+
+            const plate = {
+                pos: new THREE.Vector3(x, y, z),
+                pad,
+                requiredMinScale,
+                active: false
+            };
+            pressurePlates.push(plate);
+            return plate;
+        }
+
+        function createExitDoor(x, y, z, startsLocked = false) {
+            // Door Frame
+            addStaticBox(x - 1.15, y + 1.4, z, 0.25, 2.8, 0.4, materials.trim);
+            addStaticBox(x + 1.15, y + 1.4, z, 0.25, 2.8, 0.4, materials.trim);
+            addStaticBox(x, y + 2.9, z, 2.55, 0.25, 0.4, materials.trim);
+
+            // Glowing Door Portal Surface
+            const doorMat = (startsLocked ? materials.doorClosed : materials.doorOpen).clone();
+            const doorMesh = new THREE.Mesh(new THREE.BoxGeometry(2.05, 2.75, 0.15), doorMat);
+            doorMesh.position.set(x, y + 1.375, z);
+            roomGroup.add(doorMesh);
+
+            // Overhead beacon indicator
+            const beaconMat = new THREE.MeshBasicMaterial({ color: startsLocked ? 0xef4444 : 0x10b981 });
+            const beacon = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.14, 0.2), beaconMat);
+            beacon.position.set(x, y + 3.18, z + 0.12);
+            roomGroup.add(beacon);
+
+            exitDoor = {
+                pos: new THREE.Vector3(x, y, z),
+                mesh: doorMesh,
+                beacon,
+                unlocked: !startsLocked
+            };
+            return exitDoor;
+        }
+
+        // ==========================================
+        // 6. LEVEL DEFINITIONS (6 PUZZLE ROOMS)
+        // ==========================================
+        const ROOMS = [
+            {
+                number: 'ORIENTATION // 01 OF 06',
+                title: 'The Threshold',
+                build: () => {
+                    player.pos.set(0, 0, 9);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    const W = 18, H = 12, D = 24;
+                    addStaticBox(0, -0.5, 0, W, 1, D, materials.floor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    addStaticBox(-W / 2 - 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(0, H / 2, D / 2 + 0.5, W, H, 1, materials.wall);
+                    addStaticBox(0, H / 2, -D / 2 - 0.5, W, H, 1, materials.wall);
+
+                    // Pedestal table with tiny blue cube
+                    addStaticBox(-3.5, 0.55, 3.5, 1.8, 1.1, 1.8, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: -3.5, y: 1.35, z: 3.5,
+                        baseSize: new THREE.Vector3(1, 1, 1),
+                        initialScale: 0.45,
+                        minScale: 0.3,
+                        maxScale: 4.5,
+                        material: materials.cubeToy
+                    });
+
+                    // High Ledge Platform at North end (2.8m high)
+                    const ledgeH = 2.8;
+                    addStaticBox(0, ledgeH / 2, -8.5, W, ledgeH, 7, materials.platform);
+
+                    // Exit door on top of high ledge
+                    createExitDoor(0, ledgeH, -11.8, false);
+
+                    // Surrealist posters
+                    addPoster(-8.9, 3.2, 2, Math.PI / 2, 'PERSPECTIVE', 'Size is merely a', 'matter of distance.', '#38bdf8');
+                    addPoster(8.9, 3.2, -2, -Math.PI / 2, 'LOOK UP', 'Give your ideas', 'room to grow.', '#f59e0b');
+                }
+            },
+            {
+                number: 'ORIENTATION // 02 OF 06',
+                title: 'The Heavy Anchor',
+                build: () => {
+                    player.pos.set(0, 0, 10);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    const W = 20, H = 13, D = 26;
+                    addStaticBox(0, -0.5, 0, W, 1, D, materials.floor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    addStaticBox(-W / 2 - 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(0, H / 2, D / 2 + 0.5, W, H, 1, materials.wall);
+                    addStaticBox(0, H / 2, -D / 2 - 0.5, W, H, 1, materials.wall);
+
+                    // Pedestal with amber block
+                    addStaticBox(-4.5, 0.55, 5.5, 1.7, 1.1, 1.7, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: -4.5, y: 1.35, z: 5.5,
+                        baseSize: new THREE.Vector3(1.0, 1.0, 1.0),
+                        initialScale: 0.55,
+                        minScale: 0.35,
+                        maxScale: 4.5,
+                        material: materials.wedgeToy
+                    });
+
+                    // Heavy Floor Pressure Plate (requires scale >= 2.2)
+                    createPressurePlate(4.2, 0, 1.5, 2.2);
+
+                    // Raised Exit Terrace (1.25m high - easily jumpable + mantleable!)
+                    const terraceH = 1.25;
+                    addStaticBox(0, terraceH / 2, -9.5, W, terraceH, 7.0, materials.platform);
+
+                    // Locked Exit Door on terrace
+                    createExitDoor(0, terraceH, -12.8, true);
+
+                    addPoster(-9.9, 3.4, 2.0, Math.PI / 2, 'GRAVITAS', 'Scale your anchor', 'to carry real weight.', '#f59e0b');
+                    addPoster(9.9, 3.4, -3.5, -Math.PI / 2, 'ASCENT', 'Vault the terrace', 'once the seal breaks.', '#38bdf8');
+                }
+            },
+            {
+                number: 'ORIENTATION // 03 OF 06',
+                title: 'The Monolith',
+                build: () => {
+                    player.pos.set(0, 0, 10);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    const W = 18, H = 12, D = 24;
+                    addStaticBox(0, -0.5, 0, W, 1, D, materials.floor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    addStaticBox(-W / 2 - 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(0, H / 2, D / 2 + 0.5, W, H, 1, materials.wall);
+                    addStaticBox(0, H / 2, -D / 2 - 0.5, W, H, 1, materials.wall);
+
+                    // Dividing wall with a narrow doorway (2.4m wide, 3.2m tall)
+                    const wallZ = 0.5;
+                    addStaticBox(-5.1, H / 2, wallZ, 7.8, H, 1.2, materials.wall);
+                    addStaticBox(5.1, H / 2, wallZ, 7.8, H, 1.2, materials.wall);
+                    addStaticBox(0, 3.2 + (H - 3.2) / 2, wallZ, 2.4, H - 3.2, 1.2, materials.wall);
+
+                    // Giant Chess Monolith blocking the doorway from the front!
+                    createGrabbable({
+                        type: 'pawn',
+                        x: 0, y: 2.3, z: 2.7,
+                        baseSize: new THREE.Vector3(1.1, 1.6, 1.1),
+                        initialScale: 2.85,
+                        minScale: 0.25,
+                        maxScale: 4.5,
+                        material: materials.monolith
+                    });
+
+                    // Elevated Exit Platform in back chamber (2.7m high)
+                    const exitLedgeH = 2.7;
+                    addStaticBox(0, exitLedgeH / 2, -9.2, W, exitLedgeH, 5.5, materials.platform);
+
+                    // Unlocked exit door on top of elevated platform
+                    createExitDoor(0, exitLedgeH, -11.8, false);
+
+                    addPoster(-8.9, 3.2, 5.5, Math.PI / 2, 'PARADOX', 'What blocks your path', 'may fit in your palm.', '#6366f1');
+                    addPoster(8.9, 3.2, -4.5, -Math.PI / 2, 'REVERSAL', 'Carry the obstacle', 'and build your stair.', '#10b981');
+                }
+            },
+            {
+                number: 'ORIENTATION // 04 OF 06',
+                title: 'The Skybridge',
+                build: () => {
+                    player.pos.set(0, 0, 10.5);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    const W = 20, H = 14, D = 28;
+                    // Deep chasm floor & ceiling
+                    addStaticBox(0, -4.5, 0, W, 1, D, materials.chasmFloor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    // Perimeter walls
+                    addStaticBox(-W / 2 - 0.5, H / 2 - 2, 0, 1, H + 4, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2 - 2, 0, 1, H + 4, D, materials.wall);
+                    addStaticBox(0, H / 2 - 2, D / 2 + 0.5, W, H + 4, 1, materials.wall);
+                    addStaticBox(0, H / 2 - 2, -D / 2 - 0.5, W, H + 4, 1, materials.wall);
+
+                    // Near Balcony (z = +5 to +14, top at y = 0)
+                    addStaticBox(0, -2.0, 9.5, W, 4.0, 9.0, materials.floor);
+
+                    // 7.0m wide Chasm between z = +5.0 and z = -2.0!
+                    // Far Balcony (z = -14 to -2.0, top at y = 0)
+                    addStaticBox(0, -2.0, -8.0, W, 4.0, 12.0, materials.floor);
+
+                    // Subtle ledge trim along chasm edges
+                    addStaticBox(0, -0.1, 4.85, W, 0.25, 0.3, materials.trim);
+                    addStaticBox(0, -0.1, -1.85, W, 0.25, 0.3, materials.trim);
+
+                    // Pedestal on Near Balcony holding a purple rectangular plank/beam
+                    addStaticBox(-3.8, 0.5, 8.2, 1.6, 1.0, 1.6, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: -3.8, y: 1.2, z: 8.2,
+                        baseSize: new THREE.Vector3(1.1, 0.28, 2.4),
+                        initialScale: 0.55,
+                        minScale: 0.35,
+                        maxScale: 4.8,
+                        material: materials.plankToy
+                    });
+
+                    // Exit Door on Far Balcony
+                    createExitDoor(0, 0, -13.8, false);
+
+                    addPoster(-9.9, 3.4, 8.5, Math.PI / 2, 'SPAN', 'Aim across the void', 'to forge a crossing.', '#a855f7');
+                    addPoster(9.9, 3.4, 8.5, -Math.PI / 2, 'HORIZON', 'Distant walls grant', 'immense reach.', '#38bdf8');
+                }
+            },
+            {
+                number: 'ORIENTATION // 05 OF 06',
+                title: 'Dual Resonance',
+                build: () => {
+                    player.pos.set(0, 0, 10.5);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    const W = 22, H = 14, D = 26;
+                    addStaticBox(0, -0.5, 0, W, 1, D, materials.floor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    addStaticBox(-W / 2 - 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(0, H / 2, D / 2 + 0.5, W, H, 1, materials.wall);
+                    addStaticBox(0, H / 2, -D / 2 - 0.5, W, H, 1, materials.wall);
+
+                    // Left Pedestal: Blue Cube (meant to become Giant for Left Heavy Plate >= 2.2)
+                    addStaticBox(-6.0, 0.55, 6.5, 1.7, 1.1, 1.7, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: -6.0, y: 1.35, z: 6.5,
+                        baseSize: new THREE.Vector3(1.0, 1.0, 1.0),
+                        initialScale: 0.5,
+                        minScale: 0.3,
+                        maxScale: 4.5,
+                        material: materials.cubeToy
+                    });
+
+                    // Right Pedestal: Emerald Cube (meant to become Medium for Right Plate >= 1.25)
+                    addStaticBox(6.0, 0.55, 6.5, 1.7, 1.1, 1.7, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: 6.0, y: 1.35, z: 6.5,
+                        baseSize: new THREE.Vector3(1.0, 1.0, 1.0),
+                        initialScale: 0.45,
+                        minScale: 0.3,
+                        maxScale: 4.5,
+                        material: materials.emeraldToy
+                    });
+
+                    // Two Pressure Plates guarding the double-locked gate
+                    createPressurePlate(-5.2, 0, -1.0, 2.2);  // Heavy resonance
+                    createPressurePlate(5.2, 0, -1.0, 1.25);  // Medium resonance
+
+                    // High Exit Balcony at North end (2.4m high)
+                    const balconyH = 2.4;
+                    addStaticBox(0, balconyH / 2, -9.8, W, balconyH, 6.4, materials.platform);
+
+                    // Center step block (1.25m high) so player can jump + mantle onto the 2.4m balcony easily
+                    addStaticBox(0, 0.625, -5.8, 3.0, 1.25, 1.6, materials.pedestal);
+
+                    // Exit Door on high balcony requiring BOTH plates active
+                    createExitDoor(0, balconyH, -12.8, true);
+
+                    addPoster(-10.9, 3.5, 3.0, Math.PI / 2, 'HARMONY I', 'Left seal demands', 'colossal mass (2.2x).', '#38bdf8');
+                    addPoster(10.9, 3.5, 3.0, -Math.PI / 2, 'HARMONY II', 'Right seal responds', 'to measured balance (1.25x).', '#10b981');
+                }
+            },
+            {
+                number: 'ORIENTATION // 06 OF 06',
+                title: 'The Paradox Staircase',
+                build: () => {
+                    player.pos.set(0, 0, 11);
+                    player.yaw = 0;
+                    player.pitch = 0;
+
+                    // Towering vertical atrium
+                    const W = 22, H = 18, D = 28;
+                    addStaticBox(0, -0.5, 0, W, 1, D, materials.floor);
+                    addStaticBox(0, H + 0.5, 0, W, 1, D, materials.ceiling);
+
+                    addStaticBox(-W / 2 - 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(W / 2 + 0.5, H / 2, 0, 1, H, D, materials.wall);
+                    addStaticBox(0, H / 2, D / 2 + 0.5, W, H, 1, materials.wall);
+                    addStaticBox(0, H / 2, -D / 2 - 0.5, W, H, 1, materials.wall);
+
+                    // Mid-tier landing ledge on left wall (2.6m high) to aid multi-tier scaling
+                    addStaticBox(-7.5, 1.3, -1.5, 7.0, 2.6, 6.0, materials.platform);
+
+                    // Towering Exit Sanctuary at North wall (5.5m high!)
+                    const summitH = 5.5;
+                    addStaticBox(0, summitH / 2, -10.5, W, summitH, 7.0, materials.platform);
+
+                    // Two pedestal cubes in the atrium floor
+                    addStaticBox(-4.2, 0.55, 6.0, 1.7, 1.1, 1.7, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: -4.2, y: 1.35, z: 6.0,
+                        baseSize: new THREE.Vector3(1.0, 1.0, 1.0),
+                        initialScale: 0.5,
+                        minScale: 0.3,
+                        maxScale: 5.2,
+                        material: materials.cubeToy
+                    });
+
+                    addStaticBox(4.2, 0.55, 6.0, 1.7, 1.1, 1.7, materials.pedestal);
+                    createGrabbable({
+                        type: 'box',
+                        x: 4.2, y: 1.35, z: 6.0,
+                        baseSize: new THREE.Vector3(1.0, 1.0, 1.0),
+                        initialScale: 0.5,
+                        minScale: 0.3,
+                        maxScale: 5.2,
+                        material: materials.wedgeToy
+                    });
+
+                    // Final Awakening Exit Door at 5.5m summit
+                    createExitDoor(0, summitH, -13.8, false);
+
+                    addPoster(-10.9, 4.0, 5.5, Math.PI / 2, 'ASCENSION', 'Stack your perspective', 'to reach the skylight.', '#38bdf8');
+                    addPoster(10.9, 4.0, 5.5, -Math.PI / 2, 'NO LIMITS', 'The ceiling is only', 'as high as you look.', '#f59e0b');
+                }
+            }
+        ];
+
+        function updateLevelPills(activeIdx) {
+            const pills = document.querySelectorAll('.lvl-pill');
+            pills.forEach((btn, idx) => {
+                btn.classList.toggle('active', idx === activeIdx);
+            });
+        }
+
+        function loadRoom(index, showBanner = false) {
+            // Release any held object
+            if (heldObj) {
+                heldObj.isHeld = false;
+                heldObj = null;
+                sound.stopHoldHum();
+            }
+            hoveredObj = null;
+
+            // Clear existing room geometry
+            while (roomGroup.children.length > 0) {
+                const child = roomGroup.children[0];
+                roomGroup.remove(child);
+            }
+
+            staticColliders = [];
+            grabbables = [];
+            pressurePlates = [];
+            raycastTargets = [];
+            exitDoor = null;
+
+            player.vel.set(0, 0, 0);
+            player.onGround = false;
+            player.mantleCooldown = 0;
+            player.mantleCamDip = 0;
+
+            const roomDef = ROOMS[index];
+            document.getElementById('room-number').textContent = roomDef.number;
+            document.getElementById('room-title').textContent = roomDef.title;
+            updateLevelPills(index);
+
+            roomDef.build();
+
+            if (showBanner) {
+                showToast(roomDef.title);
+            }
+        }
+
+        // ==========================================
+        // 7. FORCED-PERSPECTIVE GRAB & SCALE ENGINE
+        // ==========================================
+        const scaleReadout = document.getElementById('scale-readout');
+        const crosshair = document.getElementById('crosshair');
+
+        function updateHoverAndGrab() {
+            if (!isLocked) return;
+
+            if (!heldObj) {
+                // Raycast for grabbable objects
+                raycaster.setFromCamera(centerNDC, camera);
+                const hitMeshes = grabbables.map(g => g.hitMesh);
+                const hits = raycaster.intersectObjects(hitMeshes, false);
+
+                if (hits.length > 0 && hits[0].distance <= 9.0) {
+                    hoveredObj = hits[0].object.userData.grabbable;
+                    crosshair.classList.add('hovering');
+                } else {
+                    hoveredObj = null;
+                    crosshair.classList.remove('hovering');
+                }
+                crosshair.classList.remove('holding');
+                scaleReadout.classList.remove('visible');
+            } else {
+                crosshair.classList.remove('hovering');
+                crosshair.classList.add('holding');
+                scaleReadout.classList.add('visible');
+                scaleReadout.textContent = `SCALE: ${heldObj.scale.toFixed(2)}x`;
+
+                // Forced Perspective Placement & Scaling
+                raycaster.setFromCamera(centerNDC, camera);
+
+                // Raycast against static room surfaces + non-held grabbable objects
+                const otherGrabbables = grabbables
+                    .filter(g => g !== heldObj)
+                    .map(g => g.hitMesh);
+                const targets = raycastTargets.concat(otherGrabbables);
+
+                const hits = raycaster.intersectObjects(targets, false);
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+
+                let targetDistance = 12.0;
+                let surfaceNormal = camDir.clone().negate();
+
+                if (hits.length > 0) {
+                    targetDistance = Math.max(0.75, Math.min(28.0, hits[0].distance));
+                    if (hits[0].face) {
+                        surfaceNormal = hits[0].face.normal.clone()
+                            .transformDirection(hits[0].object.matrixWorld)
+                            .normalize();
+                    }
+                }
+
+                // Iterative surface-offset solver so scaled object sits flush against walls/floors
+                let newScale = grabInitialScale * (targetDistance / grabInitialDist);
+                newScale = Math.max(heldObj.minScale, Math.min(heldObj.maxScale, newScale));
+
+                const halfExtents = new THREE.Vector3(
+                    (heldObj.baseSize.x * newScale) * 0.5,
+                    (heldObj.baseSize.y * newScale) * 0.5,
+                    (heldObj.baseSize.z * newScale) * 0.5
+                );
+
+                // Project half-extents onto surface normal to find exact push-back distance
+                const normalPush =
+                    Math.abs(surfaceNormal.x) * halfExtents.x +
+                    Math.abs(surfaceNormal.y) * halfExtents.y +
+                    Math.abs(surfaceNormal.z) * halfExtents.z;
+
+                const cosAngle = Math.max(0.25, Math.abs(camDir.dot(surfaceNormal)));
+                const centerDist = Math.max(0.65, targetDistance - (normalPush / cosAngle));
+
+                // Recompute scale at the true center distance for accurate angular-size preservation
+                newScale = grabInitialScale * (centerDist / grabInitialDist);
+                newScale = Math.max(heldObj.minScale, Math.min(heldObj.maxScale, newScale));
+
+                heldObj.scale = newScale;
+                heldObj.container.scale.setScalar(newScale);
+
+                const finalHalf = heldObj.getHalfExtents();
+                const finalPush =
+                    Math.abs(surfaceNormal.x) * finalHalf.x +
+                    Math.abs(surfaceNormal.y) * finalHalf.y +
+                    Math.abs(surfaceNormal.z) * finalHalf.z;
+
+                let targetPos;
+                if (hits.length > 0) {
+                    targetPos = hits[0].point.clone().addScaledVector(surfaceNormal, finalPush + 0.015);
+                } else {
+                    targetPos = camera.position.clone().addScaledVector(camDir, centerDist);
+                }
+
+                // Prevent object from overlapping player's own body
+                const playerCenter = new THREE.Vector3(player.pos.x, player.pos.y + player.height * 0.5, player.pos.z);
+                const toObj = targetPos.clone().sub(playerCenter);
+                const minSafeDist = player.radius + Math.max(finalHalf.x, finalHalf.z) + 0.22;
+                const horizDist = Math.hypot(toObj.x, toObj.z);
+                if (horizDist < minSafeDist && Math.abs(toObj.y) < (player.height * 0.5 + finalHalf.y)) {
+                    if (horizDist > 0.001) {
+                        const pushFactor = minSafeDist / horizDist;
+                        targetPos.x = playerCenter.x + toObj.x * pushFactor;
+                        targetPos.z = playerCenter.z + toObj.z * pushFactor;
+                    }
+                }
+
+                heldObj.container.position.lerp(targetPos, 0.65);
+                heldObj.container.rotation.y = player.yaw + grabYawOffset;
+                heldObj.velY = 0;
+
+                sound.updateHoldPitch(newScale / grabInitialScale);
+            }
+        }
+
+        function handleGrabToggle() {
+            if (!isLocked || transitioningRoom) return;
+
+            if (heldObj) {
+                // Drop held object
+                heldObj.isHeld = false;
+                heldObj.velY = -0.5;
+                sound.playDrop(heldObj.scale);
+                heldObj = null;
+            } else if (hoveredObj) {
+                // Grab hovered object
+                heldObj = hoveredObj;
+                heldObj.isHeld = true;
+                grabInitialDist = Math.max(0.6, camera.position.distanceTo(heldObj.container.position));
+                grabInitialScale = heldObj.scale;
+                grabYawOffset = heldObj.container.rotation.y - player.yaw;
+                sound.playGrab();
+            }
+        }
+
+        // ==========================================
+        // 8. PHYSICS & COLLISION ENGINE (PLAYER + OBJECTS)
+        // ==========================================
+        function getAllSolidBoxes(excludeGrabbable = null) {
+            const boxes = staticColliders.slice();
+            for (let i = 0; i < grabbables.length; i++) {
+                const g = grabbables[i];
+                if (g.isHeld || g === excludeGrabbable) continue;
+                boxes.push(g.getAABB());
+            }
+            return boxes;
+        }
+
+        function updateGrabbablePhysics(dt) {
+            const gravity = -18.0;
+
+            for (let i = 0; i < grabbables.length; i++) {
+                const g = grabbables[i];
+                if (g.isHeld) continue;
+
+                g.velY += gravity * dt;
+                g.container.position.y += g.velY * dt;
+
+                const aabb = g.getAABB();
+                const he = g.getHalfExtents();
+                const solids = getAllSolidBoxes(g);
+
+                for (let j = 0; j < solids.length; j++) {
+                    const s = solids[j];
+                    if (
+                        aabb.max.x > s.min.x + 0.02 && aabb.min.x < s.max.x - 0.02 &&
+                        aabb.max.z > s.min.z + 0.02 && aabb.min.z < s.max.z - 0.02 &&
+                        aabb.max.y > s.min.y && aabb.min.y < s.max.y
+                    ) {
+                        if (g.velY <= 0 && aabb.min.y < s.max.y && aabb.max.y > s.max.y) {
+                            g.container.position.y = s.max.y + he.y;
+                            g.velY = 0;
+                            aabb.min.y = s.max.y;
+                            aabb.max.y = s.max.y + he.y * 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        function updatePlayer(dt) {
+            if (!isLocked) return;
+
+            if (player.mantleCooldown > 0) {
+                player.mantleCooldown = Math.max(0, player.mantleCooldown - dt);
+            }
+            if (player.mantleCamDip > 0) {
+                player.mantleCamDip = Math.max(0, player.mantleCamDip - dt * 2.8);
+            }
+
+            // Horizontal movement input
+            let forwardInput = 0;
+            let rightInput = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) forwardInput += 1;
+            if (keys['KeyS'] || keys['ArrowDown']) forwardInput -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) rightInput += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) rightInput -= 1;
+
+            const sinY = Math.sin(player.yaw);
+            const cosY = Math.cos(player.yaw);
+
+            const moveX = (-sinY * forwardInput + cosY * rightInput);
+            const moveZ = (-cosY * forwardInput - sinY * rightInput);
+            const moveLen = Math.hypot(moveX, moveZ);
+
+            if (moveLen > 0.001) {
+                player.vel.x = (moveX / moveLen) * player.speed;
+                player.vel.z = (moveZ / moveLen) * player.speed;
+            } else {
+                player.vel.x = 0;
+                player.vel.z = 0;
+            }
+
+            // Jump
+            if (keys['Space'] && player.onGround) {
+                player.vel.y = player.jumpForce;
+                player.onGround = false;
+            }
+
+            // Gravity
+            player.vel.y += -20.0 * dt;
+
+            const solids = getAllSolidBoxes();
+            const r = player.radius;
+            const h = player.height;
+
+            // 1. Move X & resolve collisions (with smooth auto-step for small ledges <= 0.55m)
+            player.pos.x += player.vel.x * dt;
+            resolvePlayerHorizontal(solids, 'x');
+
+            // 2. Move Z & resolve collisions
+            player.pos.z += player.vel.z * dt;
+            resolvePlayerHorizontal(solids, 'z');
+
+            // 3. Move Y & resolve vertical collisions
+            player.pos.y += player.vel.y * dt;
+            player.onGround = false;
+
+            for (let i = 0; i < solids.length; i++) {
+                const b = solids[i];
+                if (
+                    player.pos.x + r > b.min.x && player.pos.x - r < b.max.x &&
+                    player.pos.z + r > b.min.z && player.pos.z - r < b.max.z &&
+                    player.pos.y + h > b.min.y && player.pos.y < b.max.y
+                ) {
+                    const overlapBottom = (player.pos.y + h) - b.min.y;
+                    const overlapTop = b.max.y - player.pos.y;
+
+                    if (overlapTop < overlapBottom && player.vel.y <= 0) {
+                        player.pos.y = b.max.y;
+                        player.vel.y = 0;
+                        player.onGround = true;
+                    } else if (overlapBottom < overlapTop && player.vel.y > 0) {
+                        player.pos.y = b.min.y - h;
+                        player.vel.y = 0;
+                    }
+                }
+            }
+
+            // 4. Subtle Ledge Mantle check (waist/chest-height ledges up to ~1.45m when airborne & pressing forward/jump)
+            tryLedgeMantle(solids, forwardInput > 0 || keys['Space']);
+
+            // Safety floor respawn if player falls into chasm (Level 4)
+            if (player.pos.y < -3.6) {
+                showToast('Fell into the dream void — Resetting');
+                loadRoom(currentRoomIndex, false);
+                return;
+            }
+
+            // Update camera transform (including subtle mantle pitch dip/recovery)
+            const dipAngle = Math.sin(player.mantleCamDip * Math.PI) * 0.065;
+            camera.position.set(player.pos.x, player.pos.y + player.eyeHeight, player.pos.z);
+            camera.rotation.y = player.yaw;
+            camera.rotation.x = player.pitch - dipAngle;
+        }
+
+        function tryLedgeMantle(solids, wantsClimb) {
+            const indicator = document.getElementById('mantle-indicator');
+            if (player.onGround || player.mantleCooldown > 0 || !wantsClimb) {
+                indicator.classList.remove('visible');
+                return;
+            }
+
+            // Only mantle near apex or descent/late-ascent of a jump, never launching up towering walls
+            if (player.vel.y > 4.2 || player.vel.y < -6.5) {
+                indicator.classList.remove('visible');
+                return;
+            }
+
+            const forwardX = -Math.sin(player.yaw);
+            const forwardZ = -Math.cos(player.yaw);
+            const probeDist = player.radius + 0.34;
+            const probeX = player.pos.x + forwardX * probeDist;
+            const probeZ = player.pos.z + forwardZ * probeDist;
+
+            const minMantleTop = player.pos.y + 0.35;
+            const maxMantleTop = player.pos.y + 1.45;
+
+            let bestLedgeY = null;
+
+            for (let i = 0; i < solids.length; i++) {
+                const b = solids[i];
+                if (
+                    probeX > b.min.x - 0.08 && probeX < b.max.x + 0.08 &&
+                    probeZ > b.min.z - 0.08 && probeZ < b.max.z + 0.08
+                ) {
+                    if (b.max.y >= minMantleTop && b.max.y <= maxMantleTop) {
+                        if (bestLedgeY === null || b.max.y < bestLedgeY) {
+                            bestLedgeY = b.max.y;
+                        }
+                    }
+                }
+            }
+
+            if (bestLedgeY !== null) {
+                // Verify headroom above the ledge so we never mantle into a ceiling or closed doorway header
+                const targetFootY = bestLedgeY + 0.02;
+                const r = player.radius * 0.88;
+                const h = player.height;
+                let blockedHeadroom = false;
+
+                for (let i = 0; i < solids.length; i++) {
+                    const b = solids[i];
+                    if (
+                        probeX + r > b.min.x && probeX - r < b.max.x &&
+                        probeZ + r > b.min.z && probeZ - r < b.max.z &&
+                        targetFootY + h > b.min.y + 0.05 && targetFootY < b.max.y - 0.05
+                    ) {
+                        blockedHeadroom = true;
+                        break;
+                    }
+                }
+
+                if (!blockedHeadroom) {
+                    player.pos.y = targetFootY;
+                    player.pos.x += forwardX * 0.24;
+                    player.pos.z += forwardZ * 0.24;
+                    player.vel.y = 1.6;
+                    player.onGround = true;
+                    player.mantleCooldown = 0.48;
+                    player.mantleCamDip = 1.0;
+
+                    sound.playMantle();
+                    indicator.classList.add('visible');
+                    clearTimeout(indicator._timer);
+                    indicator._timer = setTimeout(() => {
+                        indicator.classList.remove('visible');
+                    }, 380);
+                }
+            }
+        }
+
+        function resolvePlayerHorizontal(solids, axis) {
+            const r = player.radius;
+            const h = player.height;
+            const stepHeight = 0.55;
+
+            for (let i = 0; i < solids.length; i++) {
+                const b = solids[i];
+                if (
+                    player.pos.x + r > b.min.x && player.pos.x - r < b.max.x &&
+                    player.pos.z + r > b.min.z && player.pos.z - r < b.max.z &&
+                    player.pos.y + h > b.min.y + 0.02 && player.pos.y < b.max.y - 0.02
+                ) {
+                    const heightDiff = b.max.y - player.pos.y;
+                    if (heightDiff > 0 && heightDiff <= stepHeight && (player.onGround || player.vel.y > -2.5)) {
+                        player.pos.y = b.max.y;
+                        if (player.vel.y < 0) player.vel.y = 0;
+                        player.onGround = true;
+                        continue;
+                    }
+
+                    if (axis === 'x') {
+                        const center = (b.min.x + b.max.x) * 0.5;
+                        if (player.pos.x < center) {
+                            player.pos.x = b.min.x - r;
+                        } else {
+                            player.pos.x = b.max.x + r;
+                        }
+                    } else {
+                        const center = (b.min.z + b.max.z) * 0.5;
+                        if (player.pos.z < center) {
+                            player.pos.z = b.min.z - r;
+                        } else {
+                            player.pos.z = b.max.z + r;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 9. PUZZLE TRIGGERS & ROOM PROGRESSION
+        // ==========================================
+        function updatePuzzleLogic() {
+            if (transitioningRoom || gameCompleted) return;
+
+            let allPlatesSatisfied = true;
+
+            for (let i = 0; i < pressurePlates.length; i++) {
+                const p = pressurePlates[i];
+                let pressed = false;
+
+                for (let j = 0; j < grabbables.length; j++) {
+                    const g = grabbables[j];
+                    if (g.isHeld) continue;
+                    const aabb = g.getAABB();
+                    const overlapsXZ =
+                        aabb.max.x > p.pos.x - 1.1 && aabb.min.x < p.pos.x + 1.1 &&
+                        aabb.max.z > p.pos.z - 1.1 && aabb.min.z < p.pos.z + 1.1;
+                    const restingOnPlate = aabb.min.y <= p.pos.y + 0.32 && aabb.max.y >= p.pos.y;
+
+                    if (overlapsXZ && restingOnPlate && g.scale >= p.requiredMinScale) {
+                        pressed = true;
+                        break;
+                    }
+                }
+
+                if (pressed !== p.active) {
+                    p.active = pressed;
+                    p.pad.material = pressed ? materials.plateTopActive : materials.plateTopInactive;
+                    p.pad.position.y = p.pos.y + (pressed ? 0.09 : 0.14);
+                    sound.playPlate(pressed);
+                    if (pressed) {
+                        showToast('Pressure Plate Activated');
+                    }
+                }
+
+                if (!p.active) {
+                    allPlatesSatisfied = false;
+                }
+            }
+
+            if (exitDoor) {
+                if (pressurePlates.length > 0) {
+                    if (exitDoor.unlocked !== allPlatesSatisfied) {
+                        exitDoor.unlocked = allPlatesSatisfied;
+                        exitDoor.mesh.material = exitDoor.unlocked ? materials.doorOpen : materials.doorClosed;
+                        exitDoor.beacon.material.color.setHex(exitDoor.unlocked ? 0x10b981 : 0xef4444);
+                    }
+                }
+
+                if (exitDoor.unlocked) {
+                    const dx = Math.abs(player.pos.x - exitDoor.pos.x);
+                    const dy = Math.abs(player.pos.y - exitDoor.pos.y);
+                    const dz = Math.abs(player.pos.z - exitDoor.pos.z);
+
+                    if (dx < 1.15 && dy < 1.2 && dz < 1.05) {
+                        advanceToNextRoom();
+                    }
+                }
+            }
+        }
+
+        function advanceToNextRoom() {
+            transitioningRoom = true;
+            sound.playChime();
+
+            const curtain = document.getElementById('fade-curtain');
+            curtain.classList.add('active');
+
+            setTimeout(() => {
+                if (currentRoomIndex + 1 < ROOMS.length) {
+                    currentRoomIndex++;
+                    loadRoom(currentRoomIndex, true);
+                    curtain.classList.remove('active');
+                    transitioningRoom = false;
+                } else {
+                    gameCompleted = true;
+                    document.exitPointerLock();
+                    document.getElementById('modal-heading').textContent = 'TREATMENT COMPLETE';
+                    document.getElementById('modal-text').textContent =
+                        'Congratulations! You have mastered forced-perspective spatial reasoning across all six Somnasculpt chambers. Your perception has been recalibrated.';
+                    document.getElementById('start-btn').textContent = 'Restart Dream Therapy';
+                    document.getElementById('overlay').classList.remove('hidden');
+                    curtain.classList.remove('active');
+                    transitioningRoom = false;
+                }
+            }, 500);
+        }
+
+        // ==========================================
+        // 10. INPUT & POINTER LOCK HANDLERS
+        // ==========================================
+        const overlay = document.getElementById('overlay');
+        const startBtn = document.getElementById('start-btn');
+        const resetBtn = document.getElementById('btn-reset');
+        const muteBtn = document.getElementById('btn-mute');
+
+        document.querySelectorAll('.lvl-pill').forEach((pill) => {
+            pill.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const targetLvl = parseInt(pill.getAttribute('data-lvl'), 10);
+                if (!Number.isNaN(targetLvl) && targetLvl >= 0 && targetLvl < ROOMS.length) {
+                    gameCompleted = false;
+                    currentRoomIndex = targetLvl;
+                    loadRoom(currentRoomIndex, true);
+                    canvas.requestPointerLock();
+                }
+            });
+        });
+
+        startBtn.addEventListener('click', () => {
+            sound.init();
+            if (gameCompleted) {
+                gameCompleted = false;
+                currentRoomIndex = 0;
+                loadRoom(0, false);
+            }
+            canvas.requestPointerLock();
+        });
+
+        resetBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            loadRoom(currentRoomIndex, false);
+            showToast('Room Reset');
+            canvas.requestPointerLock();
+        });
+
+        muteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isMuted = sound.toggleMute();
+            muteBtn.textContent = isMuted ? 'Audio: OFF' : 'Audio: ON';
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+            isLocked = (document.pointerLockElement === canvas);
+            if (isLocked) {
+                overlay.classList.add('hidden');
+            } else if (!transitioningRoom) {
+                if (!gameCompleted) {
+                    document.getElementById('modal-heading').textContent = 'SESSION PAUSED';
+                    document.getElementById('modal-text').textContent =
+                        'Click below to resume your Dream Therapy session.';
+                    document.getElementById('start-btn').textContent = 'Resume Session';
+                }
+                overlay.classList.remove('hidden');
+            }
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isLocked) return;
+            const sensitivity = 0.0022;
+            player.yaw -= e.movementX * sensitivity;
+            player.pitch -= e.movementY * sensitivity;
+            const maxPitch = Math.PI / 2 - 0.03;
+            player.pitch = Math.max(-maxPitch, Math.min(maxPitch, player.pitch));
+        });
+
+        document.addEventListener('mousedown', (e) => {
+            if (e.button === 0 && isLocked) {
+                handleGrabToggle();
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'KeyR' && isLocked && !transitioningRoom) {
+                loadRoom(currentRoomIndex, false);
+                showToast('Room Reset');
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        let toastTimer = null;
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2200);
+        }
+
+        // ==========================================
+        // 11. MAIN ANIMATION LOOP
+        // ==========================================
+        let lastTime = performance.now();
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.05, (now - lastTime) / 1000);
+            lastTime = now;
+
+            updatePlayer(dt);
+            updateHoverAndGrab();
+            updateGrabbablePhysics(dt);
+            updatePuzzleLogic();
+
+            renderer.render(scene, camera);
+        }
+
+        window.onload = function() {
+            loadRoom(0, false);
+            requestAnimationFrame(animate);
+        };
+    })();
+    </script>
+</body>
+</html>
