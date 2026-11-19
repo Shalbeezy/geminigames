@@ -1,0 +1,3588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Duck World 3D — Island Paradise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            margin: 0;
+            padding: 0;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Fredoka', sans-serif;
+            background-color: #7dd3fc;
+        }
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+        .bubbly-panel {
+            background: rgba(255, 255, 255, 0.88);
+            backdrop-filter: blur(10px);
+            border: 3px solid #ffffff;
+            box-shadow: 0 8px 24px rgba(14, 116, 144, 0.22);
+            border-radius: 24px;
+        }
+        .bubbly-btn {
+            background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+            border: 3px solid #ffffff;
+            box-shadow: 0 6px 0 #b45309, 0 10px 20px rgba(0,0,0,0.2);
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+            cursor: pointer;
+        }
+        .bubbly-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 0 #b45309, 0 12px 24px rgba(0,0,0,0.25);
+        }
+        .bubbly-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #b45309, 0 4px 10px rgba(0,0,0,0.2);
+        }
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        .float-anim {
+            animation: floatSlow 3s ease-in-out infinite;
+        }
+        @keyframes popToast {
+            0% { transform: translate(-50%, 20px) scale(0.8); opacity: 0; }
+            15% { transform: translate(-50%, 0px) scale(1.05); opacity: 1; }
+            25% { transform: translate(-50%, 0px) scale(1); opacity: 1; }
+            85% { transform: translate(-50%, 0px) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -15px) scale(0.95); opacity: 0; }
+        }
+        .toast-anim {
+            animation: popToast 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        /* Dive Speed Lines Overlay */
+        #speed-lines {
+            background: radial-gradient(circle, transparent 55%, rgba(255, 255, 255, 0.45) 100%);
+            transition: opacity 0.15s ease;
+        }
+        /* Roguelike Card Hover */
+        .upgrade-card {
+            transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.18s ease, border-color 0.18s ease;
+        }
+        .upgrade-card:hover {
+            transform: translateY(-6px) scale(1.02);
+            border-color: #f59e0b;
+            box-shadow: 0 14px 30px rgba(245, 158, 11, 0.32);
+        }
+        #canvas-mount canvas {
+            cursor: crosshair;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <!-- Three.js Canvas Mount -->
+        <div id="canvas-mount" class="w-full h-full"></div>
+
+        <!-- Aerial Dive Speed Lines -->
+        <div id="speed-lines" class="pointer-events-none fixed inset-0 z-5 opacity-0"></div>
+
+        <!-- Top HUD -->
+        <div id="hud" class="hidden pointer-events-none fixed inset-0 z-10 p-3 sm:p-5 flex flex-col justify-between">
+            <!-- Top Row -->
+            <div class="flex items-start justify-between gap-2 sm:gap-4">
+                <!-- Collectibles, Ducklings, Ammo & Mode Badge -->
+                <div class="flex flex-wrap items-center gap-2 sm:gap-2.5 pointer-events-auto">
+                    <div class="bubbly-panel px-3 py-2 flex items-center gap-2">
+                        <span class="text-xl filter drop-shadow">🍞</span>
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Bread</div>
+                            <div class="text-sm sm:text-base font-bold text-slate-800 leading-none">
+                                <span id="bread-count">0</span><span class="text-slate-400 text-xs">/25</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bubbly-panel px-3 py-2 flex items-center gap-2">
+                        <span class="text-xl filter drop-shadow">🥚</span>
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-yellow-600">Eggs</div>
+                            <div class="text-sm sm:text-base font-bold text-slate-800 leading-none">
+                                <span id="egg-count">0</span><span class="text-slate-400 text-xs">/6</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bubbly-panel px-3 py-2 flex items-center gap-2">
+                        <span class="text-xl filter drop-shadow">🐤</span>
+                        <div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider text-sky-700">Squad</div>
+                            <div class="text-sm sm:text-base font-bold text-slate-800 leading-none">
+                                <span id="duckling-count">0</span><span class="text-slate-400 text-xs">/8</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode, Wing Stamina & Cloaca Ammo Pill -->
+                    <div class="bubbly-panel px-3.5 py-2 flex flex-col gap-1 min-w-[148px]">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">State</span>
+                            <span id="mode-badge" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">WALK</span>
+                        </div>
+                        <div class="flex items-center gap-1.5" title="Wing Stamina">
+                            <span class="text-[10px]">🪽</span>
+                            <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden border border-slate-300">
+                                <div id="stamina-bar" class="h-full bg-gradient-to-r from-sky-400 to-amber-400 transition-all duration-75" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5" title="Poop Ammo Gauge">
+                            <span class="text-[10px]">💩</span>
+                            <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden border border-slate-300">
+                                <div id="ammo-bar" class="h-full bg-gradient-to-r from-stone-400 via-amber-100 to-white transition-all duration-75" style="width: 100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Roguelike Wave HUD (Shown when Waves Mode is active) -->
+                    <div id="wave-hud" class="hidden bubbly-panel px-3.5 py-2 flex flex-col gap-1 min-w-[185px] border-rose-300">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-rose-700">⚔️ WAVE <span id="wave-num">1</span></span>
+                            <span class="text-[11px] font-bold text-slate-600">👾 <span id="wave-enemies">0</span> | ⭐ <span id="wave-score">0</span></span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[11px]">❤️</span>
+                            <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden border border-slate-300">
+                                <div id="hp-bar" class="h-full bg-gradient-to-r from-rose-500 to-emerald-400 transition-all duration-150" style="width: 100%;"></div>
+                            </div>
+                            <span id="hp-text" class="text-[10px] font-bold text-slate-700">100/100</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Side: Game Mode Toggle, Hat Selector, Help Toggle, Sound & Mini-Radar -->
+                <div class="flex items-start gap-2 pointer-events-auto">
+                    <button id="game-mode-btn" title="Toggle Roguelike Waves Mode (G)" class="bubbly-panel px-3 h-11 flex items-center gap-1.5 text-xs sm:text-sm font-bold text-rose-700 hover:scale-105 transition-transform cursor-pointer border-rose-200">
+                        <span>⚔️</span> <span id="game-mode-label">Waves Mode</span>
+                    </button>
+                    <button id="hat-btn" title="Cycle Hat (H)" class="bubbly-panel px-3 h-11 flex items-center gap-1.5 text-sm font-bold text-slate-700 hover:scale-105 transition-transform cursor-pointer">
+                        <span>🎩</span> <span id="hat-label" class="hidden sm:inline">No Hat</span>
+                    </button>
+                    <button id="help-toggle-btn" title="Toggle Controls Legend" class="bubbly-panel w-11 h-11 flex items-center justify-center text-lg font-bold text-slate-700 hover:scale-105 transition-transform cursor-pointer">
+                        ❔
+                    </button>
+                    <button id="mute-btn" title="Toggle Sound" class="bubbly-panel w-11 h-11 flex items-center justify-center text-lg hover:scale-105 transition-transform cursor-pointer">
+                        🔊
+                    </button>
+                    <div class="bubbly-panel p-1.5 hidden lg:flex flex-col items-center">
+                        <canvas id="minimap" width="104" height="104" class="rounded-full bg-sky-200 border-2 border-sky-400"></canvas>
+                        <span class="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">Radar</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Boss Health Bar (Top-Center when Boss is active) -->
+            <div id="boss-hud" class="hidden fixed top-20 left-1/2 -translate-x-1/2 z-20 pointer-events-none w-80 sm:w-96">
+                <div class="bubbly-panel px-4 py-2 border-amber-400 bg-slate-900/90 text-white">
+                    <div class="flex justify-between items-center text-xs font-bold mb-1">
+                        <span class="text-amber-300">👑 MEGA SEAGULL OVERLORD</span>
+                        <span id="boss-hp-text" class="text-rose-300">500 / 500</span>
+                    </div>
+                    <div class="w-full h-3 bg-slate-700 rounded-full overflow-hidden border border-slate-500">
+                        <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-red-600 via-orange-500 to-yellow-400 transition-all duration-100" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Notification Area -->
+            <div id="toast-container" class="fixed top-32 left-1/2 -translate-x-1/2 z-20 pointer-events-none"></div>
+
+            <!-- Bottom Row: Controls Hint + Mobile Touch Controls -->
+            <div class="flex items-end justify-between gap-3">
+                <!-- Collapsible Desktop Controls Legend -->
+                <div id="controls-legend" class="bubbly-panel px-4 py-2.5 hidden md:flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs font-semibold text-slate-700 max-w-3xl">
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800">WASD</kbd> Move / Fly</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-amber-100 rounded text-amber-900">L-Click / F</kbd> Shoot Poop</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-slate-200 rounded text-slate-800">R-Drag</kbd> Orbit Cam</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-sky-200 rounded text-sky-900">Space x2</kbd> Fly</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-rose-200 rounded text-rose-900">R</kbd> Ragdoll</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-emerald-200 rounded text-emerald-900">Q</kbd> Quack</span>
+                    <span><kbd class="px-1.5 py-0.5 bg-purple-200 rounded text-purple-900">G</kbd> Waves</span>
+                </div>
+
+                <!-- Mobile Virtual Joystick -->
+                <div id="mobile-joystick-zone" class="md:hidden pointer-events-auto relative w-28 h-28 rounded-full bg-white/40 border-2 border-white/80 backdrop-blur-sm flex items-center justify-center touch-none">
+                    <div id="mobile-joystick-knob" class="w-12 h-12 rounded-full bg-amber-400 border-2 border-white shadow-md"></div>
+                </div>
+
+                <!-- Action Buttons (Accessible on Desktop & Mobile) -->
+                <div class="flex flex-wrap justify-end items-center gap-2 pointer-events-auto ml-auto">
+                    <button id="btn-poop" class="bubbly-btn px-3.5 py-2.5 rounded-2xl text-slate-900 font-bold text-sm sm:text-base flex items-center gap-1.5" style="background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 100%); box-shadow: 0 5px 0 #64748b;">
+                        <span>💩</span> Fire!
+                    </button>
+                    <button id="btn-ragdoll" class="bubbly-btn px-3.5 py-2.5 rounded-2xl text-white font-bold text-sm sm:text-base flex items-center gap-1.5" style="background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%); box-shadow: 0 5px 0 #9f1239;">
+                        <span>🤪</span> Ragdoll
+                    </button>
+                    <button id="btn-fly" class="bubbly-btn px-3.5 py-2.5 rounded-2xl text-white font-bold text-sm sm:text-base flex items-center gap-1.5" style="background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); box-shadow: 0 5px 0 #0369a1;">
+                        <span>🪽</span> Fly
+                    </button>
+                    <button id="btn-quack" class="bubbly-btn px-4 py-2.5 rounded-2xl text-white font-bold text-sm sm:text-base flex items-center gap-1.5">
+                        <span>📢</span> QUACK!
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start / Welcome Overlay -->
+        <div id="start-overlay" class="fixed inset-0 z-30 flex items-center justify-center p-4 bg-sky-900/35 backdrop-blur-sm">
+            <div class="bubbly-panel max-w-lg w-full p-6 sm:p-8 text-center">
+                <div class="text-6xl mb-2 float-anim inline-block">🦆</div>
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-800 mb-2 tracking-tight">Duck World 3D</h1>
+                <p class="text-slate-600 text-sm sm:text-base mb-5 leading-relaxed">
+                    Explore a 3D island paradise, soar to floating sky islands, flop around with <span class="font-bold text-rose-600">ragdoll physics</span>, blast <span class="font-bold text-slate-800">mouse-aimed bird poop</span>, and survive <span class="font-bold text-amber-600">Roguelike Enemy Waves</span>!
+                </p>
+
+                <div class="bg-sky-50/90 rounded-2xl p-4 mb-5 text-left text-xs sm:text-sm text-slate-700 space-y-1.5 border border-sky-200">
+                    <div class="flex justify-between"><span>💩 Aim & Shoot Bird Poop:</span><span class="font-bold">Move Mouse + Left-Click (or F)</span></div>
+                    <div class="flex justify-between"><span>🎥 Orbit Camera:</span><span class="font-bold">Right-Click Drag (or Scroll)</span></div>
+                    <div class="flex justify-between"><span>⚔️ Roguelike Waves Mode:</span><span class="font-bold">Press G or Top Waves Button</span></div>
+                    <div class="flex justify-between"><span>🪽 Powered Flight & Dive:</span><span class="font-bold">Space x2 + Shift/C to Dive</span></div>
+                    <div class="flex justify-between"><span>🤪 Ragdoll & Quack Squad:</span><span class="font-bold">R (Ragdoll) | Q (Quack) | H (Hats)</span></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button id="play-btn" class="bubbly-btn py-3.5 rounded-2xl text-white font-bold text-lg tracking-wide">
+                        Free Roam 🦆
+                    </button>
+                    <button id="play-waves-btn" class="bubbly-btn py-3.5 rounded-2xl text-white font-bold text-lg tracking-wide" style="background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%); box-shadow: 0 6px 0 #9f1239;">
+                        Waves Mode ⚔️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Roguelike Between-Wave Upgrade Draft Modal -->
+        <div id="upgrade-overlay" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-slate-950/55 backdrop-blur-sm">
+            <div class="bubbly-panel max-w-3xl w-full p-6 sm:p-8 text-center border-amber-300">
+                <div class="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-800 text-xs font-bold uppercase tracking-wider mb-2">
+                    Wave <span id="cleared-wave-num">1</span> Cleared!
+                </div>
+                <h2 class="text-2xl sm:text-3xl font-bold text-slate-800 mb-1">Choose a Duck Mutation</h2>
+                <p class="text-slate-600 text-xs sm:text-sm mb-6">Pick 1 roguelike upgrade to power up your aerial & ground arsenal:</p>
+                <div id="upgrade-cards-container" class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Roguelike Game Over Modal -->
+        <div id="gameover-overlay" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-rose-950/55 backdrop-blur-sm">
+            <div class="bubbly-panel max-w-md w-full p-7 text-center border-rose-300">
+                <div class="text-6xl mb-2">💫🦆</div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Feathers Ruffled!</h2>
+                <p class="text-slate-600 text-sm mb-5">Your duck was overwhelmed in Roguelike Waves Mode.</p>
+                <div class="bg-slate-100 rounded-2xl p-4 mb-6 space-y-2 text-sm font-bold text-slate-700">
+                    <div class="flex justify-between"><span>Wave Reached:</span><span id="final-wave" class="text-rose-600">1</span></div>
+                    <div class="flex justify-between"><span>Best Wave Record:</span><span id="best-wave" class="text-amber-600">1</span></div>
+                    <div class="flex justify-between"><span>Final Score:</span><span id="final-score" class="text-sky-600">0</span></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button id="retry-waves-btn" class="bubbly-btn py-3 rounded-2xl text-white font-bold text-base" style="background: linear-gradient(180deg, #fb7185 0%, #e11d48 100%); box-shadow: 0 5px 0 #9f1239;">
+                        Retry Waves ⚔️
+                    </button>
+                    <button id="return-freeroam-btn" class="bubbly-btn py-3 rounded-2xl text-white font-bold text-base">
+                        Free Roam 🏝️
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Victory Modal -->
+        <div id="victory-overlay" class="hidden fixed inset-0 z-30 flex items-center justify-center p-4 bg-sky-900/40 backdrop-blur-sm">
+            <div class="bubbly-panel max-w-md w-full p-8 text-center">
+                <div class="text-6xl mb-3 float-anim inline-block">👑🦆</div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-2">Sky & Island Champion!</h2>
+                <p class="text-slate-600 mb-6">
+                    You collected all 25 Golden Breadcrumbs and all 6 Sky Island Eggs! Keep soaring, ragdolling, and leading your duckling parade.
+                </p>
+                <button id="keep-playing-btn" class="bubbly-btn w-full py-3.5 rounded-2xl text-white font-bold text-lg">
+                    Keep Exploring!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * DUCK WORLD 3D — RAGDOLL, SKY SOARING, POOP SHOOTER & ROGUELIKE WAVES EDITION
+     */
+    (function () {
+        'use strict';
+
+        // ==========================================
+        // 1. PROCEDURAL WEB AUDIO SYNTHESIZER
+        // ==========================================
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) {
+                        this.ctx = new AudioCtx();
+                    }
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            toggleMute() {
+                this.muted = !this.muted;
+                return this.muted;
+            }
+
+            playQuack(pitchMultiplier = 1.0) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+
+                const osc1 = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
+                const filter = this.ctx.createBiquadFilter();
+                const gain = this.ctx.createGain();
+
+                osc1.type = 'sawtooth';
+                osc2.type = 'triangle';
+
+                const baseFreq = 260 * pitchMultiplier;
+                osc1.frequency.setValueAtTime(baseFreq * 1.15, now);
+                osc1.frequency.exponentialRampToValueAtTime(baseFreq * 1.38, now + 0.05);
+                osc1.frequency.exponentialRampToValueAtTime(baseFreq * 0.7, now + 0.24);
+
+                osc2.frequency.setValueAtTime(baseFreq * 2.3, now);
+                osc2.frequency.exponentialRampToValueAtTime(baseFreq * 1.45, now + 0.24);
+
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(960 * pitchMultiplier, now);
+                filter.frequency.exponentialRampToValueAtTime(1480 * pitchMultiplier, now + 0.06);
+                filter.frequency.exponentialRampToValueAtTime(640 * pitchMultiplier, now + 0.24);
+                filter.Q.value = 3.2;
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.28, now + 0.025);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
+
+                osc1.connect(filter);
+                osc2.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc1.start(now);
+                osc2.start(now);
+                osc1.stop(now + 0.27);
+                osc2.stop(now + 0.27);
+            }
+
+            playPoopShoot() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(340, now);
+                osc.frequency.exponentialRampToValueAtTime(620, now + 0.05);
+                osc.frequency.exponentialRampToValueAtTime(180, now + 0.12);
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.14);
+            }
+
+            playSplat(heavy = false) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const dur = heavy ? 0.26 : 0.15;
+                const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(heavy ? 480 : 760, now);
+                filter.frequency.exponentialRampToValueAtTime(190, now + dur);
+                filter.Q.value = 2.8;
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(heavy ? 0.35 : 0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(now);
+            }
+
+            playHurt() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(95, now + 0.22);
+                gain.gain.setValueAtTime(0.28, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+
+            playPeep() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1120, now);
+                osc.frequency.exponentialRampToValueAtTime(1680, now + 0.06);
+                osc.frequency.exponentialRampToValueAtTime(1260, now + 0.14);
+
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.linearRampToValueAtTime(0.16, now + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.16);
+            }
+
+            playFlap() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const bufferSize = Math.floor(this.ctx.sampleRate * 0.16);
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    const env = Math.sin((i / bufferSize) * Math.PI);
+                    data[i] = (Math.random() * 2 - 1) * env;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(340, now);
+                filter.frequency.exponentialRampToValueAtTime(140, now + 0.15);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.24, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(now);
+            }
+
+            playBonk(intensity = 1.0) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'triangle';
+                const startF = 160 + Math.min(120, intensity * 60);
+                osc.frequency.setValueAtTime(startF, now);
+                osc.frequency.exponentialRampToValueAtTime(52, now + 0.18);
+
+                gain.gain.setValueAtTime(Math.min(0.32, 0.12 + intensity * 0.14), now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+
+            playCannon() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(34, now + 0.45);
+                gain.gain.setValueAtTime(0.38, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            }
+
+            playCollect(pitchOffset = 1.0) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const notes = [587.33, 880, 1174.66];
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    const t = now + idx * 0.06;
+                    osc.frequency.setValueAtTime(freq * pitchOffset, t);
+                    gain.gain.setValueAtTime(0.001, t);
+                    gain.gain.linearRampToValueAtTime(0.18, t + 0.015);
+                    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(t);
+                    osc.stop(t + 0.28);
+                });
+            }
+
+            playRingChime(combo = 1) {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                const freq = 523.25 * Math.pow(1.12, Math.min(8, combo));
+                osc.frequency.setValueAtTime(freq, now);
+                osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.22);
+                gain.gain.setValueAtTime(0.22, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.36);
+            }
+
+            playSplash() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const bufferSize = Math.floor(this.ctx.sampleRate * 0.32);
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(420, now);
+                filter.frequency.linearRampToValueAtTime(920, now + 0.25);
+                filter.Q.value = 1.5;
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.24, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start(now);
+            }
+
+            playBounce() {
+                if (this.muted || !this.ctx) return;
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(190, now);
+                osc.frequency.exponentialRampToValueAtTime(620, now + 0.22);
+
+                gain.gain.setValueAtTime(0.24, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.26);
+            }
+        }
+
+        const audio = new SoundEngine();
+
+        // ==========================================
+        // 2. TERRAIN & FLOATING SKY ISLANDS MATH
+        // ==========================================
+        const WATER_LEVEL = 0.0;
+        const ISLAND_RADIUS = 96;
+
+        // Floating Sky Islands definitions (x, y, z, radius)
+        const skyIslands = [
+            { x: -38, y: 26, z: -38, radius: 13, name: 'Cloudtop Nest' },
+            { x: 42, y: 34, z: -26, radius: 12, name: 'Breeze Isle' },
+            { x: 35, y: 42, z: 38, radius: 14, name: 'Sunspire Citadel' },
+            { x: -42, y: 32, z: 34, radius: 11, name: 'Feather Atoll' },
+            { x: 0, y: 52, z: -55, radius: 15, name: 'Sky Crown Sanctuary' }
+        ];
+
+        function getMainIslandHeight(x, z) {
+            const distFromCenter = Math.hypot(x, z);
+
+            // Central freshwater pond depression
+            const pondDist = Math.hypot(x + 8, z + 6);
+            const pondCarve = Math.max(0, 1 - pondDist / 21);
+            const pondDepth = pondCarve * pondCarve * 3.4;
+
+            // Gentle winding stream connecting central pond to the east beach
+            const streamZ = -6 + Math.sin(x * 0.09) * 5.5;
+            const inStreamX = x > -8 && x < 80;
+            const streamDist = Math.abs(z - streamZ);
+            const streamCarve = inStreamX ? Math.max(0, 1 - streamDist / 6.2) : 0;
+            const streamDepth = streamCarve * streamCarve * 2.2;
+
+            // Rolling island hills
+            const h1 = Math.sin(x * 0.045) * Math.cos(z * 0.045) * 3.2;
+            const h2 = Math.sin(x * 0.09 + 1.3) * Math.sin(z * 0.08 - 0.7) * 1.4;
+
+            // Lookout Hill in the North-West
+            const nwHillDist = Math.hypot(x + 34, z + 36);
+            const nwHill = Math.max(0, 1 - nwHillDist / 28);
+            const nwHillHeight = nwHill * nwHill * 9.8;
+
+            // Sunset Ridge in the South-East
+            const seHillDist = Math.hypot(x - 36, z - 34);
+            const seHill = Math.max(0, 1 - seHillDist / 25);
+            const seHillHeight = seHill * seHill * 7.2;
+
+            const islandMask = Math.max(0, 1 - Math.pow(distFromCenter / ISLAND_RADIUS, 2.35));
+            const baseElevation = -2.8 + islandMask * 6.4;
+
+            let height = baseElevation + (h1 + h2) * islandMask + nwHillHeight + seHillHeight;
+            height -= (pondDepth + streamDepth);
+
+            return height;
+        }
+
+        // Combined terrain height supporting both main island and floating sky islands!
+        function getSupportHeight(x, y, z) {
+            let maxSupport = getMainIslandHeight(x, z);
+
+            for (let i = 0; i < skyIslands.length; i++) {
+                const isl = skyIslands[i];
+                const d = Math.hypot(x - isl.x, z - isl.z);
+                if (d < isl.radius) {
+                    const dome = Math.cos((d / isl.radius) * (Math.PI * 0.5)) * 1.4;
+                    const topY = isl.y + dome;
+                    // Only support entities above the island's underside
+                    if (y >= isl.y - 2.2 && topY > maxSupport) {
+                        maxSupport = topY;
+                    }
+                }
+            }
+            return maxSupport;
+        }
+
+        // ==========================================
+        // 3. THREE.JS SCENE, LIGHTING & SKY
+        // ==========================================
+        const container = document.getElementById('canvas-mount');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x7dd3fc);
+        scene.fog = new THREE.FogExp2(0x93c5fd, 0.0044);
+
+        const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.2, 520);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild(renderer.domElement);
+
+        const hemiLight = new THREE.HemisphereLight(0xe0f2fe, 0x3f6212, 0.82);
+        hemiLight.position.set(0, 80, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 1.18);
+        dirLight.position.set(50, 95, 42);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 10;
+        dirLight.shadow.camera.far = 220;
+        const shadowBound = 92;
+        dirLight.shadow.camera.left = -shadowBound;
+        dirLight.shadow.camera.right = shadowBound;
+        dirLight.shadow.camera.top = shadowBound;
+        dirLight.shadow.camera.bottom = -shadowBound;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        // ==========================================
+        // 4. ISLAND TERRAIN, SKY ISLANDS & WATER
+        // ==========================================
+        function buildTerrain() {
+            const size = 250;
+            const segments = 156;
+            const geo = new THREE.PlaneGeometry(size, size, segments, segments);
+            geo.rotateX(-Math.PI / 2);
+
+            const pos = geo.attributes.position;
+            const colors = [];
+            const color = new THREE.Color();
+
+            for (let i = 0; i < pos.count; i++) {
+                const x = pos.getX(i);
+                const z = pos.getZ(i);
+                const y = getMainIslandHeight(x, z);
+                pos.setY(i, y);
+
+                if (y < -0.4) {
+                    color.setHex(0xd97706);
+                } else if (y < 0.85) {
+                    color.setHex(0xfde68a);
+                } else if (y < 5.5) {
+                    const patch = Math.sin(x * 0.15) * Math.cos(z * 0.15);
+                    color.setHex(patch > 0 ? 0x4ade80 : 0x22c55e);
+                } else if (y < 8.4) {
+                    color.setHex(0x16a34a);
+                } else {
+                    color.setHex(0x94a3b8);
+                }
+                colors.push(color.r, color.g, color.b);
+            }
+
+            geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            geo.computeVertexNormals();
+
+            const mat = new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.85,
+                metalness: 0.05,
+                flatShading: true
+            });
+
+            const terrainMesh = new THREE.Mesh(geo, mat);
+            terrainMesh.receiveShadow = true;
+            scene.add(terrainMesh);
+        }
+
+        function buildSkyIslands() {
+            const grassMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.75, flatShading: true });
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.9, flatShading: true });
+            const goldNestMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.6 });
+
+            skyIslands.forEach((isl) => {
+                const group = new THREE.Group();
+                group.position.set(isl.x, isl.y, isl.z);
+
+                // Lush green top cap
+                const topGeo = new THREE.CylinderGeometry(isl.radius, isl.radius * 0.92, 1.8, 16);
+                const topMesh = new THREE.Mesh(topGeo, grassMat);
+                topMesh.position.y = 0.2;
+                topMesh.receiveShadow = true;
+                topMesh.castShadow = true;
+                group.add(topMesh);
+
+                // Tapered rocky inverted mountain underside
+                const rockGeo = new THREE.ConeGeometry(isl.radius * 0.92, isl.radius * 1.15, 12);
+                rockGeo.rotateX(Math.PI);
+                const rockMesh = new THREE.Mesh(rockGeo, rockMat);
+                rockMesh.position.y = -isl.radius * 0.57 - 0.6;
+                rockMesh.castShadow = true;
+                group.add(rockMesh);
+
+                // Cozy straw nest at center
+                const nest = new THREE.Mesh(new THREE.TorusGeometry(1.3, 0.35, 8, 16), goldNestMat);
+                nest.rotation.x = Math.PI / 2;
+                nest.position.y = 1.35;
+                group.add(nest);
+
+                scene.add(group);
+            });
+        }
+
+        const waterGeo = new THREE.PlaneGeometry(460, 460, 64, 64);
+        waterGeo.rotateX(-Math.PI / 2);
+        const waterMat = new THREE.MeshStandardMaterial({
+            color: 0x0ea5e9,
+            emissive: 0x0369a1,
+            emissiveIntensity: 0.18,
+            roughness: 0.18,
+            metalness: 0.35,
+            transparent: true,
+            opacity: 0.84,
+            flatShading: true
+        });
+        const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+        waterMesh.position.y = WATER_LEVEL;
+        waterMesh.receiveShadow = true;
+        scene.add(waterMesh);
+
+        buildTerrain();
+        buildSkyIslands();
+
+        // ==========================================
+        // 5. ARTICULATED & SPRING-RAGDOLL DUCK RIG
+        // ==========================================
+        const HATS = ['None', 'Propeller', 'Crown', 'Pirate', 'Wizard'];
+        let currentHatIndex = 0;
+
+        function createDuckMesh(options = {}) {
+            const isDuckling = options.isDuckling || false;
+            const bodyColor = options.bodyColor || (isDuckling ? 0xfef08a : 0xffffff);
+            const wingColor = options.wingColor || (isDuckling ? 0xfde047 : 0xf8fafc);
+            const scale = isDuckling ? 0.52 : 1.0;
+
+            const root = new THREE.Group();
+            root.scale.set(scale, scale, scale);
+
+            const featherMat = new THREE.MeshStandardMaterial({ color: bodyColor, roughness: 0.55, metalness: 0.05 });
+            const wingMat = new THREE.MeshStandardMaterial({ color: wingColor, roughness: 0.5 });
+            const orangeMat = new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.4 });
+            const darkOrangeMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.45 });
+            const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.15 });
+            const glintMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+            // Visual body group
+            const bodyPivot = new THREE.Group();
+            bodyPivot.position.y = 0.72;
+            root.add(bodyPivot);
+
+            const bodyGeo = new THREE.SphereGeometry(0.68, 18, 16);
+            bodyGeo.scale(0.92, 0.88, 1.28);
+            const bodyMesh = new THREE.Mesh(bodyGeo, featherMat);
+            bodyMesh.castShadow = true;
+            bodyMesh.receiveShadow = true;
+            bodyPivot.add(bodyMesh);
+
+            // Articulated Springy Tail
+            const tailPivot = new THREE.Group();
+            tailPivot.position.set(0, 0.18, -0.72);
+            bodyPivot.add(tailPivot);
+
+            const tailGeo = new THREE.ConeGeometry(0.28, 0.55, 10);
+            tailGeo.rotateX(-Math.PI * 0.36);
+            const tailMesh = new THREE.Mesh(tailGeo, featherMat);
+            tailMesh.position.set(0, 0.08, -0.15);
+            tailMesh.castShadow = true;
+            tailPivot.add(tailMesh);
+
+            // Floppy Spring-Mounted Neck & Head Group
+            const neckPivot = new THREE.Group();
+            neckPivot.position.set(0, 0.42, 0.42);
+            bodyPivot.add(neckPivot);
+
+            const headGroup = new THREE.Group();
+            headGroup.position.set(0, 0.28, 0.12);
+            neckPivot.add(headGroup);
+
+            const headGeo = new THREE.SphereGeometry(0.45, 18, 16);
+            const headMesh = new THREE.Mesh(headGeo, featherMat);
+            headMesh.castShadow = true;
+            headGroup.add(headMesh);
+
+            // Wearable Hats Mount (for player duck)
+            const hatMeshes = {};
+            let propellerBlades = null;
+
+            if (!isDuckling) {
+                // Default fluffy tuft
+                const tuftGeo = new THREE.ConeGeometry(0.11, 0.28, 8);
+                const tuft = new THREE.Mesh(tuftGeo, featherMat);
+                tuft.position.set(0, 0.48, -0.05);
+                tuft.rotation.x = -0.35;
+                headGroup.add(tuft);
+                hatMeshes['None'] = tuft;
+
+                // 1. Propeller Beanie
+                const beanieGroup = new THREE.Group();
+                beanieGroup.position.set(0, 0.38, 0);
+                const cap = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.32, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5),
+                    new THREE.MeshStandardMaterial({ color: 0xef4444 })
+                );
+                beanieGroup.add(cap);
+                const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.18), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+                pin.position.y = 0.35;
+                beanieGroup.add(pin);
+                propellerBlades = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.65, 0.03, 0.1),
+                    new THREE.MeshStandardMaterial({ color: 0x38bdf8 })
+                );
+                propellerBlades.position.y = 0.43;
+                beanieGroup.add(propellerBlades);
+                beanieGroup.visible = false;
+                headGroup.add(beanieGroup);
+                hatMeshes['Propeller'] = beanieGroup;
+
+                // 2. Royal Golden Crown
+                const crownGroup = new THREE.Group();
+                crownGroup.position.set(0, 0.43, 0);
+                const crownBase = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.28, 0.24, 0.22, 8),
+                    new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.6, roughness: 0.25 })
+                );
+                crownGroup.add(crownBase);
+                crownGroup.visible = false;
+                headGroup.add(crownGroup);
+                hatMeshes['Crown'] = crownGroup;
+
+                // 3. Pirate Tricorne
+                const pirateGroup = new THREE.Group();
+                pirateGroup.position.set(0, 0.42, 0);
+                const brim = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.55, 0.55, 0.06, 3),
+                    new THREE.MeshStandardMaterial({ color: 0x1e293b })
+                );
+                pirateGroup.add(brim);
+                const dome = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.26, 10, 8),
+                    new THREE.MeshStandardMaterial({ color: 0x1e293b })
+                );
+                dome.position.y = 0.1;
+                pirateGroup.add(dome);
+                pirateGroup.visible = false;
+                headGroup.add(pirateGroup);
+                hatMeshes['Pirate'] = pirateGroup;
+
+                // 4. Wizard Hat
+                const wizardGroup = new THREE.Group();
+                wizardGroup.position.set(0, 0.4, 0);
+                const wizBrim = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.52, 0.52, 0.05, 14),
+                    new THREE.MeshStandardMaterial({ color: 0x6d28d9 })
+                );
+                wizardGroup.add(wizBrim);
+                const wizCone = new THREE.Mesh(
+                    new THREE.ConeGeometry(0.32, 0.78, 12),
+                    new THREE.MeshStandardMaterial({ color: 0x7c3aed })
+                );
+                wizCone.position.y = 0.38;
+                wizCone.rotation.x = -0.15;
+                wizardGroup.add(wizCone);
+                wizardGroup.visible = false;
+                headGroup.add(wizardGroup);
+                hatMeshes['Wizard'] = wizardGroup;
+            }
+
+            // Eyes & Cheeks
+            [-1, 1].forEach((side) => {
+                const eye = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 12), eyeMat);
+                eye.position.set(side * 0.27, 0.1, 0.33);
+                headGroup.add(eye);
+
+                const glint = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 8), glintMat);
+                glint.position.set(side * 0.29, 0.125, 0.39);
+                headGroup.add(glint);
+
+                const cheek = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.075, 10, 10),
+                    new THREE.MeshBasicMaterial({ color: 0xfda4af })
+                );
+                cheek.scale.set(1, 0.6, 0.4);
+                cheek.position.set(side * 0.32, -0.04, 0.28);
+                headGroup.add(cheek);
+            });
+
+            // Articulated Bill
+            const upperBillGeo = new THREE.SphereGeometry(0.26, 14, 12);
+            upperBillGeo.scale(1.05, 0.42, 1.55);
+            const upperBill = new THREE.Mesh(upperBillGeo, orangeMat);
+            upperBill.position.set(0, -0.02, 0.52);
+            upperBill.castShadow = true;
+            headGroup.add(upperBill);
+
+            const lowerBillPivot = new THREE.Group();
+            lowerBillPivot.position.set(0, -0.08, 0.35);
+            headGroup.add(lowerBillPivot);
+
+            const lowerBillGeo = new THREE.SphereGeometry(0.22, 12, 10);
+            lowerBillGeo.scale(0.95, 0.32, 1.35);
+            const lowerBill = new THREE.Mesh(lowerBillGeo, darkOrangeMat);
+            lowerBill.position.set(0, 0, 0.15);
+            lowerBillPivot.add(lowerBill);
+
+            // Articulated Left & Right Wings
+            const wings = [];
+            [-1, 1].forEach((side) => {
+                const wingPivot = new THREE.Group();
+                wingPivot.position.set(side * 0.56, 0.14, 0.02);
+                bodyPivot.add(wingPivot);
+
+                const wingGeo = new THREE.SphereGeometry(0.45, 14, 12);
+                wingGeo.scale(0.28, 0.72, 1.45);
+                const wingMesh = new THREE.Mesh(wingGeo, wingMat);
+                wingMesh.position.set(side * 0.08, -0.1, -0.08);
+                wingMesh.castShadow = true;
+                wingPivot.add(wingMesh);
+                wings.push(wingPivot);
+            });
+
+            // Articulated Dangling Webbed Feet
+            const feet = [];
+            [-1, 1].forEach((side) => {
+                const footPivot = new THREE.Group();
+                footPivot.position.set(side * 0.28, -0.44, 0.04);
+                bodyPivot.add(footPivot);
+
+                const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.26, 8), orangeMat);
+                leg.position.y = -0.12;
+                footPivot.add(leg);
+
+                const webGeo = new THREE.ConeGeometry(0.24, 0.38, 4);
+                webGeo.rotateX(Math.PI / 2);
+                webGeo.scale(1.15, 0.22, 1.15);
+                const web = new THREE.Mesh(webGeo, orangeMat);
+                web.position.set(0, -0.24, 0.12);
+                web.castShadow = true;
+                footPivot.add(web);
+
+                feet.push(footPivot);
+            });
+
+            return {
+                root,
+                bodyPivot,
+                neckPivot,
+                headGroup,
+                tailPivot,
+                lowerBillPivot,
+                leftWing: wings[0],
+                rightWing: wings[1],
+                leftFoot: feet[0],
+                rightFoot: feet[1],
+                hatMeshes,
+                propellerBlades
+            };
+        }
+
+        const playerDuck = createDuckMesh({ isDuckling: false });
+        scene.add(playerDuck.root);
+
+        // ==========================================
+        // 6. WORLD PROPS, GEYSERS, CANNON & RINGS
+        // ==========================================
+        const colliders = [];
+        const bouncyMushrooms = [];
+        const geysers = [];
+        const beachBalls = [];
+        const physicsCrates = [];
+        const clouds = [];
+        const skyRings = [];
+        let duckCannon = null;
+
+        function populateWorld() {
+            // 1. Cozy Wooden Dock
+            const dockGroup = new THREE.Group();
+            dockGroup.position.set(6.5, 0.28, -6.0);
+            dockGroup.rotation.y = -Math.PI / 2;
+
+            const woodMat = new THREE.MeshStandardMaterial({ color: 0x92400e, roughness: 0.85 });
+            const postMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+
+            for (let i = 0; i < 7; i++) {
+                const plank = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.14, 0.52), woodMat);
+                plank.position.set(0, 0, i * 0.62);
+                plank.castShadow = true;
+                plank.receiveShadow = true;
+                dockGroup.add(plank);
+            }
+            [[-1.1, 0.3], [1.1, 0.3], [-1.1, 3.5], [1.1, 3.5]].forEach(([px, pz]) => {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 1.4, 8), postMat);
+                post.position.set(px, -0.2, pz);
+                post.castShadow = true;
+                dockGroup.add(post);
+            });
+            scene.add(dockGroup);
+
+            // 2. Stylized Lighthouse on North-East Point
+            const lhX = 52, lhZ = -34;
+            const lhY = getMainIslandHeight(lhX, lhZ);
+            const lhGroup = new THREE.Group();
+            lhGroup.position.set(lhX, lhY, lhZ);
+            const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.5 });
+            const redMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.5 });
+            for (let s = 0; s < 5; s++) {
+                const seg = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.5 - s * 0.14, 1.65 - s * 0.14, 2.2, 12),
+                    s % 2 === 0 ? whiteMat : redMat
+                );
+                seg.position.y = 1.1 + s * 2.2;
+                seg.castShadow = true;
+                lhGroup.add(seg);
+            }
+            const lantern = new THREE.Mesh(
+                new THREE.CylinderGeometry(1.1, 1.1, 1.6, 12),
+                new THREE.MeshBasicMaterial({ color: 0xfef08a })
+            );
+            lantern.position.y = 11.8;
+            lhGroup.add(lantern);
+            const roof = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 12), redMat);
+            roof.position.y = 13.4;
+            lhGroup.add(roof);
+            scene.add(lhGroup);
+            colliders.push({ x: lhX, z: lhZ, radius: 1.75 });
+
+            // 3. Duck Launch Cannon (Hop into it to blast across the island in Ragdoll mode!)
+            const canX = -20, canZ = 8;
+            const canY = getMainIslandHeight(canX, canZ);
+            const cannonGroup = new THREE.Group();
+            cannonGroup.position.set(canX, canY, canZ);
+            cannonGroup.rotation.y = Math.PI * 0.25;
+
+            const baseWood = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 2.4), woodMat);
+            baseWood.position.y = 0.45;
+            baseWood.castShadow = true;
+            cannonGroup.add(baseWood);
+
+            const barrel = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.85, 1.05, 3.4, 16),
+                new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.6, roughness: 0.3 })
+            );
+            barrel.position.set(0, 1.45, 0.3);
+            barrel.rotation.x = Math.PI * 0.28;
+            barrel.castShadow = true;
+            cannonGroup.add(barrel);
+
+            const goldRing = new THREE.Mesh(
+                new THREE.TorusGeometry(0.88, 0.12, 8, 16),
+                new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.7 })
+            );
+            goldRing.position.set(0, 2.55, 1.65);
+            goldRing.rotation.x = Math.PI * 0.28;
+            cannonGroup.add(goldRing);
+
+            scene.add(cannonGroup);
+            duckCannon = { x: canX, y: canY, z: canZ, mesh: cannonGroup, cooldown: 0 };
+
+            // 4. Updraft Wind Geysers (Launch duck high into sky island altitude!)
+            const geyserCoords = [
+                [-28, -28], [30, -18], [26, 26], [-26, 26]
+            ];
+            geyserCoords.forEach(([gx, gz]) => {
+                const gy = Math.max(getMainIslandHeight(gx, gz), WATER_LEVEL);
+                const gGroup = new THREE.Group();
+                gGroup.position.set(gx, gy, gz);
+
+                // Stone vent ring
+                const vent = new THREE.Mesh(
+                    new THREE.TorusGeometry(1.6, 0.42, 8, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x64748b, flatShading: true })
+                );
+                vent.rotation.x = Math.PI / 2;
+                gGroup.add(vent);
+
+                // Swirling translucent wind column
+                const windCol = new THREE.Mesh(
+                    new THREE.CylinderGeometry(1.3, 1.8, 22, 14, 1, true),
+                    new THREE.MeshBasicMaterial({
+                        color: 0xbae6fd,
+                        transparent: true,
+                        opacity: 0.24,
+                        side: THREE.DoubleSide
+                    })
+                );
+                windCol.position.y = 11;
+                gGroup.add(windCol);
+
+                scene.add(gGroup);
+                geysers.push({ x: gx, y: gy, z: gz, radius: 2.3, height: 26, windCol });
+            });
+
+            // 5. Aerial Sky Ring Course (Fly through for speed boosts & chimes!)
+            const ringCoords = [
+                [0, 18, -15, 0],
+                [-24, 24, -28, 0.6],
+                [-36, 30, -10, 1.4],
+                [-16, 34, 18, 2.2],
+                [18, 36, 24, 1.1],
+                [38, 38, 2, 0.2],
+                [24, 44, -32, -0.7],
+                [0, 50, -45, 0]
+            ];
+            ringCoords.forEach(([rx, ry, rz, rotY], idx) => {
+                const ringMesh = new THREE.Mesh(
+                    new THREE.TorusGeometry(4.2, 0.35, 10, 24),
+                    new THREE.MeshStandardMaterial({
+                        color: 0xfbbf24,
+                        emissive: 0xf59e0b,
+                        emissiveIntensity: 0.45,
+                        roughness: 0.2
+                    })
+                );
+                ringMesh.position.set(rx, ry, rz);
+                ringMesh.rotation.y = rotY;
+                scene.add(ringMesh);
+                skyRings.push({
+                    mesh: ringMesh,
+                    pos: new THREE.Vector3(rx, ry, rz),
+                    cooldown: 0,
+                    index: idx
+                });
+            });
+
+            // 6. Stylized Trees
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.9 });
+            const leafMats = [
+                new THREE.MeshStandardMaterial({ color: 0x15803d, flatShading: true }),
+                new THREE.MeshStandardMaterial({ color: 0x16a34a, flatShading: true }),
+                new THREE.MeshStandardMaterial({ color: 0x65a30d, flatShading: true })
+            ];
+
+            const treeSpots = [
+                [-22, 18], [-32, 8], [-18, 34], [24, 22], [35, 12], [18, 42],
+                [-46, -12], [-25, -48], [-12, -38], [26, -32], [44, -22], [14, -46],
+                [-52, 26], [52, 28], [-48, -42], [48, -44], [38, 48], [-36, 48],
+                [60, -8], [-62, 4], [10, 58], [-10, -60]
+            ];
+
+            treeSpots.forEach(([tx, tz], idx) => {
+                const ty = getMainIslandHeight(tx, tz);
+                if (ty < 1.1) return;
+
+                const tree = new THREE.Group();
+                tree.position.set(tx, ty, tz);
+                const s = 0.85 + (idx % 4) * 0.2;
+                tree.scale.set(s, s, s);
+
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.48, 2.4, 8), trunkMat);
+                trunk.position.y = 1.2;
+                trunk.castShadow = true;
+                tree.add(trunk);
+
+                const mat = leafMats[idx % leafMats.length];
+                if (idx % 2 === 0) {
+                    for (let tier = 0; tier < 3; tier++) {
+                        const cone = new THREE.Mesh(new THREE.ConeGeometry(1.9 - tier * 0.42, 2.2, 7), mat);
+                        cone.position.y = 2.6 + tier * 1.15;
+                        cone.castShadow = true;
+                        tree.add(cone);
+                    }
+                } else {
+                    const crown1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.85, 1), mat);
+                    crown1.position.y = 3.2;
+                    crown1.castShadow = true;
+                    tree.add(crown1);
+
+                    const crown2 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.25, 1), mat);
+                    crown2.position.set(0.8, 2.7, 0.6);
+                    crown2.castShadow = true;
+                    tree.add(crown2);
+                }
+
+                scene.add(tree);
+                colliders.push({ x: tx, z: tz, radius: 0.65 * s });
+            });
+
+            // 7. Smooth Boulders & Rocks
+            const rockMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.85, flatShading: true });
+            const rockSpots = [
+                [-35, -35], [-31, -39], [36, 33], [40, 30], [-16, -24],
+                [22, -16], [-45, 15], [55, 16], [-28, 52], [15, -28]
+            ];
+            rockSpots.forEach(([rx, rz], i) => {
+                const ry = getMainIslandHeight(rx, rz);
+                const rScale = 1.0 + (i % 3) * 0.55;
+                const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(rScale, 0), rockMat);
+                rock.position.set(rx, ry + rScale * 0.45, rz);
+                rock.rotation.set(i, i * 0.7, 0);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                scene.add(rock);
+                colliders.push({ x: rx, z: rz, radius: rScale * 0.85 });
+            });
+
+            // 8. Stackable Wooden Crates (Smash into them in Ragdoll mode!)
+            const crateMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
+            const crateClusters = [
+                [16, -12], [-10, 22], [28, 8]
+            ];
+            crateClusters.forEach(([cx, cz]) => {
+                const cy = getMainIslandHeight(cx, cz);
+                const offsets = [
+                    [-0.6, 0.5, 0], [0.6, 0.5, 0], [0, 1.5, 0]
+                ];
+                offsets.forEach(([ox, oy, oz]) => {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.95, 0.95), crateMat);
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+                    mesh.position.set(cx + ox, cy + oy, cz + oz);
+                    scene.add(mesh);
+                    physicsCrates.push({
+                        mesh,
+                        pos: mesh.position.clone(),
+                        vel: new THREE.Vector3(),
+                        angVel: new THREE.Vector3(),
+                        halfSize: 0.48
+                    });
+                });
+            });
+
+            // 9. Lily Pads in the Central Pond
+            const lilyMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.6 });
+            const flowerPinkMat = new THREE.MeshStandardMaterial({ color: 0xf472b6, roughness: 0.4 });
+            const lilyCoords = [
+                [-12, -10], [-15, -3], [-6, -15], [-3, -2], [-18, -12], [-10, 4], [2, -12]
+            ];
+            lilyCoords.forEach(([lx, lz], idx) => {
+                const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.08, 14), lilyMat);
+                pad.position.set(lx, WATER_LEVEL + 0.04, lz);
+                pad.receiveShadow = true;
+                scene.add(pad);
+
+                if (idx % 2 === 0) {
+                    const lotus = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), flowerPinkMat);
+                    lotus.position.set(lx + 0.35, WATER_LEVEL + 0.2, lz + 0.2);
+                    scene.add(lotus);
+                }
+            });
+
+            // 10. Bouncy Red-Cap Mushrooms
+            const mushCapMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4 });
+            const mushStemMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, roughness: 0.7 });
+            const mushSpots = [
+                [-22, -20], [24, 16], [-16, 26], [26, -24], [0, 34]
+            ];
+            mushSpots.forEach(([mx, mz]) => {
+                const my = getMainIslandHeight(mx, mz);
+                const group = new THREE.Group();
+                group.position.set(mx, my, mz);
+
+                const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.5, 0.7, 12), mushStemMat);
+                stem.position.y = 0.35;
+                group.add(stem);
+
+                const cap = new THREE.Mesh(new THREE.SphereGeometry(1.15, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55), mushCapMat);
+                cap.position.y = 0.55;
+                cap.castShadow = true;
+                group.add(cap);
+
+                for (let s = 0; s < 5; s++) {
+                    const ang = (s / 5) * Math.PI * 2;
+                    const dot = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+                    dot.position.set(Math.cos(ang) * 0.72, 1.05, Math.sin(ang) * 0.72);
+                    group.add(dot);
+                }
+
+                scene.add(group);
+                bouncyMushrooms.push({ x: mx, y: my, z: mz, mesh: group, bounceAnim: 0 });
+            });
+
+            // 11. Interactive Beach Balls
+            const ballCoords = [
+                [14, 10], [-14, 16], [42, 4]
+            ];
+            ballCoords.forEach(([bx, bz], idx) => {
+                const by = getMainIslandHeight(bx, bz);
+                const ballGeo = new THREE.SphereGeometry(0.85, 18, 16);
+                const ballMat = new THREE.MeshStandardMaterial({
+                    color: idx === 0 ? 0xf43f5e : idx === 1 ? 0x3b82f6 : 0xfacc15,
+                    roughness: 0.3
+                });
+                const mesh = new THREE.Mesh(ballGeo, ballMat);
+                mesh.castShadow = true;
+                mesh.position.set(bx, Math.max(by, WATER_LEVEL) + 0.85, bz);
+                scene.add(mesh);
+
+                beachBalls.push({
+                    mesh,
+                    pos: mesh.position.clone(),
+                    vel: new THREE.Vector3(),
+                    radius: 0.85
+                });
+            });
+
+            // 12. Fluffy Floating Clouds
+            const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, flatShading: true });
+            for (let c = 0; c < 18; c++) {
+                const cloud = new THREE.Group();
+                const puffs = 3 + (c % 3);
+                for (let p = 0; p < puffs; p++) {
+                    const puff = new THREE.Mesh(new THREE.DodecahedronGeometry(3.0 + (p % 2) * 1.2, 1), cloudMat);
+                    puff.position.set((p - 1) * 2.8, (p % 2) * 0.7, (p % 3 - 1) * 1.1);
+                    cloud.add(puff);
+                }
+                cloud.position.set(
+                    (Math.random() - 0.5) * 240,
+                    36 + Math.random() * 24,
+                    (Math.random() - 0.5) * 240
+                );
+                scene.add(cloud);
+                clouds.push({ mesh: cloud, speed: 0.8 + Math.random() * 1.1 });
+            }
+        }
+
+        populateWorld();
+
+        // ==========================================
+        // 7. COLLECTIBLES (25 BREADCRUMBS & 6 SKY EGGS)
+        // ==========================================
+        const breadcrumbs = [];
+        const skyEggs = [];
+        const TOTAL_BREAD = 25;
+        const TOTAL_EGGS = 6;
+        let collectedBreadCount = 0;
+        let collectedEggCount = 0;
+
+        function spawnCollectibles() {
+            const breadMat = new THREE.MeshStandardMaterial({
+                color: 0xfbbf24,
+                emissive: 0xd97706,
+                emissiveIntensity: 0.35,
+                roughness: 0.25,
+                metalness: 0.4
+            });
+            const crustMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.6 });
+
+            const locations = [
+                [8, 6], [14, -4], [-12, -10], [-15, -3], [-6, -15],
+                [22, 12], [32, 22], [36, 34], [20, 38], [4, 34],
+                [-14, 30], [-28, 22], [-38, 10], [-45, -8], [-34, -36],
+                [-22, -46], [-4, -42], [16, -38], [34, -30], [48, -14],
+                [56, 8], [46, 38], [-44, 36], [-56, -24], [0, -56]
+            ];
+
+            locations.forEach(([bx, bz], idx) => {
+                const groundY = Math.max(getMainIslandHeight(bx, bz), WATER_LEVEL);
+                const group = new THREE.Group();
+                group.position.set(bx, groundY + 1.05, bz);
+
+                const loaf = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.48, 0.45), breadMat);
+                loaf.castShadow = true;
+                group.add(loaf);
+
+                const top = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.45, 12), crustMat);
+                top.rotation.x = Math.PI / 2;
+                top.position.y = 0.22;
+                group.add(top);
+
+                scene.add(group);
+                breadcrumbs.push({
+                    mesh: group,
+                    x: bx,
+                    baseY: groundY + 1.05,
+                    z: bz,
+                    collected: false,
+                    phase: idx * 0.5
+                });
+            });
+
+            // 6 Golden Sky Eggs (5 on Sky Islands + 1 atop Lighthouse!)
+            const eggMat = new THREE.MeshStandardMaterial({
+                color: 0xfef08a,
+                emissive: 0xeab308,
+                emissiveIntensity: 0.5,
+                metalness: 0.65,
+                roughness: 0.15
+            });
+
+            const eggCoords = [
+                ...skyIslands.map((isl) => [isl.x, isl.y + 2.2, isl.z]),
+                [52, getMainIslandHeight(52, -34) + 15.0, -34] // Lighthouse peak
+            ];
+
+            eggCoords.forEach(([ex, ey, ez], idx) => {
+                const eggGeo = new THREE.SphereGeometry(0.62, 16, 16);
+                eggGeo.scale(0.82, 1.25, 0.82);
+                const mesh = new THREE.Mesh(eggGeo, eggMat);
+                mesh.position.set(ex, ey, ez);
+                mesh.castShadow = true;
+                scene.add(mesh);
+
+                skyEggs.push({
+                    mesh,
+                    x: ex,
+                    baseY: ey,
+                    z: ez,
+                    collected: false,
+                    phase: idx * 1.1
+                });
+            });
+        }
+
+        spawnCollectibles();
+
+        // ==========================================
+        // 8. FRIENDLY DUCKLING NPCs (GROUND & FLIGHT PARADE)
+        // ==========================================
+        const ducklings = [];
+        let followingDucklingsCount = 0;
+
+        function spawnDucklings() {
+            const spawnPoints = [
+                [-10, -8], [-16, -6], [18, 16], [-24, 14],
+                [28, -18], [-30, -32], [34, 28], [12, 44]
+            ];
+
+            spawnPoints.forEach(([dx, dz], idx) => {
+                const dy = Math.max(getMainIslandHeight(dx, dz), WATER_LEVEL);
+                const ducklingRig = createDuckMesh({
+                    isDuckling: true,
+                    bodyColor: idx % 2 === 0 ? 0xfef08a : 0xfde047
+                });
+                ducklingRig.root.position.set(dx, dy, dz);
+                scene.add(ducklingRig.root);
+
+                ducklings.push({
+                    rig: ducklingRig,
+                    pos: new THREE.Vector3(dx, dy, dz),
+                    velY: 0,
+                    yaw: Math.random() * Math.PI * 2,
+                    following: false,
+                    wanderAngle: Math.random() * Math.PI * 2,
+                    wanderTimer: 1 + Math.random() * 3,
+                    walkPhase: Math.random() * 10,
+                    quackTimer: 0
+                });
+            });
+        }
+
+        spawnDucklings();
+
+        // ==========================================
+        // 9. VISUAL EFFECTS (QUACK RINGS & RIPPLES)
+        // ==========================================
+        const effectRings = [];
+
+        function spawnRing(x, y, z, colorHex, maxScale, duration) {
+            const ringGeo = new THREE.RingGeometry(0.45, 0.65, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({
+                color: colorHex,
+                transparent: true,
+                opacity: 0.85,
+                side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(ringGeo, ringMat);
+            mesh.position.set(x, y + 0.08, z);
+            scene.add(mesh);
+
+            effectRings.push({
+                mesh,
+                age: 0,
+                duration,
+                maxScale
+            });
+        }
+
+        // ==========================================
+        // 10. PLAYER STATE: WALK, SWIM, FLY & RAGDOLL
+        // ==========================================
+        const player = {
+            pos: new THREE.Vector3(10, getMainIslandHeight(10, 8), 8),
+            vel: new THREE.Vector3(0, 0, 0),
+            yaw: Math.PI,
+            pitch: 0,
+            roll: 0,
+            grounded: true,
+            inWater: false,
+            flying: false,
+            ragdoll: false,
+            ragdollTimer: 0,
+            ragdollRot: new THREE.Vector3(0, 0, 0),
+            ragdollAngVel: new THREE.Vector3(0, 0, 0),
+            // Spring-damper secondary physics for floppy head, tail & feet
+            headSpringPos: new THREE.Vector2(0, 0),
+            headSpringVel: new THREE.Vector2(0, 0),
+            footSwing: 0,
+            footSwingVel: 0,
+            stamina: 100,
+            maxStamina: 100,
+            ammo: 100,
+            maxAmmo: 100,
+            shootCooldown: 0,
+            hp: 100,
+            maxHp: 100,
+            invulnTimer: 0,
+            quackTimer: 0,
+            walkPhase: 0,
+            rippleTimer: 0,
+            ringCombo: 0,
+            trailHistory: []
+        };
+
+        // ==========================================
+        // 10B. MOUSE-AIMED BIRD POOP SHOOTING & DECALS
+        // ==========================================
+        const mouseNDC = new THREE.Vector2(0, 0);
+        const aimRaycaster = new THREE.Raycaster();
+        const aimTargetPoint = new THREE.Vector3(10, 1, 18);
+        const poopProjectiles = [];
+        const poopDecals = [];
+        const MAX_DECALS = 95;
+
+        // 3D Ground/Surface Targeting Reticle + Dotted Arc
+        const reticleGroup = new THREE.Group();
+        const outerReticle = new THREE.Mesh(
+            new THREE.RingGeometry(0.55, 0.72, 24),
+            new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.9 })
+        );
+        outerReticle.rotation.x = -Math.PI / 2;
+        reticleGroup.add(outerReticle);
+
+        const innerReticle = new THREE.Mesh(
+            new THREE.CircleGeometry(0.22, 16),
+            new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.95 })
+        );
+        innerReticle.rotation.x = -Math.PI / 2;
+        innerReticle.position.y = 0.01;
+        reticleGroup.add(innerReticle);
+        scene.add(reticleGroup);
+
+        // Predictive Trajectory Dots
+        const arcDots = [];
+        const ARC_DOT_COUNT = 10;
+        const arcDotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55 });
+        const arcDotGeo = new THREE.SphereGeometry(0.11, 8, 8);
+        for (let i = 0; i < ARC_DOT_COUNT; i++) {
+            const dot = new THREE.Mesh(arcDotGeo, arcDotMat);
+            scene.add(dot);
+            arcDots.push(dot);
+        }
+
+        const poopMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.25 });
+        const poopAcidMat = new THREE.MeshStandardMaterial({ color: 0xa3e635, emissive: 0x4d7c0f, emissiveIntensity: 0.4, roughness: 0.25 });
+        const decalMat = new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.92, depthWrite: false });
+        const decalAcidMat = new THREE.MeshBasicMaterial({ color: 0xbef264, transparent: true, opacity: 0.92, depthWrite: false });
+
+        function updateAimPoint() {
+            aimRaycaster.setFromCamera(mouseNDC, camera);
+            const rayOrigin = aimRaycaster.ray.origin;
+            const rayDir = aimRaycaster.ray.direction;
+
+            // Check direct hit against active enemies first for snappy aim-assist
+            let bestDist = 140;
+            let hitPos = null;
+
+            for (let i = 0; i < enemies.length; i++) {
+                const en = enemies[i];
+                const toEnemy = new THREE.Vector3().subVectors(en.pos, rayOrigin);
+                const t = toEnemy.dot(rayDir);
+                if (t > 1.5 && t < bestDist) {
+                    const closestPt = rayOrigin.clone().addScaledVector(rayDir, t);
+                    if (closestPt.distanceTo(en.pos) < en.radius * 1.35) {
+                        bestDist = t;
+                        hitPos = en.pos.clone();
+                    }
+                }
+            }
+
+            // March along ray to intersect terrain, sky islands, or ocean surface
+            if (!hitPos) {
+                for (let d = 2; d <= 135; d += 1.2) {
+                    const px = rayOrigin.x + rayDir.x * d;
+                    const py = rayOrigin.y + rayDir.y * d;
+                    const pz = rayOrigin.z + rayDir.z * d;
+                    const surfH = Math.max(getSupportHeight(px, py + 1.5, pz), WATER_LEVEL);
+                    if (py <= surfH) {
+                        hitPos = new THREE.Vector3(px, surfH, pz);
+                        break;
+                    }
+                }
+            }
+
+            if (!hitPos) {
+                hitPos = rayOrigin.clone().addScaledVector(rayDir, 65);
+            }
+
+            aimTargetPoint.copy(hitPos);
+            reticleGroup.position.set(aimTargetPoint.x, aimTargetPoint.y + 0.08, aimTargetPoint.z);
+
+            const splashRadius = 1.6 * rogueStats.splashMult;
+            reticleGroup.scale.set(splashRadius / 1.6, 1, splashRadius / 1.6);
+            outerReticle.material.color.setHex(rogueStats.acidSplash ? 0xbef264 : 0xffffff);
+        }
+
+        function computeBallisticVelocity(startPos, targetPos, speed) {
+            const diff = new THREE.Vector3().subVectors(targetPos, startPos);
+            const dist = Math.max(1.5, diff.length());
+            const flightTime = Math.max(0.16, Math.min(1.35, dist / speed));
+            const gravity = 24.0;
+            return new THREE.Vector3(
+                diff.x / flightTime,
+                (diff.y + 0.5 * gravity * flightTime * flightTime) / flightTime,
+                diff.z / flightTime
+            );
+        }
+
+        function spawnPoopSplatDecal(x, y, z, scale = 1.0) {
+            const splatGroup = new THREE.Group();
+            splatGroup.position.set(x, y + 0.04, z);
+
+            const mat = rogueStats.acidSplash ? decalAcidMat : decalMat;
+            const mainBlob = new THREE.Mesh(new THREE.CircleGeometry(0.45 * scale, 12), mat);
+            mainBlob.rotation.x = -Math.PI / 2;
+            splatGroup.add(mainBlob);
+
+            for (let i = 0; i < 4; i++) {
+                const ang = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+                const r = (0.38 + Math.random() * 0.35) * scale;
+                const drop = new THREE.Mesh(new THREE.CircleGeometry((0.12 + Math.random() * 0.1) * scale, 8), mat);
+                drop.rotation.x = -Math.PI / 2;
+                drop.position.set(Math.cos(ang) * r, 0.005, Math.sin(ang) * r);
+                splatGroup.add(drop);
+            }
+
+            scene.add(splatGroup);
+            poopDecals.push({ mesh: splatGroup, age: 0 });
+            if (poopDecals.length > MAX_DECALS) {
+                const oldest = poopDecals.shift();
+                scene.remove(oldest.mesh);
+            }
+        }
+
+        function shootBirdPoop(originPos = null, customTarget = null, isDucklingShot = false) {
+            if (!gameStarted || upgradeDraftOpen) return;
+
+            if (!isDucklingShot) {
+                if (player.shootCooldown > 0 || player.ammo < rogueStats.ammoCost) return;
+                player.ammo = Math.max(0, player.ammo - rogueStats.ammoCost);
+                player.shootCooldown = rogueStats.fireDelay;
+                audio.playPoopShoot();
+                if (playerDuck && playerDuck.tailPivot) {
+                    playerDuck.tailPivot.rotation.x = 0.55;
+                }
+            }
+
+            const start = originPos ? originPos.clone() : new THREE.Vector3(
+                player.pos.x - Math.sin(player.yaw) * 0.45,
+                player.pos.y + 0.65,
+                player.pos.z - Math.cos(player.yaw) * 0.45
+            );
+            const target = customTarget ? customTarget.clone() : aimTargetPoint.clone();
+
+            // Face duck toward aim target if standing/swimming
+            if (!isDucklingShot && !player.flying && !player.ragdoll) {
+                const aimYaw = Math.atan2(target.x - player.pos.x, target.z - player.pos.z);
+                player.yaw = aimYaw;
+            }
+
+            const count = isDucklingShot ? 1 : rogueStats.multiShot;
+            const spreadStep = 0.14;
+
+            for (let i = 0; i < count; i++) {
+                const offsetIdx = i - (count - 1) / 2;
+                const spreadTarget = target.clone();
+                if (offsetIdx !== 0) {
+                    const perpX = -(target.z - start.z);
+                    const perpZ = (target.x - start.x);
+                    const len = Math.hypot(perpX, perpZ) || 1;
+                    spreadTarget.x += (perpX / len) * offsetIdx * 2.2;
+                    spreadTarget.z += (perpZ / len) * offsetIdx * 2.2;
+                }
+
+                const projScale = isDucklingShot ? 0.6 : rogueStats.poopSize;
+                const mesh = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.24 * projScale, 10, 10),
+                    rogueStats.acidSplash ? poopAcidMat : poopMat
+                );
+                mesh.scale.set(0.95, 1.25, 0.95);
+                mesh.position.copy(start);
+                mesh.castShadow = true;
+                scene.add(mesh);
+
+                const vel = computeBallisticVelocity(start, spreadTarget, 34 * rogueStats.projSpeedMult);
+                poopProjectiles.push({
+                    mesh,
+                    pos: start.clone(),
+                    vel,
+                    damage: (isDucklingShot ? 14 : 28) * rogueStats.damageMult,
+                    splashRadius: (isDucklingShot ? 1.2 : 2.3) * rogueStats.splashMult,
+                    scale: projScale,
+                    age: 0
+                });
+            }
+
+            // Duckling Turret Escort upgrade: following ducklings also fire mini-poops!
+            if (!isDucklingShot && rogueStats.ducklingTurrets) {
+                ducklings.forEach((d) => {
+                    if (d.following) {
+                        const dOrigin = new THREE.Vector3(d.pos.x, d.pos.y + 0.45, d.pos.z);
+                        shootBirdPoop(dOrigin, target, true);
+                    }
+                });
+            }
+        }
+
+        // ==========================================
+        // 10C. ROGUELIKE WAVES MODE & UPGRADES
+        // ==========================================
+        let wavesModeActive = false;
+        let upgradeDraftOpen = false;
+        let currentWave = 1;
+        let rogueScore = 0;
+        let bestWaveRecord = 1;
+        let waveSpawnQueue = [];
+        let waveSpawnTimer = 0;
+        let activeBoss = null;
+        const enemies = [];
+
+        const rogueStats = {
+            damageMult: 1.0,
+            fireDelay: 0.24,
+            ammoRegen: 38,
+            ammoCost: 14,
+            multiShot: 1,
+            splashMult: 1.0,
+            poopSize: 1.0,
+            projSpeedMult: 1.0,
+            acidSplash: false,
+            ducklingTurrets: false,
+            vampiricBread: false,
+            magnetAura: false
+        };
+
+        function resetRogueStats() {
+            rogueStats.damageMult = 1.0;
+            rogueStats.fireDelay = 0.24;
+            rogueStats.ammoRegen = 38;
+            rogueStats.ammoCost = 14;
+            rogueStats.multiShot = 1;
+            rogueStats.splashMult = 1.0;
+            rogueStats.poopSize = 1.0;
+            rogueStats.projSpeedMult = 1.0;
+            rogueStats.acidSplash = false;
+            rogueStats.ducklingTurrets = false;
+            rogueStats.vampiricBread = false;
+            rogueStats.magnetAura = false;
+            player.maxHp = 100;
+            player.hp = 100;
+            player.ammo = player.maxAmmo;
+        }
+
+        const UPGRADE_POOL = [
+            {
+                id: 'triple',
+                icon: '💩💩💩',
+                title: 'Triple Cloaca Spread',
+                desc: '+2 extra bird poop projectiles per shot in a wide fan.',
+                apply: () => { rogueStats.multiShot += 2; }
+            },
+            {
+                id: 'rapid',
+                icon: '⚡💩',
+                title: 'Hyper Digestion',
+                desc: '+45% fire rate and +50% faster poop ammo regeneration.',
+                apply: () => { rogueStats.fireDelay *= 0.68; rogueStats.ammoRegen *= 1.5; }
+            },
+            {
+                id: 'mega',
+                icon: '💣💩',
+                title: 'Explosive Mega-Splat',
+                desc: '+45% poop damage, larger projectiles, and +50% splash radius.',
+                apply: () => { rogueStats.damageMult *= 1.45; rogueStats.poopSize *= 1.45; rogueStats.splashMult *= 1.5; }
+            },
+            {
+                id: 'acid',
+                icon: '🧪🟢',
+                title: 'Radioactive Lime Poop',
+                desc: 'Poop turns neon lime, dealing +35% damage and heavy enemy knockback.',
+                apply: () => { rogueStats.acidSplash = true; rogueStats.damageMult *= 1.35; }
+            },
+            {
+                id: 'turrets',
+                icon: '🐤🔫',
+                title: 'Duckling Turret Squad',
+                desc: 'Recruits a duckling immediately & all squad ducklings fire mini-poops with you!',
+                apply: () => {
+                    rogueStats.ducklingTurrets = true;
+                    const unrecruited = ducklings.find(d => !d.following);
+                    if (unrecruited) {
+                        unrecruited.following = true;
+                        unrecruited.pos.copy(player.pos).add(new THREE.Vector3(1.5, 0.5, 1.5));
+                        followingDucklingsCount++;
+                        document.getElementById('duckling-count').textContent = followingDucklingsCount;
+                    }
+                }
+            },
+            {
+                id: 'thrusters',
+                icon: '🚀🪽',
+                title: 'Jetstream Wing Thrusters',
+                desc: '+40 max Wing Stamina and +25% projectile velocity.',
+                apply: () => { player.maxStamina += 40; player.stamina = player.maxStamina; rogueStats.projSpeedMult *= 1.25; }
+            },
+            {
+                id: 'vitality',
+                icon: '❤️🍞',
+                title: 'Golden Loaf Vitality',
+                desc: '+35 Max HP, full heal, and collecting breadcrumbs restores +20 HP!',
+                apply: () => { player.maxHp += 35; player.hp = player.maxHp; rogueStats.vampiricBread = true; }
+            },
+            {
+                id: 'magnet',
+                icon: '🧲✨',
+                title: 'Feather Magnet Aura',
+                desc: 'Pulls nearby breadcrumbs from 4x distance & boosts poop splash radius +30%.',
+                apply: () => { rogueStats.magnetAura = true; rogueStats.splashMult *= 1.3; }
+            }
+        ];
+
+        function clearAllEnemies() {
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                scene.remove(enemies[i].mesh);
+            }
+            enemies.length = 0;
+            waveSpawnQueue = [];
+            activeBoss = null;
+            document.getElementById('boss-hud').classList.add('hidden');
+        }
+
+        function createEnemyMesh(type) {
+            const group = new THREE.Group();
+            if (type === 'crab') {
+                const shell = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.65, 12, 10),
+                    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.4, flatShading: true })
+                );
+                shell.scale.set(1.25, 0.55, 1.0);
+                shell.position.y = 0.42;
+                shell.castShadow = true;
+                group.add(shell);
+
+                [-1, 1].forEach(s => {
+                    const claw = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), new THREE.MeshStandardMaterial({ color: 0xdc2626 }));
+                    claw.position.set(s * 0.75, 0.45, 0.48);
+                    group.add(claw);
+                    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), new THREE.MeshBasicMaterial({ color: 0x0f172a }));
+                    eye.position.set(s * 0.25, 0.72, 0.35);
+                    group.add(eye);
+                });
+            } else if (type === 'fox') {
+                const furMat = new THREE.MeshStandardMaterial({ color: 0xea580c, roughness: 0.6, flatShading: true });
+                const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.68, 1.35), furMat);
+                body.position.y = 0.55;
+                body.castShadow = true;
+                group.add(body);
+
+                const head = new THREE.Mesh(new THREE.ConeGeometry(0.45, 0.85, 6), furMat);
+                head.rotation.x = Math.PI / 2;
+                head.position.set(0, 0.82, 0.85);
+                group.add(head);
+
+                const tail = new THREE.Mesh(new THREE.ConeGeometry(0.32, 0.9, 8), new THREE.MeshStandardMaterial({ color: 0xffedd5 }));
+                tail.rotation.x = -Math.PI * 0.35;
+                tail.position.set(0, 0.68, -0.88);
+                group.add(tail);
+            } else if (type === 'crow') {
+                const crowMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5, flatShading: true });
+                const body = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 10), crowMat);
+                body.scale.set(0.85, 0.85, 1.3);
+                group.add(body);
+
+                const beak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 6), new THREE.MeshStandardMaterial({ color: 0xfacc15 }));
+                beak.rotation.x = Math.PI / 2;
+                beak.position.z = 0.65;
+                group.add(beak);
+
+                const leftW = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.45), crowMat);
+                leftW.position.x = -0.65;
+                group.add(leftW);
+                const rightW = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.45), crowMat);
+                rightW.position.x = 0.65;
+                group.add(rightW);
+                group.userData.wings = [leftW, rightW];
+            } else if (type === 'tortoise') {
+                const shell = new THREE.Mesh(
+                    new THREE.DodecahedronGeometry(0.95, 1),
+                    new THREE.MeshStandardMaterial({ color: 0x3f6212, roughness: 0.7, flatShading: true })
+                );
+                shell.scale.set(1.1, 0.75, 1.2);
+                shell.position.y = 0.68;
+                shell.castShadow = true;
+                group.add(shell);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 10, 10), new THREE.MeshStandardMaterial({ color: 0x84cc16 }));
+                head.position.set(0, 0.52, 1.05);
+                group.add(head);
+            } else if (type === 'boss') {
+                // Giant Mega Seagull Boss
+                const whiteMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.4 });
+                const greyMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5 });
+                const body = new THREE.Mesh(new THREE.SphereGeometry(2.1, 16, 14), whiteMat);
+                body.scale.set(0.95, 0.9, 1.35);
+                body.castShadow = true;
+                group.add(body);
+
+                const head = new THREE.Mesh(new THREE.SphereGeometry(1.15, 14, 14), whiteMat);
+                head.position.set(0, 1.65, 1.75);
+                group.add(head);
+
+                const beak = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.6, 8), new THREE.MeshStandardMaterial({ color: 0xf97316 }));
+                beak.rotation.x = Math.PI / 2;
+                beak.position.set(0, 1.5, 3.0);
+                group.add(beak);
+
+                const crown = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.75, 0.65, 0.55, 8),
+                    new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.7, roughness: 0.2 })
+                );
+                crown.position.set(0, 2.75, 1.75);
+                group.add(crown);
+
+                const leftW = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.22, 1.3), greyMat);
+                leftW.position.set(-2.6, 0.5, 0);
+                group.add(leftW);
+                const rightW = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.22, 1.3), greyMat);
+                rightW.position.set(2.6, 0.5, 0);
+                group.add(rightW);
+                group.userData.wings = [leftW, rightW];
+            }
+            return group;
+        }
+
+        function spawnSingleEnemy(type) {
+            const angle = Math.random() * Math.PI * 2;
+            const spawnDist = 26 + Math.random() * 24;
+            const sx = Math.max(-75, Math.min(75, player.pos.x + Math.cos(angle) * spawnDist));
+            const sz = Math.max(-75, Math.min(75, player.pos.z + Math.sin(angle) * spawnDist));
+            const groundY = Math.max(getMainIslandHeight(sx, sz), WATER_LEVEL);
+            const isAir = (type === 'crow' || type === 'boss');
+            const sy = isAir ? groundY + (type === 'boss' ? 9 : 6.5) : groundY;
+
+            const mesh = createEnemyMesh(type);
+            mesh.position.set(sx, sy, sz);
+            scene.add(mesh);
+
+            const hpScale = 1 + (currentWave - 1) * 0.18;
+            const configs = {
+                crab:     { hp: 35 * hpScale,  speed: 6.2,  radius: 0.85, damage: 10, score: 100 },
+                fox:      { hp: 55 * hpScale,  speed: 9.4,  radius: 0.95, damage: 15, score: 160 },
+                crow:     { hp: 40 * hpScale,  speed: 10.5, radius: 0.9,  damage: 14, score: 150 },
+                tortoise: { hp: 120 * hpScale, speed: 3.6,  radius: 1.25, damage: 22, score: 250 },
+                boss:     { hp: 480 * hpScale, speed: 7.4,  radius: 2.6,  damage: 28, score: 1200 }
+            };
+            const cfg = configs[type];
+
+            const enemyObj = {
+                type,
+                mesh,
+                pos: new THREE.Vector3(sx, sy, sz),
+                vel: new THREE.Vector3(),
+                hp: Math.round(cfg.hp),
+                maxHp: Math.round(cfg.hp),
+                speed: cfg.speed,
+                radius: cfg.radius,
+                damage: cfg.damage,
+                score: cfg.score,
+                isAir,
+                phase: Math.random() * Math.PI * 2
+            };
+            enemies.push(enemyObj);
+
+            if (type === 'boss') {
+                activeBoss = enemyObj;
+                document.getElementById('boss-hud').classList.remove('hidden');
+                updateBossHUD();
+                showToast('👑 BOSS ALERT: Mega Seagull Overlord descended!');
+            }
+        }
+
+        function startWave(waveNum) {
+            currentWave = waveNum;
+            bestWaveRecord = Math.max(bestWaveRecord, currentWave);
+            waveSpawnQueue = [];
+
+            const totalCount = 4 + waveNum * 2;
+            for (let i = 0; i < totalCount; i++) {
+                const roll = Math.random();
+                if (waveNum >= 3 && roll < 0.22) waveSpawnQueue.push('tortoise');
+                else if (waveNum >= 2 && roll < 0.5) waveSpawnQueue.push('crow');
+                else if (roll < 0.76) waveSpawnQueue.push('fox');
+                else waveSpawnQueue.push('crab');
+            }
+
+            if (waveNum % 5 === 0) {
+                waveSpawnQueue.push('boss');
+            }
+
+            waveSpawnTimer = 0.4;
+            updateWaveHUD();
+            showToast(`⚔️ Wave ${currentWave} Incoming!`);
+        }
+
+        function openUpgradeDraft() {
+            upgradeDraftOpen = true;
+            document.getElementById('cleared-wave-num').textContent = currentWave;
+            const container = document.getElementById('upgrade-cards-container');
+            container.innerHTML = '';
+
+            // Pick 3 unique random upgrades
+            const shuffled = [...UPGRADE_POOL].sort(() => Math.random() - 0.5).slice(0, 3);
+            shuffled.forEach((upg) => {
+                const card = document.createElement('button');
+                card.className = 'upgrade-card bubbly-panel p-5 flex flex-col justify-between text-left cursor-pointer bg-white hover:bg-amber-50/70';
+                card.innerHTML = `
+                    <div>
+                        <div class="text-3xl mb-2">${upg.icon}</div>
+                        <div class="text-base font-bold text-slate-800 mb-1">${upg.title}</div>
+                        <p class="text-xs text-slate-600 leading-relaxed">${upg.desc}</p>
+                    </div>
+                    <div class="mt-4 text-xs font-bold text-amber-600 uppercase tracking-wider">Select Upgrade →</div>
+                `;
+                card.addEventListener('click', () => {
+                    upg.apply();
+                    audio.playCollect(1.2);
+                    upgradeDraftOpen = false;
+                    document.getElementById('upgrade-overlay').classList.add('hidden');
+                    updateWaveHUD();
+                    startWave(currentWave + 1);
+                });
+                container.appendChild(card);
+            });
+
+            document.getElementById('upgrade-overlay').classList.remove('hidden');
+        }
+
+        function updateWaveHUD() {
+            document.getElementById('wave-num').textContent = currentWave;
+            document.getElementById('wave-enemies').textContent = enemies.length + waveSpawnQueue.length;
+            document.getElementById('wave-score').textContent = rogueScore;
+            const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
+            document.getElementById('hp-bar').style.width = `${hpPct}%`;
+            document.getElementById('hp-text').textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
+        }
+
+        function updateBossHUD() {
+            if (!activeBoss) return;
+            const pct = Math.max(0, (activeBoss.hp / activeBoss.maxHp) * 100);
+            document.getElementById('boss-hp-bar').style.width = `${pct}%`;
+            document.getElementById('boss-hp-text').textContent = `${Math.max(0, Math.ceil(activeBoss.hp))} / ${activeBoss.maxHp}`;
+        }
+
+        function toggleWavesMode(forceState = null) {
+            wavesModeActive = forceState !== null ? forceState : !wavesModeActive;
+            const waveHud = document.getElementById('wave-hud');
+            const modeLabel = document.getElementById('game-mode-label');
+
+            if (wavesModeActive) {
+                waveHud.classList.remove('hidden');
+                modeLabel.textContent = 'Exit Waves';
+                resetRogueStats();
+                rogueScore = 0;
+                clearAllEnemies();
+                startWave(1);
+            } else {
+                waveHud.classList.add('hidden');
+                modeLabel.textContent = 'Waves Mode';
+                upgradeDraftOpen = false;
+                document.getElementById('upgrade-overlay').classList.add('hidden');
+                document.getElementById('gameover-overlay').classList.add('hidden');
+                clearAllEnemies();
+                showToast('🏝️ Returned to Peaceful Island Free Roam');
+            }
+        }
+
+        function damagePlayer(amount, knockDir) {
+            if (!wavesModeActive || player.invulnTimer > 0 || player.hp <= 0) return;
+            player.hp = Math.max(0, player.hp - amount);
+            player.invulnTimer = 0.85;
+            audio.playHurt();
+            updateWaveHUD();
+
+            if (amount >= 18) {
+                enterRagdoll(new THREE.Vector3(knockDir.x * 11, 7.5, knockDir.z * 11), '💥 Heavy Hit! Ragdoll Knockback!');
+            } else {
+                player.vel.x += knockDir.x * 9;
+                player.vel.z += knockDir.z * 9;
+                player.vel.y = Math.max(player.vel.y, 4.5);
+            }
+
+            if (player.hp <= 0) {
+                clearAllEnemies();
+                document.getElementById('final-wave').textContent = currentWave;
+                document.getElementById('best-wave').textContent = bestWaveRecord;
+                document.getElementById('final-score').textContent = rogueScore;
+                document.getElementById('gameover-overlay').classList.remove('hidden');
+            }
+        }
+
+        const keys = {};
+        let joystickVec = { x: 0, y: 0 };
+        let lastSpaceTapTime = 0;
+
+        const camState = {
+            yaw: 0,
+            pitch: 0.36,
+            distance: 9.8,
+            isDragging: false,
+            lastX: 0,
+            lastY: 0
+        };
+
+        function updateModeHUD() {
+            const badge = document.getElementById('mode-badge');
+            if (player.ragdoll) {
+                badge.textContent = 'RAGDOLL';
+                badge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800';
+            } else if (player.flying) {
+                badge.textContent = 'SOARING';
+                badge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800';
+            } else if (player.inWater) {
+                badge.textContent = 'SWIM';
+                badge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-800';
+            } else {
+                badge.textContent = 'WALK';
+                badge.className = 'text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800';
+            }
+        }
+
+        function enterRagdoll(impulseVec = null, message = null) {
+            if (!player.ragdoll) {
+                player.ragdoll = true;
+                player.flying = false;
+                player.grounded = false;
+                player.ragdollRot.set(player.pitch, player.yaw, player.roll);
+                player.ragdollAngVel.set(
+                    (Math.random() - 0.5) * 14,
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 14
+                );
+                audio.playQuack(1.32);
+                if (message) showToast(message);
+            }
+            if (impulseVec) {
+                player.vel.add(impulseVec);
+                player.ragdollAngVel.x += (Math.random() - 0.5) * 12;
+                player.ragdollAngVel.z += (Math.random() - 0.5) * 12;
+            }
+            updateModeHUD();
+        }
+
+        function exitRagdoll() {
+            if (!player.ragdoll) return;
+            player.ragdoll = false;
+            player.yaw = player.ragdollRot.y;
+            player.pitch = 0;
+            player.roll = 0;
+            player.vel.y = Math.max(player.vel.y, 5.2); // Little recovery hop!
+            audio.playQuack(1.05);
+            updateModeHUD();
+        }
+
+        function toggleRagdoll() {
+            if (!gameStarted) return;
+            if (player.ragdoll) {
+                exitRagdoll();
+            } else {
+                enterRagdoll(new THREE.Vector3(Math.sin(player.yaw) * 4, 5.5, Math.cos(player.yaw) * 4), '🤪 Floppy Ragdoll Mode! Press R or Space to pop up');
+            }
+        }
+
+        function engageFlightOrFlap() {
+            if (!gameStarted) return;
+            if (player.ragdoll) {
+                exitRagdoll();
+                player.flying = true;
+                player.vel.y = 9.5;
+                audio.playFlap();
+                updateModeHUD();
+                return;
+            }
+
+            if (!player.flying) {
+                if (player.grounded || player.inWater) {
+                    // Normal jump off ground/water
+                    player.vel.y = player.inWater ? 8.2 : 9.4;
+                    player.grounded = false;
+                    if (player.inWater) {
+                        audio.playSplash();
+                        spawnRing(player.pos.x, WATER_LEVEL, player.pos.z, 0xffffff, 4.0, 0.5);
+                    }
+                } else {
+                    // Second press in mid-air engages true 3D powered flight!
+                    player.flying = true;
+                    player.pitch = 0.22;
+                    player.vel.y = Math.max(player.vel.y, 7.5);
+                    audio.playFlap();
+                    spawnRing(player.pos.x, player.pos.y, player.pos.z, 0xbae6fd, 3.2, 0.45);
+                    updateModeHUD();
+                }
+            } else {
+                // Wing flap boost during powered flight
+                if (player.stamina > 8) {
+                    player.stamina = Math.max(0, player.stamina - 11);
+                    player.vel.y = Math.min(15, player.vel.y + 6.8);
+                    player.pitch = Math.min(0.68, player.pitch + 0.16);
+                    player.headSpringVel.y -= 6.5;
+                    audio.playFlap();
+                    spawnRing(player.pos.x, player.pos.y - 0.3, player.pos.z, 0xffffff, 2.6, 0.4);
+                }
+            }
+        }
+
+        function cycleHat() {
+            currentHatIndex = (currentHatIndex + 1) % HATS.length;
+            const activeName = HATS[currentHatIndex];
+            Object.keys(playerDuck.hatMeshes).forEach((key) => {
+                playerDuck.hatMeshes[key].visible = (key === activeName);
+            });
+            document.getElementById('hat-label').textContent = activeName === 'None' ? 'No Hat' : activeName;
+            audio.playPeep();
+            showToast(`🎩 Hat equipped: ${activeName}`);
+        }
+
+        function triggerQuack() {
+            if (!gameStarted) return;
+            audio.playQuack(player.ragdoll ? 1.28 : 1.0 + (Math.random() - 0.5) * 0.12);
+            player.quackTimer = 0.28;
+            player.headSpringVel.y += 4.5;
+
+            const ringY = Math.max(player.pos.y, WATER_LEVEL);
+            spawnRing(player.pos.x, ringY, player.pos.z, 0xfef08a, 8.5, 0.65);
+
+            let recruitedAny = false;
+            ducklings.forEach((d) => {
+                const dist = d.pos.distanceTo(player.pos);
+                if (!d.following && dist < 10.5) {
+                    d.following = true;
+                    d.quackTimer = 0.35;
+                    d.velY = 4.8;
+                    followingDucklingsCount++;
+                    recruitedAny = true;
+                    document.getElementById('duckling-count').textContent = followingDucklingsCount;
+                    setTimeout(() => audio.playPeep(), 140);
+                    spawnRing(d.pos.x, Math.max(d.pos.y, WATER_LEVEL), d.pos.z, 0x38bdf8, 3.5, 0.5);
+                } else if (d.following) {
+                    setTimeout(() => {
+                        d.quackTimer = 0.25;
+                        audio.playPeep();
+                    }, 120 + Math.random() * 220);
+                }
+            });
+
+            if (recruitedAny) {
+                showToast('🐤 A duckling joined your flying & waddling squad!');
+            }
+        }
+
+        // Keyboard Listeners
+        window.addEventListener('keydown', (e) => {
+            keys[e.code] = true;
+            if (e.code === 'Space') {
+                if (!e.repeat) {
+                    const now = performance.now();
+                    if (now - lastSpaceTapTime < 300 && !player.flying && !player.ragdoll) {
+                        player.grounded = false;
+                        engageFlightOrFlap();
+                    } else {
+                        engageFlightOrFlap();
+                    }
+                    lastSpaceTapTime = now;
+                }
+                e.preventDefault();
+            }
+            if (e.code === 'KeyQ') {
+                if (!e.repeat) triggerQuack();
+            }
+            if (e.code === 'KeyF') {
+                shootBirdPoop();
+            }
+            if (e.code === 'KeyR') {
+                if (!e.repeat) toggleRagdoll();
+            }
+            if (e.code === 'KeyH') {
+                if (!e.repeat) cycleHat();
+            }
+            if (e.code === 'KeyG') {
+                if (!e.repeat && gameStarted) toggleWavesMode();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            keys[e.code] = false;
+        });
+
+        // Mouse Aiming, Left-Click Poop Shooting & Right-Click Orbit Camera
+        const domCanvas = renderer.domElement;
+
+        domCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        domCanvas.addEventListener('pointerdown', (e) => {
+            const rect = domCanvas.getBoundingClientRect();
+            mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            if (e.button === 2 || e.button === 1 || e.shiftKey) {
+                camState.isDragging = true;
+                camState.lastX = e.clientX;
+                camState.lastY = e.clientY;
+            } else if (e.button === 0) {
+                updateAimPoint();
+                shootBirdPoop();
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            const rect = domCanvas.getBoundingClientRect();
+            mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            if (!camState.isDragging) return;
+            const dx = e.clientX - camState.lastX;
+            const dy = e.clientY - camState.lastY;
+
+            camState.yaw -= dx * 0.0065;
+            camState.pitch = Math.max(0.08, Math.min(1.28, camState.pitch + dy * 0.0055));
+
+            camState.lastX = e.clientX;
+            camState.lastY = e.clientY;
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (camState.isDragging) {
+                camState.isDragging = false;
+            }
+        });
+
+        domCanvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            camState.distance = Math.max(4.5, Math.min(22, camState.distance + e.deltaY * 0.008));
+        }, { passive: false });
+
+        // Mobile Virtual Joystick
+        const joyZone = document.getElementById('mobile-joystick-zone');
+        const joyKnob = document.getElementById('mobile-joystick-knob');
+        let joyActive = false;
+
+        function updateJoystick(clientX, clientY) {
+            const rect = joyZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            const maxR = rect.width / 2 - 20;
+
+            let dx = clientX - centerX;
+            let dy = clientY - centerY;
+            const dist = Math.hypot(dx, dy);
+            if (dist > maxR) {
+                dx = (dx / dist) * maxR;
+                dy = (dy / dist) * maxR;
+            }
+            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            joystickVec.x = dx / maxR;
+            joystickVec.y = dy / maxR;
+        }
+
+        joyZone.addEventListener('pointerdown', (e) => {
+            e.stopPropagation();
+            joyActive = true;
+            updateJoystick(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointermove', (e) => {
+            if (joyActive) updateJoystick(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointerup', () => {
+            if (joyActive) {
+                joyActive = false;
+                joyKnob.style.transform = 'translate(0px, 0px)';
+                joystickVec.x = 0;
+                joystickVec.y = 0;
+            }
+        });
+
+        // UI Button Bindings
+        let gameStarted = false;
+        document.getElementById('play-btn').addEventListener('click', () => {
+            audio.init();
+            audio.playQuack(1.05);
+            gameStarted = true;
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+        });
+
+        document.getElementById('play-waves-btn').addEventListener('click', () => {
+            audio.init();
+            audio.playQuack(1.12);
+            gameStarted = true;
+            document.getElementById('start-overlay').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            toggleWavesMode(true);
+        });
+
+        document.getElementById('game-mode-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (gameStarted) toggleWavesMode();
+        });
+
+        document.getElementById('retry-waves-btn').addEventListener('click', () => {
+            document.getElementById('gameover-overlay').classList.add('hidden');
+            toggleWavesMode(true);
+        });
+
+        document.getElementById('return-freeroam-btn').addEventListener('click', () => {
+            document.getElementById('gameover-overlay').classList.add('hidden');
+            toggleWavesMode(false);
+        });
+
+        document.getElementById('btn-poop').addEventListener('click', (e) => {
+            e.stopPropagation();
+            shootBirdPoop();
+        });
+
+        document.getElementById('btn-quack').addEventListener('click', (e) => {
+            e.stopPropagation();
+            triggerQuack();
+        });
+
+        document.getElementById('btn-fly').addEventListener('click', (e) => {
+            e.stopPropagation();
+            engageFlightOrFlap();
+        });
+
+        document.getElementById('btn-ragdoll').addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleRagdoll();
+        });
+
+        document.getElementById('hat-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            cycleHat();
+        });
+
+        document.getElementById('help-toggle-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const legend = document.getElementById('controls-legend');
+            legend.classList.toggle('hidden');
+            legend.classList.toggle('flex');
+        });
+
+        document.getElementById('mute-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const muted = audio.toggleMute();
+            e.currentTarget.textContent = muted ? '🔇' : '🔊';
+        });
+
+        document.getElementById('keep-playing-btn').addEventListener('click', () => {
+            document.getElementById('victory-overlay').classList.add('hidden');
+        });
+
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = 'bubbly-panel px-5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 toast-anim whitespace-nowrap';
+            el.textContent = msg;
+            container.innerHTML = '';
+            container.appendChild(el);
+        }
+
+        function checkVictory() {
+            if (collectedBreadCount >= TOTAL_BREAD && collectedEggCount >= TOTAL_EGGS) {
+                document.getElementById('victory-overlay').classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // 11. MINIMAP / RADAR RENDERER
+        // ==========================================
+        const minimapCanvas = document.getElementById('minimap');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        function renderMinimap() {
+            const w = minimapCanvas.width;
+            const h = minimapCanvas.height;
+            const cx = w / 2;
+            const cy = h / 2;
+            const scale = 0.48;
+
+            miniCtx.clearRect(0, 0, w, h);
+
+            miniCtx.fillStyle = '#38bdf8';
+            miniCtx.fillRect(0, 0, w, h);
+
+            miniCtx.fillStyle = '#fde68a';
+            miniCtx.beginPath();
+            miniCtx.arc(cx, cy, ISLAND_RADIUS * scale, 0, Math.PI * 2);
+            miniCtx.fill();
+
+            miniCtx.fillStyle = '#4ade80';
+            miniCtx.beginPath();
+            miniCtx.arc(cx, cy, (ISLAND_RADIUS - 12) * scale, 0, Math.PI * 2);
+            miniCtx.fill();
+
+            // Sky islands indicator rings
+            miniCtx.strokeStyle = 'rgba(255,255,255,0.75)';
+            miniCtx.lineWidth = 1.2;
+            skyIslands.forEach((isl) => {
+                miniCtx.beginPath();
+                miniCtx.arc(cx + isl.x * scale, cy + isl.z * scale, isl.radius * scale, 0, Math.PI * 2);
+                miniCtx.stroke();
+            });
+
+            // Central pond
+            miniCtx.fillStyle = '#0ea5e9';
+            miniCtx.beginPath();
+            miniCtx.arc(cx - 8 * scale, cy - 6 * scale, 18 * scale, 0, Math.PI * 2);
+            miniCtx.fill();
+
+            // Uncollected Breadcrumbs
+            miniCtx.fillStyle = '#f59e0b';
+            breadcrumbs.forEach((b) => {
+                if (!b.collected) {
+                    miniCtx.beginPath();
+                    miniCtx.arc(cx + b.x * scale, cy + b.z * scale, 2.0, 0, Math.PI * 2);
+                    miniCtx.fill();
+                }
+            });
+
+            // Uncollected Sky Eggs
+            miniCtx.fillStyle = '#fef08a';
+            skyEggs.forEach((eg) => {
+                if (!eg.collected) {
+                    miniCtx.beginPath();
+                    miniCtx.arc(cx + eg.x * scale, cy + eg.z * scale, 3.0, 0, Math.PI * 2);
+                    miniCtx.fill();
+                }
+            });
+
+            // Player Duck Arrow
+            const px = cx + player.pos.x * scale;
+            const py = cy + player.pos.z * scale;
+            miniCtx.save();
+            miniCtx.translate(px, py);
+            miniCtx.rotate(-player.yaw + Math.PI);
+            miniCtx.fillStyle = '#ef4444';
+            miniCtx.beginPath();
+            miniCtx.moveTo(0, -5);
+            miniCtx.lineTo(4, 4);
+            miniCtx.lineTo(-4, 4);
+            miniCtx.closePath();
+            miniCtx.fill();
+            miniCtx.restore();
+        }
+
+        // ==========================================
+        // 12. MAIN SIMULATION, FLIGHT & RAGDOLL LOOP
+        // ==========================================
+        function shortestAngleDiff(a, b) {
+            let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
+            return diff < -Math.PI ? diff + Math.PI * 2 : diff;
+        }
+
+        let lastTime = performance.now();
+        let elapsedTotal = 0;
+
+        function update(dt) {
+            elapsedTotal += dt;
+
+            if (upgradeDraftOpen) return;
+
+            // Regenerate Cloaca Poop Ammo & cooldowns
+            if (player.shootCooldown > 0) player.shootCooldown -= dt;
+            if (player.invulnTimer > 0) player.invulnTimer -= dt;
+            player.ammo = Math.min(player.maxAmmo, player.ammo + rogueStats.ammoRegen * dt);
+            document.getElementById('ammo-bar').style.width = `${(player.ammo / player.maxAmmo) * 100}%`;
+
+            // Continuous fire when holding F
+            if (keys['KeyF'] && gameStarted) {
+                shootBirdPoop();
+            }
+
+            // Animate clouds & propeller hat
+            clouds.forEach((c) => {
+                c.mesh.position.x += c.speed * dt;
+                if (c.mesh.position.x > 135) c.mesh.position.x = -135;
+            });
+            if (playerDuck.propellerBlades && HATS[currentHatIndex] === 'Propeller') {
+                playerDuck.propellerBlades.rotation.y += dt * (player.flying ? 26 : 9);
+            }
+
+            // Animate wind geyser columns & sky rings
+            geysers.forEach((g) => {
+                g.windCol.rotation.y += dt * 3.5;
+            });
+            skyRings.forEach((r) => {
+                r.mesh.rotation.z += dt * 1.1;
+                if (r.cooldown > 0) r.cooldown -= dt;
+            });
+
+            waterMesh.position.y = WATER_LEVEL + Math.sin(elapsedTotal * 2.1) * 0.04;
+
+            // Movement Inputs
+            let moveX = joystickVec.x;
+            let moveZ = joystickVec.y;
+            if (keys['KeyW'] || keys['ArrowUp']) moveZ -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) moveZ += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) moveX -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) moveX += 1;
+
+            const inputMag = Math.min(1, Math.hypot(moveX, moveZ));
+            const isDiveOrSprint = keys['ShiftLeft'] || keys['ShiftRight'] || keys['KeyC'];
+
+            // Hold Space in mid-air after apex to automatically engage flight!
+            if (gameStarted && keys['Space'] && !player.grounded && !player.inWater && !player.flying && !player.ragdoll && player.vel.y < -1.0) {
+                player.flying = true;
+                player.pitch = 0.15;
+                updateModeHUD();
+            }
+
+            // ======================================
+            // A. RAGDOLL PHYSICS MODE
+            // ======================================
+            if (player.ragdoll) {
+                // Allow slight rolling influence from WASD so player is never stuck
+                if (inputMag > 0.1) {
+                    const fX = -Math.sin(camState.yaw);
+                    const fZ = -Math.cos(camState.yaw);
+                    const rX = Math.cos(camState.yaw);
+                    const rZ = -Math.sin(camState.yaw);
+                    player.vel.x += (fX * -moveZ + rX * moveX) * 14 * dt;
+                    player.vel.z += (fZ * -moveZ + rZ * moveX) * 14 * dt;
+                }
+
+                player.vel.y -= 24.0 * dt;
+                player.pos.addScaledVector(player.vel, dt);
+
+                // Tumble angular velocity
+                player.ragdollRot.x += player.ragdollAngVel.x * dt;
+                player.ragdollRot.y += player.ragdollAngVel.y * dt;
+                player.ragdollRot.z += player.ragdollAngVel.z * dt;
+
+                const groundH = getSupportHeight(player.pos.x, player.pos.y, player.pos.z);
+                if (groundH < WATER_LEVEL - 0.15 && player.pos.y <= WATER_LEVEL - 0.15) {
+                    // Buoyant ragdoll floating in water!
+                    player.inWater = true;
+                    player.pos.y = WATER_LEVEL - 0.12 + Math.sin(elapsedTotal * 5) * 0.08;
+                    player.vel.multiplyScalar(Math.pow(0.08, dt));
+                    player.ragdollAngVel.multiplyScalar(Math.pow(0.1, dt));
+                    player.ragdollRot.x += shortestAngleDiff(player.ragdollRot.x, Math.PI * 0.45) * dt * 4;
+                    player.ragdollRot.z += shortestAngleDiff(player.ragdollRot.z, 0) * dt * 4;
+                } else if (player.pos.y <= groundH + 0.55) {
+                    // Bouncy terrain collision & slope rolling
+                    player.pos.y = groundH + 0.55;
+                    if (player.vel.y < -3.2) {
+                        const impact = Math.abs(player.vel.y);
+                        audio.playBonk(impact * 0.08);
+                        player.vel.y = impact * 0.48; // Bouncy ragdoll rebound!
+                        player.ragdollAngVel.set(
+                            (Math.random() - 0.5) * impact * 1.4,
+                            (Math.random() - 0.5) * impact,
+                            (Math.random() - 0.5) * impact * 1.4
+                        );
+                        player.headSpringVel.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 18);
+                    } else {
+                        player.vel.y = 0;
+                        player.vel.x *= Math.pow(0.18, dt);
+                        player.vel.z *= Math.pow(0.18, dt);
+                        player.ragdollAngVel.multiplyScalar(Math.pow(0.12, dt));
+                    }
+                }
+            }
+            // ======================================
+            // B. FULL 3D SOARING FLIGHT MODE
+            // ======================================
+            else if (player.flying) {
+                // Turning (A/D) & Pitching (W/S)
+                const turnInput = -moveX;
+                const pitchInput = -moveZ; // W pitches nose down for dive speed, S pulls up!
+
+                player.yaw += turnInput * 2.15 * dt;
+                const targetRoll = turnInput * 0.65;
+                player.roll += (targetRoll - player.roll) * Math.min(1, dt * 8);
+
+                if (isDiveOrSprint) {
+                    // Steep power dive!
+                    player.pitch += (-0.75 - player.pitch) * Math.min(1, dt * 5);
+                } else if (Math.abs(pitchInput) > 0.05) {
+                    player.pitch = Math.max(-0.85, Math.min(0.75, player.pitch - pitchInput * 1.65 * dt));
+                } else {
+                    // Gentle natural glide pitch
+                    player.pitch += (-0.06 - player.pitch) * Math.min(1, dt * 2.5);
+                }
+
+                // Energy conversion: diving builds high speed, climbing converts speed to altitude!
+                const currentHorizSpeed = Math.hypot(player.vel.x, player.vel.z);
+                const diveBoost = Math.max(0, -Math.sin(player.pitch)) * 22 * dt;
+                const climbDrag = Math.max(0, Math.sin(player.pitch)) * 9 * dt;
+                const targetSpeed = Math.max(10.5, Math.min(28.0, currentHorizSpeed + diveBoost - climbDrag + (isDiveOrSprint ? 10 * dt : 0)));
+
+                player.vel.x = Math.sin(player.yaw) * targetSpeed;
+                player.vel.z = Math.cos(player.yaw) * targetSpeed;
+
+                const targetVelY = Math.sin(player.pitch) * targetSpeed - (isDiveOrSprint ? 4.5 : 1.35);
+                player.vel.y += (targetVelY - player.vel.y) * Math.min(1, dt * 5.5);
+
+                player.pos.addScaledVector(player.vel, dt);
+
+                // Regenerate wing stamina gently while gliding
+                player.stamina = Math.min(player.maxStamina, player.stamina + 9 * dt);
+
+                // Smooth camera auto-align behind soaring duck unless dragging
+                if (!camState.isDragging) {
+                    camState.yaw += shortestAngleDiff(camState.yaw, player.yaw + Math.PI) * Math.min(1, dt * 3.5);
+                }
+
+                // Landing or Crash-Ragdoll check
+                const supportH = getSupportHeight(player.pos.x, player.pos.y, player.pos.z);
+                if (supportH < WATER_LEVEL - 0.15 && player.pos.y <= WATER_LEVEL - 0.1) {
+                    player.flying = false;
+                    player.inWater = true;
+                    player.pitch = 0;
+                    player.roll = 0;
+                    audio.playSplash();
+                    spawnRing(player.pos.x, WATER_LEVEL, player.pos.z, 0xffffff, 5.5, 0.65);
+                    updateModeHUD();
+                } else if (player.pos.y <= supportH) {
+                    const impactSpeed = Math.hypot(player.vel.x, player.vel.z);
+                    player.pos.y = supportH;
+                    player.flying = false;
+                    player.pitch = 0;
+                    player.roll = 0;
+                    if (isDiveOrSprint && impactSpeed > 18) {
+                        // Dive-bomb crash triggers hilarious ragdoll tumble!
+                        enterRagdoll(new THREE.Vector3(player.vel.x * 0.45, 6.5, player.vel.z * 0.45), '💥 Crash landing! Ragdoll tumble!');
+                    } else {
+                        player.grounded = true;
+                        player.vel.y = 0;
+                        updateModeHUD();
+                    }
+                }
+            }
+            // ======================================
+            // C. GROUND WADDLE & WATER SWIM MODE
+            // ======================================
+            else {
+                player.pitch += (0 - player.pitch) * Math.min(1, dt * 10);
+                player.roll += (0 - player.roll) * Math.min(1, dt * 10);
+
+                if (gameStarted && inputMag > 0.05) {
+                    const forwardX = -Math.sin(camState.yaw);
+                    const forwardZ = -Math.cos(camState.yaw);
+                    const rightX = Math.cos(camState.yaw);
+                    const rightZ = -Math.sin(camState.yaw);
+
+                    const worldDirX = (forwardX * -moveZ + rightX * moveX) / Math.hypot(moveX, moveZ);
+                    const worldDirZ = (forwardZ * -moveZ + rightZ * moveX) / Math.hypot(moveX, moveZ);
+
+                    const targetYaw = Math.atan2(worldDirX, worldDirZ);
+                    player.yaw += shortestAngleDiff(player.yaw, targetYaw) * Math.min(1, dt * 11);
+
+                    const baseSpeed = player.inWater ? 9.2 : 8.0;
+                    const speed = baseSpeed * (isDiveOrSprint ? 1.52 : 1.0) * inputMag;
+
+                    player.vel.x = worldDirX * speed;
+                    player.vel.z = worldDirZ * speed;
+                } else {
+                    player.vel.x *= Math.pow(0.001, dt);
+                    player.vel.z *= Math.pow(0.001, dt);
+                }
+
+                player.vel.y -= 24.0 * dt;
+                player.pos.addScaledVector(player.vel, dt);
+
+                const groundH = getSupportHeight(player.pos.x, player.pos.y, player.pos.z);
+                const wasInWater = player.inWater;
+
+                if (groundH < WATER_LEVEL - 0.15 && player.pos.y <= WATER_LEVEL - 0.15) {
+                    player.inWater = true;
+                    player.grounded = false;
+                    const floatY = WATER_LEVEL - 0.15 + Math.sin(elapsedTotal * 4.5) * 0.05;
+                    if (player.pos.y <= floatY) {
+                        player.pos.y = floatY;
+                        if (player.vel.y < 0) player.vel.y = 0;
+                    }
+                    if (!wasInWater) {
+                        audio.playSplash();
+                        spawnRing(player.pos.x, WATER_LEVEL, player.pos.z, 0xffffff, 4.2, 0.55);
+                        updateModeHUD();
+                    }
+                } else {
+                    if (wasInWater) {
+                        player.inWater = false;
+                        updateModeHUD();
+                    }
+                    player.inWater = false;
+                    if (player.pos.y <= groundH) {
+                        player.pos.y = groundH;
+                        player.vel.y = 0;
+                        player.grounded = true;
+                    } else {
+                        player.grounded = false;
+                    }
+                }
+
+                // Recharge wing stamina quickly on ground or water
+                player.stamina = Math.min(player.maxStamina, player.stamina + 34 * dt);
+            }
+
+            // Update Stamina Bar & Dive Speed Lines UI
+            document.getElementById('stamina-bar').style.width = `${(player.stamina / player.maxStamina) * 100}%`;
+            const totalSpeed = player.vel.length();
+            const speedLinesEl = document.getElementById('speed-lines');
+            speedLinesEl.style.opacity = (player.flying && totalSpeed > 18) ? Math.min(0.85, (totalSpeed - 18) / 10) : 0;
+
+            // World Boundary Keep-In
+            const distFromOrigin = Math.hypot(player.pos.x, player.pos.z);
+            if (distFromOrigin > 132) {
+                const pullBack = 132 / distFromOrigin;
+                player.pos.x *= pullBack;
+                player.pos.z *= pullBack;
+            }
+
+            // Static Tree & Rock Colliders (High speed impact triggers Ragdoll!)
+            colliders.forEach((col) => {
+                if (player.pos.y > 14) return;
+                const dx = player.pos.x - col.x;
+                const dz = player.pos.z - col.z;
+                const dist = Math.hypot(dx, dz);
+                const minDist = col.radius + 0.55;
+                if (dist < minDist && dist > 0.001) {
+                    const nx = dx / dist;
+                    const nz = dz / dist;
+                    player.pos.x = col.x + nx * minDist;
+                    player.pos.z = col.z + nz * minDist;
+
+                    const impactSpeed = Math.hypot(player.vel.x, player.vel.z);
+                    if (impactSpeed > 11.2 && !player.ragdoll) {
+                        enterRagdoll(new THREE.Vector3(nx * 8, 6.5, nz * 8), '💫 Bonk! High-speed impact!');
+                    }
+                }
+            });
+
+            // Updraft Wind Geysers
+            geysers.forEach((g) => {
+                const d = Math.hypot(player.pos.x - g.x, player.pos.z - g.z);
+                if (d < g.radius && player.pos.y >= g.y - 1 && player.pos.y <= g.y + g.height) {
+                    player.vel.y = Math.max(player.vel.y + 38 * dt, 16.5);
+                    player.grounded = false;
+                    player.stamina = player.maxStamina;
+                    if (!player.ragdoll && !player.flying) {
+                        player.flying = true;
+                        player.pitch = 0.35;
+                        audio.playFlap();
+                        updateModeHUD();
+                    }
+                }
+            });
+
+            // Duck Launch Cannon!
+            if (duckCannon) {
+                if (duckCannon.cooldown > 0) duckCannon.cooldown -= dt;
+                const distToCannon = Math.hypot(player.pos.x - duckCannon.x, player.pos.z - duckCannon.z);
+                if (duckCannon.cooldown <= 0 && distToCannon < 1.8 && Math.abs(player.pos.y - duckCannon.y) < 2.2) {
+                    duckCannon.cooldown = 2.0;
+                    audio.playCannon();
+                    spawnRing(duckCannon.x, duckCannon.y + 2.5, duckCannon.z, 0xf97316, 7.5, 0.7);
+                    player.pos.set(duckCannon.x + 1.5, duckCannon.y + 3.0, duckCannon.z + 1.5);
+                    player.vel.set(24, 28, 24);
+                    enterRagdoll(null, '🚀 CANNON BLAST! Press Space mid-air to spread wings!');
+                }
+            }
+
+            // Aerial Sky Ring Checkpoints
+            skyRings.forEach((r) => {
+                if (r.cooldown <= 0 && player.pos.distanceTo(r.pos) < 4.4) {
+                    r.cooldown = 3.0;
+                    player.ringCombo++;
+                    player.stamina = player.maxStamina;
+                    player.vel.multiplyScalar(1.22);
+                    audio.playRingChime(player.ringCombo);
+                    spawnRing(r.pos.x, r.pos.y, r.pos.z, 0xfef08a, 6.5, 0.6);
+                    showToast(`✨ Sky Ring Boost x${player.ringCombo}! Stamina Refilled!`);
+                }
+            });
+
+            // Water swim ripples
+            const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+            if (player.inWater && horizSpeed > 0.8) {
+                player.rippleTimer -= dt;
+                if (player.rippleTimer <= 0) {
+                    player.rippleTimer = 0.28;
+                    spawnRing(player.pos.x, WATER_LEVEL, player.pos.z, 0xe0f2fe, 2.8, 0.7);
+                }
+            }
+
+            // Breadcrumb Trail History for Duckling Squad
+            if (horizSpeed > 0.5 || player.flying) {
+                const lastPt = player.trailHistory[0];
+                if (!lastPt || lastPt.distanceTo(player.pos) > 0.3) {
+                    player.trailHistory.unshift(player.pos.clone());
+                    if (player.trailHistory.length > 240) {
+                        player.trailHistory.pop();
+                    }
+                }
+            }
+
+            // ======================================
+            // D. SPRING-DAMPER SECONDARY RAGDOLL RIG
+            // ======================================
+            playerDuck.root.position.copy(player.pos);
+
+            // Spring-damper head & neck inertia (reacts to acceleration, turns, and ragdoll flops!)
+            const springK = player.ragdoll ? 38 : 85;
+            const springDamp = player.ragdoll ? 4.2 : 9.5;
+            const targetHeadX = player.ragdoll ? Math.sin(elapsedTotal * 14) * 0.55 : -player.roll * 0.45;
+            const targetHeadY = player.ragdoll ? Math.cos(elapsedTotal * 12) * 0.55 : -player.vel.y * 0.032;
+
+            player.headSpringVel.x += ((targetHeadX - player.headSpringPos.x) * springK - player.headSpringVel.x * springDamp) * dt;
+            player.headSpringVel.y += ((targetHeadY - player.headSpringPos.y) * springK - player.headSpringVel.y * springDamp) * dt;
+            player.headSpringPos.addScaledVector(player.headSpringVel, dt);
+
+            playerDuck.neckPivot.rotation.z = Math.max(-0.85, Math.min(0.85, player.headSpringPos.x));
+            playerDuck.neckPivot.rotation.x = Math.max(-0.85, Math.min(0.85, player.headSpringPos.y));
+            playerDuck.tailPivot.rotation.x = -player.headSpringPos.y * 0.8 + Math.sin(elapsedTotal * 10) * 0.12;
+
+            if (player.ragdoll) {
+                playerDuck.root.rotation.set(player.ragdollRot.x, player.ragdollRot.y, player.ragdollRot.z);
+                // Flailing wings and dangling legs in ragdoll mode
+                playerDuck.leftWing.rotation.z = -0.8 + Math.sin(elapsedTotal * 18) * 0.55;
+                playerDuck.rightWing.rotation.z = 0.8 - Math.cos(elapsedTotal * 18) * 0.55;
+                playerDuck.leftFoot.rotation.x = Math.sin(elapsedTotal * 15) * 0.85;
+                playerDuck.rightFoot.rotation.x = -Math.sin(elapsedTotal * 15) * 0.85;
+                playerDuck.bodyPivot.rotation.z = 0;
+            } else {
+                playerDuck.root.rotation.order = 'YXZ';
+                playerDuck.root.rotation.y = player.yaw;
+                playerDuck.root.rotation.x = -player.pitch;
+                playerDuck.root.rotation.z = -player.roll;
+
+                if (horizSpeed > 0.4 && (player.grounded || player.inWater)) {
+                    player.walkPhase += dt * horizSpeed * (isDiveOrSprint ? 2.4 : 1.9);
+                } else {
+                    player.walkPhase = 0;
+                }
+
+                const waddleRoll = Math.sin(player.walkPhase) * (player.inWater ? 0.06 : 0.14);
+                playerDuck.bodyPivot.rotation.z = waddleRoll;
+                playerDuck.bodyPivot.position.y = 0.72 + Math.abs(Math.sin(player.walkPhase)) * (player.grounded ? 0.08 : 0.02);
+
+                if (player.flying || !player.grounded) {
+                    // Feet dangle back dynamically with airspeed!
+                    const airTrail = Math.min(1.1, horizSpeed * 0.055);
+                    playerDuck.leftFoot.rotation.x = -airTrail + Math.sin(elapsedTotal * 10) * 0.15;
+                    playerDuck.rightFoot.rotation.x = -airTrail - Math.sin(elapsedTotal * 10) * 0.15;
+
+                    const isDiving = player.flying && isDiveOrSprint;
+                    if (isDiving) {
+                        // Swept-back falcon dive wings!
+                        playerDuck.leftWing.rotation.z = -0.15;
+                        playerDuck.rightWing.rotation.z = 0.15;
+                        playerDuck.leftWing.rotation.y = 0.55;
+                        playerDuck.rightWing.rotation.y = -0.55;
+                    } else {
+                        const flap = Math.sin(elapsedTotal * 14) * 0.48 + 0.35;
+                        playerDuck.leftWing.rotation.z = -flap;
+                        playerDuck.rightWing.rotation.z = flap;
+                        playerDuck.leftWing.rotation.y = 0;
+                        playerDuck.rightWing.rotation.y = 0;
+                    }
+                } else {
+                    playerDuck.leftFoot.rotation.x = Math.sin(player.walkPhase) * 0.65;
+                    playerDuck.rightFoot.rotation.x = -Math.sin(player.walkPhase) * 0.65;
+                    const idleFlap = isDiveOrSprint && horizSpeed > 1 ? Math.sin(player.walkPhase * 2) * 0.25 + 0.18 : 0.05;
+                    playerDuck.leftWing.rotation.z = -idleFlap;
+                    playerDuck.rightWing.rotation.z = idleFlap;
+                    playerDuck.leftWing.rotation.y = 0;
+                    playerDuck.rightWing.rotation.y = 0;
+                }
+            }
+
+            // Quack bill animation
+            if (player.quackTimer > 0) {
+                player.quackTimer -= dt;
+                const openAmt = Math.sin((player.quackTimer / 0.28) * Math.PI) * 0.58;
+                playerDuck.lowerBillPivot.rotation.x = openAmt;
+                playerDuck.headGroup.rotation.x = -openAmt * 0.35;
+            } else {
+                playerDuck.lowerBillPivot.rotation.x = 0;
+                playerDuck.headGroup.rotation.x = 0;
+            }
+
+            // Bouncy Mushrooms
+            bouncyMushrooms.forEach((m) => {
+                const dist = Math.hypot(player.pos.x - m.x, player.pos.z - m.z);
+                if (dist < 1.3 && Math.abs(player.pos.y - (m.y + 0.9)) < 0.8 && player.vel.y <= 0.5) {
+                    player.vel.y = 19.5;
+                    player.grounded = false;
+                    player.stamina = player.maxStamina;
+                    m.bounceAnim = 1.0;
+                    audio.playBounce();
+                    spawnRing(m.x, m.y + 0.2, m.z, 0xfef08a, 4.5, 0.5);
+                }
+                if (m.bounceAnim > 0) {
+                    m.bounceAnim = Math.max(0, m.bounceAnim - dt * 3.5);
+                    const squash = 1 + Math.sin(m.bounceAnim * Math.PI * 2) * 0.28 * m.bounceAnim;
+                    m.mesh.scale.set(1 / Math.sqrt(squash), squash, 1 / Math.sqrt(squash));
+                }
+            });
+
+            // Beach Balls & Knockable Physics Crates
+            beachBalls.forEach((ball) => {
+                const dx = ball.pos.x - player.pos.x;
+                const dz = ball.pos.z - player.pos.z;
+                const dist = Math.hypot(dx, dz);
+                const minD = ball.radius + 0.65;
+                if (dist < minD && dist > 0.001 && Math.abs(ball.pos.y - player.pos.y) < 1.5) {
+                    const nx = dx / dist;
+                    const nz = dz / dist;
+                    const pushForce = Math.max(6.0, totalSpeed * 1.45);
+                    ball.vel.x = nx * pushForce;
+                    ball.vel.z = nz * pushForce;
+                    ball.vel.y = 3.2;
+                }
+
+                ball.vel.y -= 18 * dt;
+                ball.pos.addScaledVector(ball.vel, dt);
+                ball.vel.x *= Math.pow(0.15, dt);
+                ball.vel.z *= Math.pow(0.15, dt);
+
+                const bGround = Math.max(getMainIslandHeight(ball.pos.x, ball.pos.z), WATER_LEVEL - 0.25);
+                if (ball.pos.y <= bGround + ball.radius) {
+                    ball.pos.y = bGround + ball.radius;
+                    ball.vel.y = 0;
+                }
+
+                ball.mesh.position.copy(ball.pos);
+                ball.mesh.rotation.x += ball.vel.z * dt;
+                ball.mesh.rotation.z -= ball.vel.x * dt;
+            });
+
+            physicsCrates.forEach((cr) => {
+                const dx = cr.pos.x - player.pos.x;
+                const dz = cr.pos.z - player.pos.z;
+                const dist = Math.hypot(dx, dz);
+                if (dist < 1.15 && Math.abs(cr.pos.y - player.pos.y) < 1.4 && totalSpeed > 2.0) {
+                    const nx = dx / (dist || 1);
+                    const nz = dz / (dist || 1);
+                    const impulse = Math.max(5.0, totalSpeed * 1.3);
+                    cr.vel.set(nx * impulse, 4.5, nz * impulse);
+                    cr.angVel.set((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+                    audio.playBonk(0.6);
+                }
+
+                cr.vel.y -= 20 * dt;
+                cr.pos.addScaledVector(cr.vel, dt);
+                cr.vel.x *= Math.pow(0.08, dt);
+                cr.vel.z *= Math.pow(0.08, dt);
+                cr.angVel.multiplyScalar(Math.pow(0.08, dt));
+
+                const cGround = Math.max(getMainIslandHeight(cr.pos.x, cr.pos.z), WATER_LEVEL - 0.2);
+                if (cr.pos.y <= cGround + cr.halfSize) {
+                    cr.pos.y = cGround + cr.halfSize;
+                    cr.vel.y = 0;
+                }
+
+                cr.mesh.position.copy(cr.pos);
+                cr.mesh.rotation.x += cr.angVel.x * dt;
+                cr.mesh.rotation.y += cr.angVel.y * dt;
+                cr.mesh.rotation.z += cr.angVel.z * dt;
+            });
+
+            // Collectibles (25 Golden Breadcrumbs & 6 Sky Eggs)
+            breadcrumbs.forEach((b) => {
+                if (b.collected) return;
+                b.mesh.rotation.y += dt * 2.2;
+                b.mesh.position.y = b.baseY + Math.sin(elapsedTotal * 3.2 + b.phase) * 0.18;
+
+                const distToPlayer = player.pos.distanceTo(b.mesh.position);
+                if (rogueStats.magnetAura && distToPlayer < 8.5 && distToPlayer > 0.2) {
+                    const pull = new THREE.Vector3().subVectors(player.pos, b.mesh.position).normalize();
+                    b.x += pull.x * 14 * dt;
+                    b.z += pull.z * 14 * dt;
+                    b.baseY += pull.y * 14 * dt;
+                    b.mesh.position.set(b.x, b.baseY, b.z);
+                }
+
+                if (distToPlayer < 1.65) {
+                    b.collected = true;
+                    b.mesh.visible = false;
+                    collectedBreadCount++;
+                    document.getElementById('bread-count').textContent = collectedBreadCount;
+                    audio.playCollect(1.0);
+                    spawnRing(b.x, b.baseY - 0.8, b.z, 0xfbbf24, 3.8, 0.5);
+                    if (wavesModeActive) {
+                        rogueScore += 75;
+                        if (rogueStats.vampiricBread) {
+                            player.hp = Math.min(player.maxHp, player.hp + 20);
+                        }
+                        updateWaveHUD();
+                    }
+                    if (collectedBreadCount % 5 === 0) {
+                        showToast(`🍞 ${collectedBreadCount} / ${TOTAL_BREAD} Golden Breadcrumbs!`);
+                    }
+                    checkVictory();
+                }
+            });
+
+            skyEggs.forEach((eg) => {
+                if (eg.collected) return;
+                eg.mesh.rotation.y += dt * 1.8;
+                eg.mesh.position.y = eg.baseY + Math.sin(elapsedTotal * 2.8 + eg.phase) * 0.25;
+
+                if (player.pos.distanceTo(eg.mesh.position) < 1.75) {
+                    eg.collected = true;
+                    eg.mesh.visible = false;
+                    collectedEggCount++;
+                    document.getElementById('egg-count').textContent = collectedEggCount;
+                    audio.playCollect(1.25);
+                    spawnRing(eg.x, eg.baseY - 0.9, eg.z, 0xfef08a, 5.0, 0.65);
+                    showToast(`🥚 Golden Sky Egg found! (${collectedEggCount}/${TOTAL_EGGS})`);
+                    checkVictory();
+                }
+            });
+
+            // Duckling Squad AI (Waddles on land, swims in water, and FLIES in formation when you fly!)
+            let followerSlot = 0;
+            ducklings.forEach((d) => {
+                let dSpeed = 0;
+                let isDucklingFlying = false;
+
+                if (d.following) {
+                    followerSlot++;
+                    const trailIndex = Math.min(player.trailHistory.length - 1, followerSlot * 7);
+                    const targetPt = player.trailHistory[trailIndex] || player.pos;
+                    const toTargetX = targetPt.x - d.pos.x;
+                    const toTargetZ = targetPt.z - d.pos.z;
+                    const dist = Math.hypot(toTargetX, toTargetZ);
+
+                    if (dist > 0.45) {
+                        const targetYaw = Math.atan2(toTargetX, toTargetZ);
+                        d.yaw += shortestAngleDiff(d.yaw, targetYaw) * Math.min(1, dt * 10);
+                        dSpeed = Math.min(22.0, dist * 5.2);
+                        d.pos.x += Math.sin(d.yaw) * dSpeed * dt;
+                        d.pos.z += Math.cos(d.yaw) * dSpeed * dt;
+                    }
+
+                    // If player is high off the ground, ducklings flap their tiny wings to follow in the air!
+                    const dGround = Math.max(getSupportHeight(d.pos.x, d.pos.y, d.pos.z), WATER_LEVEL - 0.08);
+                    if (targetPt.y > dGround + 1.4 || player.flying) {
+                        isDucklingFlying = true;
+                        const desiredY = Math.max(dGround + 0.5, targetPt.y - 0.2);
+                        d.pos.y += (desiredY - d.pos.y) * Math.min(1, dt * 5.5);
+                        d.velY = 0;
+                    }
+                } else {
+                    d.wanderTimer -= dt;
+                    if (d.wanderTimer <= 0) {
+                        d.wanderTimer = 2 + Math.random() * 3.5;
+                        d.wanderAngle += (Math.random() - 0.5) * 2.4;
+                    }
+                    d.yaw += shortestAngleDiff(d.yaw, d.wanderAngle) * Math.min(1, dt * 4);
+                    dSpeed = 1.4;
+                    const nextX = d.pos.x + Math.sin(d.yaw) * dSpeed * dt;
+                    const nextZ = d.pos.z + Math.cos(d.yaw) * dSpeed * dt;
+                    if (Math.hypot(nextX, nextZ) < ISLAND_RADIUS - 6) {
+                        d.pos.x = nextX;
+                        d.pos.z = nextZ;
+                    } else {
+                        d.wanderAngle += Math.PI;
+                    }
+                }
+
+                if (!isDucklingFlying) {
+                    d.velY -= 20 * dt;
+                    d.pos.y += d.velY * dt;
+                    const dGround = Math.max(getSupportHeight(d.pos.x, d.pos.y, d.pos.z), WATER_LEVEL - 0.08);
+                    if (d.pos.y <= dGround) {
+                        d.pos.y = dGround;
+                        d.velY = 0;
+                    }
+                    d.rig.leftWing.rotation.z = -0.05;
+                    d.rig.rightWing.rotation.z = 0.05;
+                } else {
+                    const flap = Math.sin(elapsedTotal * 18 + followerSlot) * 0.6 + 0.3;
+                    d.rig.leftWing.rotation.z = -flap;
+                    d.rig.rightWing.rotation.z = flap;
+                }
+
+                d.rig.root.position.copy(d.pos);
+                d.rig.root.rotation.y = d.yaw;
+
+                if (dSpeed > 0.2) {
+                    d.walkPhase += dt * dSpeed * 2.8;
+                }
+                d.rig.bodyPivot.rotation.z = Math.sin(d.walkPhase) * 0.14;
+                d.rig.leftFoot.rotation.x = Math.sin(d.walkPhase) * 0.65;
+                d.rig.rightFoot.rotation.x = -Math.sin(d.walkPhase) * 0.65;
+
+                if (d.quackTimer > 0) {
+                    d.quackTimer -= dt;
+                    d.rig.lowerBillPivot.rotation.x = Math.sin((d.quackTimer / 0.35) * Math.PI) * 0.5;
+                } else {
+                    d.rig.lowerBillPivot.rotation.x = 0;
+                }
+            });
+
+            // Expanding Effect Rings
+            for (let i = effectRings.length - 1; i >= 0; i--) {
+                const r = effectRings[i];
+                r.age += dt;
+                const t = r.age / r.duration;
+                if (t >= 1) {
+                    scene.remove(r.mesh);
+                    r.mesh.geometry.dispose();
+                    r.mesh.material.dispose();
+                    effectRings.splice(i, 1);
+                } else {
+                    const s = 1 + t * r.maxScale;
+                    r.mesh.scale.set(s, 1, s);
+                    r.mesh.material.opacity = (1 - t) * 0.8;
+                }
+            }
+
+            // Smooth Third-Person Orbit Camera Follow
+            const lookTarget = new THREE.Vector3(player.pos.x, player.pos.y + 1.35, player.pos.z);
+
+            const camOffsetX = Math.sin(camState.yaw) * Math.cos(camState.pitch) * camState.distance;
+            const camOffsetY = Math.sin(camState.pitch) * camState.distance;
+            const camOffsetZ = Math.cos(camState.yaw) * Math.cos(camState.pitch) * camState.distance;
+
+            const desiredCamPos = new THREE.Vector3(
+                lookTarget.x + camOffsetX,
+                lookTarget.y + camOffsetY,
+                lookTarget.z + camOffsetZ
+            );
+
+            // Prevent camera from clipping below terrain or ocean
+            const camGroundH = Math.max(getMainIslandHeight(desiredCamPos.x, desiredCamPos.z), WATER_LEVEL) + 0.85;
+            if (desiredCamPos.y < camGroundH) {
+                desiredCamPos.y = camGroundH;
+            }
+
+            camera.position.lerp(desiredCamPos, Math.min(1, dt * 11));
+            camera.lookAt(lookTarget);
+
+            // Update 3D Mouse Reticle & Predictive Trajectory Arc
+            if (gameStarted) {
+                updateAimPoint();
+                const startArc = new THREE.Vector3(
+                    player.pos.x - Math.sin(player.yaw) * 0.45,
+                    player.pos.y + 0.65,
+                    player.pos.z - Math.cos(player.yaw) * 0.45
+                );
+                const arcVel = computeBallisticVelocity(startArc, aimTargetPoint, 34 * rogueStats.projSpeedMult);
+                const totalT = Math.max(0.16, Math.min(1.35, startArc.distanceTo(aimTargetPoint) / (34 * rogueStats.projSpeedMult)));
+                for (let i = 0; i < ARC_DOT_COUNT; i++) {
+                    const frac = (i + 1) / (ARC_DOT_COUNT + 1);
+                    const t = totalT * frac;
+                    arcDots[i].position.set(
+                        startArc.x + arcVel.x * t,
+                        startArc.y + arcVel.y * t - 0.5 * 24.0 * t * t,
+                        startArc.z + arcVel.z * t
+                    );
+                    arcDots[i].visible = true;
+                }
+            } else {
+                arcDots.forEach(d => { d.visible = false; });
+            }
+
+            // ======================================
+            // E. BIRD POOP PROJECTILES & SPLAT PHYSICS
+            // ======================================
+            for (let i = poopProjectiles.length - 1; i >= 0; i--) {
+                const p = poopProjectiles[i];
+                p.age += dt;
+                p.vel.y -= 24.0 * dt;
+                p.pos.addScaledVector(p.vel, dt);
+                p.mesh.position.copy(p.pos);
+
+                let hitSurface = false;
+                let hitY = p.pos.y;
+
+                // Check direct enemy hit
+                for (let eIdx = enemies.length - 1; eIdx >= 0; eIdx--) {
+                    const en = enemies[eIdx];
+                    if (p.pos.distanceTo(en.pos) < en.radius + 0.42 * p.scale) {
+                        hitSurface = true;
+                        hitY = en.pos.y;
+                        break;
+                    }
+                }
+
+                // Check terrain / sky island / ocean hit
+                const surfH = Math.max(getSupportHeight(p.pos.x, p.pos.y + 0.6, p.pos.z), WATER_LEVEL);
+                if (!hitSurface && p.pos.y <= surfH) {
+                    hitSurface = true;
+                    hitY = surfH;
+                }
+
+                if (hitSurface || p.age > 3.5) {
+                    if (hitSurface) {
+                        audio.playSplat(p.scale > 1.2);
+                        spawnRing(p.pos.x, hitY, p.pos.z, rogueStats.acidSplash ? 0xbef264 : 0xffffff, p.splashRadius * 1.4, 0.38);
+
+                        if (hitY > WATER_LEVEL + 0.05) {
+                            spawnPoopSplatDecal(p.pos.x, hitY, p.pos.z, p.scale);
+                        }
+
+                        // Splash damage & knockback to enemies
+                        for (let eIdx = enemies.length - 1; eIdx >= 0; eIdx--) {
+                            const en = enemies[eIdx];
+                            const dist = p.pos.distanceTo(en.pos);
+                            if (dist <= p.splashRadius + en.radius) {
+                                const falloff = dist < en.radius + 0.5 ? 1.0 : 0.65;
+                                en.hp -= p.damage * falloff;
+
+                                const kb = new THREE.Vector3().subVectors(en.pos, p.pos);
+                                kb.y = 0;
+                                if (kb.lengthSq() > 0.001) kb.normalize();
+                                const kbForce = (rogueStats.acidSplash ? 14 : 8) * (en.type === 'boss' ? 0.25 : 1.0);
+                                en.vel.x += kb.x * kbForce;
+                                en.vel.z += kb.z * kbForce;
+
+                                if (en.type === 'boss') updateBossHUD();
+
+                                if (en.hp <= 0) {
+                                    rogueScore += en.score;
+                                    spawnRing(en.pos.x, Math.max(en.pos.y, WATER_LEVEL), en.pos.z, 0xfbbf24, 5.5, 0.55);
+                                    if (en.type === 'boss') {
+                                        activeBoss = null;
+                                        document.getElementById('boss-hud').classList.add('hidden');
+                                        showToast('👑 MEGA SEAGULL DEFEATED! +1200 PTS!');
+                                    }
+                                    scene.remove(en.mesh);
+                                    enemies.splice(eIdx, 1);
+                                    updateWaveHUD();
+                                }
+                            }
+                        }
+
+                        // Knockback beach balls & crates too!
+                        beachBalls.forEach((ball) => {
+                            const d = p.pos.distanceTo(ball.pos);
+                            if (d < p.splashRadius + ball.radius) {
+                                const dir = new THREE.Vector3().subVectors(ball.pos, p.pos).normalize();
+                                ball.vel.addScaledVector(dir, 12);
+                                ball.vel.y = 5.5;
+                            }
+                        });
+                        physicsCrates.forEach((cr) => {
+                            const d = p.pos.distanceTo(cr.pos);
+                            if (d < p.splashRadius + 1.0) {
+                                const dir = new THREE.Vector3().subVectors(cr.pos, p.pos).normalize();
+                                cr.vel.addScaledVector(dir, 10);
+                                cr.vel.y = 5.0;
+                                cr.angVel.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+                            }
+                        });
+                    }
+
+                    scene.remove(p.mesh);
+                    poopProjectiles.splice(i, 1);
+                }
+            }
+
+            // Fade old poop splat decals
+            for (let i = poopDecals.length - 1; i >= 0; i--) {
+                poopDecals[i].age += dt;
+                if (poopDecals[i].age > 22) {
+                    scene.remove(poopDecals[i].mesh);
+                    poopDecals.splice(i, 1);
+                }
+            }
+
+            // ======================================
+            // F. ROGUELIKE WAVES SPAWNER & ENEMY AI
+            // ======================================
+            if (wavesModeActive && gameStarted && player.hp > 0) {
+                if (waveSpawnQueue.length > 0) {
+                    waveSpawnTimer -= dt;
+                    if (waveSpawnTimer <= 0) {
+                        const nextType = waveSpawnQueue.shift();
+                        spawnSingleEnemy(nextType);
+                        waveSpawnTimer = Math.max(0.45, 1.35 - currentWave * 0.08);
+                        updateWaveHUD();
+                    }
+                } else if (enemies.length === 0 && !upgradeDraftOpen) {
+                    openUpgradeDraft();
+                }
+
+                for (let i = 0; i < enemies.length; i++) {
+                    const en = enemies[i];
+                    en.phase += dt * 8;
+                    const toPlayer = new THREE.Vector3().subVectors(player.pos, en.pos);
+                    const flatDist = Math.hypot(toPlayer.x, toPlayer.z);
+                    const targetYaw = Math.atan2(toPlayer.x, toPlayer.z);
+                    en.mesh.rotation.y = targetYaw;
+
+                    if (en.isAir) {
+                        const desiredAlt = Math.max(player.pos.y + 0.8, getMainIslandHeight(en.pos.x, en.pos.z) + 1.8);
+                        const dir3D = new THREE.Vector3(toPlayer.x, desiredAlt - en.pos.y, toPlayer.z).normalize();
+                        en.pos.addScaledVector(dir3D, en.speed * dt);
+                        en.pos.addScaledVector(en.vel, dt);
+                        en.vel.multiplyScalar(Math.pow(0.05, dt));
+                        if (en.mesh.userData.wings) {
+                            const flap = Math.sin(en.phase * 1.4) * 0.45;
+                            en.mesh.userData.wings[0].rotation.z = flap;
+                            en.mesh.userData.wings[1].rotation.z = -flap;
+                        }
+                    } else {
+                        if (flatDist > 0.1) {
+                            en.pos.x += (toPlayer.x / flatDist) * en.speed * dt;
+                            en.pos.z += (toPlayer.z / flatDist) * en.speed * dt;
+                        }
+                        en.pos.addScaledVector(en.vel, dt);
+                        en.vel.multiplyScalar(Math.pow(0.04, dt));
+                        const eGround = Math.max(getMainIslandHeight(en.pos.x, en.pos.z), WATER_LEVEL);
+                        en.pos.y = eGround + Math.abs(Math.sin(en.phase)) * 0.14;
+                    }
+
+                    en.mesh.position.copy(en.pos);
+
+                    // Contact damage check against player duck
+                    if (en.pos.distanceTo(player.pos) < en.radius + 0.65) {
+                        const knockDir = new THREE.Vector3().subVectors(player.pos, en.pos).normalize();
+                        damagePlayer(en.damage, knockDir);
+                    }
+                }
+            }
+
+            if (gameStarted) {
+                renderMinimap();
+            }
+        }
+
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.05, (now - lastTime) / 1000);
+            lastTime = now;
+
+            // Gentle attract-screen camera rotation before game starts
+            if (!gameStarted) {
+                camState.yaw += dt * 0.25;
+            }
+
+            update(dt);
+            renderer.render(scene, camera);
+        }
+
+        // Responsive Resize Handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = function () {
+            lastTime = performance.now();
+            requestAnimationFrame(animate);
+        };
+    })();
+    </script>
+</body>
+</html>
